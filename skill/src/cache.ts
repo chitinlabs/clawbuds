@@ -36,12 +36,15 @@ export function readCache(opts?: { limit?: number; afterSeq?: number }): WsEvent
 }
 
 export function getLastCachedSeq(): number {
-  return loadState().lastSeq
+  const state = loadState()
+  // For backward compatibility, check for global _lastSeq first
+  return (state as Record<string, unknown>)._lastSeq as number || 0
 }
 
 export function updateLastSeq(seq: number): void {
   const state = loadState()
-  if (seq > state.lastSeq) {
-    saveState({ ...state, lastSeq: seq })
+  const currentSeq = getLastCachedSeq()
+  if (seq > currentSeq) {
+    saveState({ ...state, _lastSeq: seq })
   }
 }

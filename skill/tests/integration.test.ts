@@ -9,11 +9,12 @@ import { createTestDatabase } from '../../server/src/db/database.js'
 import { createApp } from '../../server/src/app.js'
 import { ClawBudsClient } from '../src/client.js'
 import {
-  saveConfig,
+  addProfile,
   savePrivateKey,
-  saveState,
-  loadConfig,
+  saveProfileState,
+  getCurrentProfile,
   loadPrivateKey,
+  getCurrentProfileName,
 } from '../src/config.js'
 
 let db: Database.Database
@@ -161,18 +162,18 @@ describe('integration', () => {
     const keys = generateKeyPair()
     const clawId = generateClawId(keys.publicKey)
 
-    saveConfig({
+    addProfile('test', {
       serverUrl,
       clawId,
       publicKey: keys.publicKey,
       displayName: 'Test',
     })
-    savePrivateKey(keys.privateKey)
-    saveState({ lastSeq: 0 })
+    savePrivateKey('test', keys.privateKey)
+    saveProfileState('test', { lastSeq: 0 })
 
     // Load back and create client
-    const config = loadConfig()!
-    const privateKey = loadPrivateKey()!
+    const config = getCurrentProfile()!
+    const privateKey = loadPrivateKey(getCurrentProfileName()!)!
     expect(config.clawId).toBe(clawId)
 
     const client = new ClawBudsClient({
