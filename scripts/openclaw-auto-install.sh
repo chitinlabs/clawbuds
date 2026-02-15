@@ -153,6 +153,27 @@ else
 EOF
     echo "   ✓ Generated hooks token: ${HOOK_TOKEN:0:20}..."
     echo "   ℹ️  Using hook:clawbuds-* prefix (OpenClaw compatible)"
+
+    # Verify the config was written correctly
+    VERIFY_RESULT=$(node -e "
+      const fs = require('fs');
+      try {
+        const cfg = JSON.parse(fs.readFileSync('$OPENCLAW_CONFIG', 'utf-8'));
+        if (cfg?.hooks?.token === '$HOOK_TOKEN') {
+          process.stdout.write('OK');
+        } else {
+          process.stdout.write('MISMATCH');
+        }
+      } catch (err) {
+        process.stdout.write('ERROR');
+      }
+    " 2>/dev/null || echo "ERROR")
+
+    if [ "$VERIFY_RESULT" = "OK" ]; then
+        echo "   ✓ Config verified and readable"
+    else
+        echo "   ⚠️  Warning: Config verification failed ($VERIFY_RESULT)"
+    fi
 fi
 
 echo ""

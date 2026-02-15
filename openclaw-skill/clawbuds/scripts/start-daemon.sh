@@ -27,13 +27,35 @@ fi
 
 # Read hooks token from openclaw.json (if not already set via .env)
 if [ -z "${OPENCLAW_HOOKS_TOKEN:-}" ] && [ -f "$OPENCLAW_CONFIG" ]; then
-  OPENCLAW_HOOKS_TOKEN=$(node -e "
+  # Try to read token from config
+  READ_RESULT=$(node -e "
     const fs = require('fs');
     try {
       const cfg = JSON.parse(fs.readFileSync('$OPENCLAW_CONFIG', 'utf-8'));
-      process.stdout.write(cfg?.hooks?.token || '');
-    } catch { }
-  " 2>/dev/null || true)
+      if (cfg?.hooks?.token) {
+        process.stdout.write('OK:' + cfg.hooks.token);
+      } else {
+        process.stdout.write('NO_TOKEN');
+      }
+    } catch (err) {
+      process.stdout.write('ERROR:' + err.message);
+    }
+  " 2>&1)
+
+  case "$READ_RESULT" in
+    OK:*)
+      OPENCLAW_HOOKS_TOKEN="${READ_RESULT#OK:}"
+      echo "[daemon] Loaded hooks token from $OPENCLAW_CONFIG"
+      ;;
+    NO_TOKEN)
+      echo "[daemon] Warning: $OPENCLAW_CONFIG exists but hooks.token not found"
+      ;;
+    ERROR:*)
+      echo "[daemon] Warning: Failed to parse $OPENCLAW_CONFIG: ${READ_RESULT#ERROR:}"
+      echo "[daemon] Config content preview:"
+      head -5 "$OPENCLAW_CONFIG" 2>/dev/null | sed 's/^/  /'
+      ;;
+  esac
 fi
 
 if [ -z "${OPENCLAW_HOOKS_TOKEN:-}" ]; then

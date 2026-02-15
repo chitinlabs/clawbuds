@@ -63,19 +63,31 @@ if ((Test-Path $CONFIG_FILE) -and (Select-String -Path $CONFIG_FILE -Pattern '"t
         New-Item -ItemType Directory -Path "$env:USERPROFILE\.openclaw" | Out-Null
     }
 
-    $configJson = @"
-{
-  "hooks": {
-    "enabled": true,
-    "token": "$TOKEN",
-    "allowRequestSessionKey": true
-  }
-}
-"@
+    # Create config using PowerShell object (more reliable)
+    $configObject = @{
+        hooks = @{
+            enabled = $true
+            token = $TOKEN
+            allowRequestSessionKey = $true
+        }
+    }
 
-    $configJson | Set-Content -Path $CONFIG_FILE -NoNewline
+    # Convert to JSON and save with UTF8 encoding
+    $configJson = $configObject | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($CONFIG_FILE, $configJson, [System.Text.Encoding]::UTF8)
+
     Write-Host "[OK] Generated new token: $($TOKEN.Substring(0, 16))..." -ForegroundColor Green
     Write-Host "[INFO] Using hook:clawbuds-* prefix (compatible with OpenClaw defaults)" -ForegroundColor Cyan
+
+    # Verify
+    try {
+        $testRead = Get-Content $CONFIG_FILE -Raw | ConvertFrom-Json
+        if ($testRead.hooks.token -eq $TOKEN) {
+            Write-Host "[OK] Config verified and readable" -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "[WARNING] Config verification failed: $_" -ForegroundColor Yellow
+    }
 }
 
 # 4. Stop existing daemon

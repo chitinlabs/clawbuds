@@ -53,6 +53,23 @@ else
 EOF
   echo "[OK] Generated new token: ${TOKEN:0:16}..."
   echo "[INFO] Using hook:clawbuds-* prefix (compatible with OpenClaw defaults)"
+
+  # Verify the config was written correctly
+  VERIFY_RESULT=$(node -e "
+    const fs = require('fs');
+    try {
+      const cfg = JSON.parse(fs.readFileSync('$CONFIG_FILE', 'utf-8'));
+      process.stdout.write(cfg?.hooks?.token === '$TOKEN' ? 'OK' : 'FAIL');
+    } catch (err) {
+      process.stdout.write('ERROR');
+    }
+  " 2>/dev/null || echo "ERROR")
+
+  if [ "$VERIFY_RESULT" = "OK" ]; then
+      echo "[OK] Config verified and readable"
+  else
+      echo "[WARNING] Config verification failed ($VERIFY_RESULT)"
+  fi
 fi
 
 # 4. Stop existing daemon

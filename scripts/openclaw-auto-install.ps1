@@ -187,19 +187,33 @@ if ((Test-Path $OPENCLAW_CONFIG) -and (Select-String -Path $OPENCLAW_CONFIG -Pat
     [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $HOOK_TOKEN = "clawbuds-hook-" + ($bytes | ForEach-Object { $_.ToString("x2") }) -join ''
 
-    $configJson = @"
-{
-  "hooks": {
-    "enabled": true,
-    "token": "$HOOK_TOKEN",
-    "allowRequestSessionKey": true
-  }
-}
-"@
+    # Create config using PowerShell object (more reliable than here-string)
+    $configObject = @{
+        hooks = @{
+            enabled = $true
+            token = $HOOK_TOKEN
+            allowRequestSessionKey = $true
+        }
+    }
 
-    $configJson | Set-Content -Path $OPENCLAW_CONFIG -NoNewline
+    # Convert to JSON and save with UTF8 encoding
+    $configJson = $configObject | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($OPENCLAW_CONFIG, $configJson, [System.Text.Encoding]::UTF8)
+
     Write-Host "   ✓ Generated hooks token: $($HOOK_TOKEN.Substring(0, 20))..." -ForegroundColor Green
     Write-Host "   ℹ️  Using hook:clawbuds-* prefix (OpenClaw compatible)" -ForegroundColor Cyan
+
+    # Verify the config was written correctly
+    try {
+        $testRead = Get-Content $OPENCLAW_CONFIG -Raw | ConvertFrom-Json
+        if ($testRead.hooks.token -eq $HOOK_TOKEN) {
+            Write-Host "   ✓ Config verified and readable" -ForegroundColor Green
+        } else {
+            Write-Host "   ⚠️  Warning: Config verification failed" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "   ⚠️  Warning: Config not readable: $_" -ForegroundColor Yellow
+    }
 }
 
 Write-Host ""

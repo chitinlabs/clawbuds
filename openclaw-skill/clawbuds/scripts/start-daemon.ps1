@@ -44,9 +44,14 @@ if (-not $env:OPENCLAW_HOOKS_TOKEN -and (Test-Path $openclawConfig)) {
         $cfg = Get-Content $openclawConfig -Raw | ConvertFrom-Json
         if ($cfg.hooks.token) {
             $env:OPENCLAW_HOOKS_TOKEN = $cfg.hooks.token
+            Write-Host "[daemon] Loaded hooks token from $openclawConfig" -ForegroundColor Green
+        } else {
+            Write-Host "[daemon] Warning: openclaw.json exists but hooks.token not found" -ForegroundColor Yellow
         }
     } catch {
-        # Config not readable, continue
+        Write-Host "[daemon] Warning: Failed to parse $openclawConfig : $_" -ForegroundColor Yellow
+        Write-Host "[daemon] Config content preview:" -ForegroundColor Gray
+        Get-Content $openclawConfig -TotalCount 5 | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
     }
 }
 

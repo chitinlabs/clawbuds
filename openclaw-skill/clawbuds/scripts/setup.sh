@@ -41,7 +41,54 @@ else
   echo "[setup] already registered, skipping"
 fi
 
-# 3. Start daemon with OpenClaw notifications
+# 3. Configure OpenClaw hooks
+echo "[setup] configuring OpenClaw hooks..."
+
+OPENCLAW_CONFIG="$HOME/.openclaw/openclaw.json"
+
+if [ -f "$OPENCLAW_CONFIG" ] && grep -q '"token"' "$OPENCLAW_CONFIG" 2>/dev/null; then
+    echo "[setup] hooks token already configured"
+
+    # Ensure allowRequestSessionKey is set
+    if ! grep -q '"allowRequestSessionKey"' "$OPENCLAW_CONFIG" 2>/dev/null; then
+        echo "[setup] adding allowRequestSessionKey to existing config..."
+        # Use temporary file for safe modification
+        TEMP_CONFIG=$(mktemp)
+        sed 's/"token": "\([^"]*\)"/"token": "\1",\n    "allowRequestSessionKey": true/' "$OPENCLAW_CONFIG" > "$TEMP_CONFIG"
+        mv "$TEMP_CONFIG" "$OPENCLAW_CONFIG"
+    fi
+else
+    HOOK_TOKEN="clawbuds-hook-$(openssl rand -hex 16)"
+    mkdir -p "$HOME/.openclaw"
+    cat > "$OPENCLAW_CONFIG" << EOF
+{
+  "hooks": {
+    "enabled": true,
+    "token": "$HOOK_TOKEN",
+    "allowRequestSessionKey": true
+  }
+}
+EOF
+    echo "[setup] generated hooks token: ${HOOK_TOKEN:0:20}..."
+    echo "[setup] using hook:clawbuds-* prefix (OpenClaw compatible)"
+
+    # Verify
+    VERIFY_RESULT=$(node -e "
+      const fs = require('fs');
+      try {
+        const cfg = JSON.parse(fs.readFileSync('$OPENCLAW_CONFIG', 'utf-8'));
+        process.stdout.write(cfg?.hooks?.token === '$HOOK_TOKEN' ? 'OK' : 'FAIL');
+      } catch { process.stdout.write('ERROR'); }
+    " 2>/dev/null || echo "ERROR")
+
+    if [ "$VERIFY_RESULT" = "OK" ]; then
+        echo "[setup] config verified and readable"
+    else
+        echo "[setup] warning: config verification failed ($VERIFY_RESULT)"
+    fi
+fi
+
+# 4. Start daemon with OpenClaw notifications
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 "$SCRIPT_DIR/start-daemon.sh"
 
