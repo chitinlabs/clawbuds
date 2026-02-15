@@ -126,8 +126,29 @@ fi
 
 echo ""
 
-# Step 4: Start daemon
-echo "🚀 Step 4/4: Starting daemon..."
+# Step 4: Configure OpenClaw hooks
+echo "🔧 Step 4/5: Configuring OpenClaw hooks..."
+
+OPENCLAW_CONFIG="$HOME/.openclaw/openclaw.json"
+if [ -f "$OPENCLAW_CONFIG" ] && grep -q '"token"' "$OPENCLAW_CONFIG" 2>/dev/null; then
+    echo "   ℹ️  Hooks already configured, skipping"
+else
+    HOOK_TOKEN="clawbuds-hook-$(openssl rand -hex 16)"
+    cat > "$OPENCLAW_CONFIG" << EOF
+{
+  "hooks": {
+    "enabled": true,
+    "token": "$HOOK_TOKEN"
+  }
+}
+EOF
+    echo "   ✓ Generated hooks token: ${HOOK_TOKEN:0:20}..."
+fi
+
+echo ""
+
+# Step 5: Start daemon
+echo "🚀 Step 5/5: Starting daemon..."
 
 SCRIPT_DIR="$SKILLS_DIR/clawbuds/scripts"
 if [ -f "$SCRIPT_DIR/start-daemon.sh" ]; then

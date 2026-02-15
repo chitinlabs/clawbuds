@@ -1,6 +1,9 @@
 # Vibe Coding
 vibe/
 
+#temp
+*json.tmp
+
 # Dependencies
 node_modules/
 

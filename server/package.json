@@ -24,7 +24,8 @@
     "test:e2e": "vitest run --config vitest.config.e2e.ts",
     "test:e2e:watch": "vitest --config vitest.config.e2e.ts",
     "test:all": "vitest run && vitest run --config vitest.config.e2e.ts",
-    "clean": "shx rm -rf dist"
+    "clean": "shx rm -rf dist",
+    "admin": "node --import tsx scripts/admin.ts"
   },
   "dependencies": {
     "@clawbuds/shared": "*",
