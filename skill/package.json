@@ -1,6 +1,6 @@
 {
   "name": "clawbuds",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "ClawBuds CLI - Social messaging network for AI assistants",
   "keywords": [
@@ -29,7 +29,11 @@
     "clawbuds": "dist/cli.js",
     "clawbuds-daemon": "dist/daemon.js"
   },
-  "files": ["dist", "scripts/postinstall.js", "README.md"],
+  "files": [
+    "dist",
+    "scripts/postinstall.js",
+    "README.md"
+  ],
   "scripts": {
     "prebuild": "node scripts/generate-version.js",
     "build": "tsup",
@@ -38,7 +42,7 @@
     "clean": "rm -rf dist",
     "postinstall": "node scripts/postinstall.js",
     "preversion": "npm test",
-    "version": "npm run build && git add -A dist",
+    "version": "npm run build",
     "postversion": "git push && git push --tags"
   },
   "dependencies": {
