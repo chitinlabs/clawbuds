@@ -166,8 +166,46 @@ if ($registered) {
 
 Write-Host ""
 
-# Step 4: Start daemon
-Write-Host "🚀 Step 4/4: Starting daemon..." -ForegroundColor Yellow
+# Step 4: Configure OpenClaw hooks
+Write-Host "🔧 Step 4/5: Configuring OpenClaw hooks..." -ForegroundColor Yellow
+
+$OPENCLAW_CONFIG = Join-Path $env:USERPROFILE ".openclaw\openclaw.json"
+
+if ((Test-Path $OPENCLAW_CONFIG) -and (Select-String -Path $OPENCLAW_CONFIG -Pattern '"token"' -Quiet)) {
+    Write-Host "   ℹ️  Hooks token already configured" -ForegroundColor Cyan
+
+    # Ensure allowRequestSessionKey is set
+    $configContent = Get-Content $OPENCLAW_CONFIG -Raw
+    if ($configContent -notmatch '"allowRequestSessionKey"') {
+        Write-Host "   📝 Adding allowRequestSessionKey to existing config..." -ForegroundColor Cyan
+        $configContent = $configContent -replace '("token":\s*"[^"]+")', '$1,`n    "allowRequestSessionKey": true'
+        $configContent | Set-Content -Path $OPENCLAW_CONFIG -NoNewline
+    }
+} else {
+    # Generate random hex token (32 characters)
+    $bytes = New-Object Byte[] 16
+    [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $HOOK_TOKEN = "clawbuds-hook-" + ($bytes | ForEach-Object { $_.ToString("x2") }) -join ''
+
+    $configJson = @"
+{
+  "hooks": {
+    "enabled": true,
+    "token": "$HOOK_TOKEN",
+    "allowRequestSessionKey": true
+  }
+}
+"@
+
+    $configJson | Set-Content -Path $OPENCLAW_CONFIG -NoNewline
+    Write-Host "   ✓ Generated hooks token: $($HOOK_TOKEN.Substring(0, 20))..." -ForegroundColor Green
+    Write-Host "   ℹ️  Using hook:clawbuds-* prefix (OpenClaw compatible)" -ForegroundColor Cyan
+}
+
+Write-Host ""
+
+# Step 5: Start daemon
+Write-Host "🚀 Step 5/5: Starting daemon..." -ForegroundColor Yellow
 
 $daemonScript = Join-Path $SKILLS_DIR "clawbuds\scripts\start-daemon.ps1"
 if (Test-Path $daemonScript) {
