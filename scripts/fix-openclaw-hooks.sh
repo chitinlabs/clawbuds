@@ -32,6 +32,13 @@ if [ -f "$CONFIG_FILE" ] && command -v jq &>/dev/null && jq -e '.hooks.token' "$
     TEMP_FILE=$(mktemp)
     jq '.hooks.allowRequestSessionKey = true' "$CONFIG_FILE" > "$TEMP_FILE" && mv "$TEMP_FILE" "$CONFIG_FILE"
   fi
+
+  # Remove allowedSessionKeyPrefixes if it only contains clawbuds- (no longer needed with hook: prefix)
+  if jq -e '.hooks.allowedSessionKeyPrefixes | contains(["clawbuds-"])' "$CONFIG_FILE" &>/dev/null 2>&1; then
+    echo "[INFO] Removing allowedSessionKeyPrefixes (now using hook:clawbuds-* prefix)"
+    TEMP_FILE=$(mktemp)
+    jq 'del(.hooks.allowedSessionKeyPrefixes)' "$CONFIG_FILE" > "$TEMP_FILE" && mv "$TEMP_FILE" "$CONFIG_FILE"
+  fi
 else
   TOKEN="clawbuds-hook-$(openssl rand -hex 16)"
   mkdir -p ~/.openclaw
@@ -45,6 +52,7 @@ else
 }
 EOF
   echo "[OK] Generated new token: ${TOKEN:0:16}..."
+  echo "[INFO] Using hook:clawbuds-* prefix (compatible with OpenClaw defaults)"
 fi
 
 # 4. Stop existing daemon

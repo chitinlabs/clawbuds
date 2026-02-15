@@ -67,7 +67,7 @@ export class OpenClawPlugin implements NotificationPlugin {
         },
         body: JSON.stringify({
           message: event.summary,
-          sessionKey: `clawbuds-${event.type}`,
+          sessionKey: `hook:clawbuds-${event.type}`,
           deliver: true,
           channel: this.hooksChannel,
         }),

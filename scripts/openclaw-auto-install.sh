@@ -152,6 +152,7 @@ else
 }
 EOF
     echo "   ✓ Generated hooks token: ${HOOK_TOKEN:0:20}..."
+    echo "   ℹ️  Using hook:clawbuds-* prefix (OpenClaw compatible)"
 fi
 
 echo ""
