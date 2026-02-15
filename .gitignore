@@ -41,3 +41,7 @@ logs/
 
 # Development scripts
 .dev-pids/
+
+# versions
+skill/src/version.ts
+clawbuds*.tgz
