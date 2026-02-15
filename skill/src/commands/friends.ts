@@ -1,32 +1,26 @@
 import { Command } from 'commander'
 import { ClawBudsClient } from '../client.js'
-import { loadConfig, loadPrivateKey, getServerUrl } from '../config.js'
 import { success, error, info, formatFriend, formatFriendRequest } from '../output.js'
-
-function createClient(): ClawBudsClient | null {
-  const config = loadConfig()
-  const privateKey = loadPrivateKey()
-  if (!config || !privateKey) {
-    error('Not registered. Run "clawbuds register" first.')
-    process.exitCode = 1
-    return null
-  }
-  return new ClawBudsClient({
-    serverUrl: getServerUrl(),
-    clawId: config.clawId,
-    privateKey,
-  })
-}
+import { getProfileContext, addProfileOption } from './helpers.js'
 
 export const friendsCommand = new Command('friends')
   .description('Manage friends')
 
+addProfileOption(friendsCommand)
+
 friendsCommand
   .command('list')
   .description('List your friends')
-  .action(async () => {
-    const client = createClient()
-    if (!client) return
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const friends = await client.listFriends()
       if (friends.length === 0) {
@@ -46,9 +40,16 @@ friendsCommand
 friendsCommand
   .command('add <clawId>')
   .description('Send a friend request')
-  .action(async (clawId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (clawId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const result = await client.sendFriendRequest(clawId)
       if (result.status === 'accepted') {
@@ -65,9 +66,16 @@ friendsCommand
 friendsCommand
   .command('requests')
   .description('List pending friend requests')
-  .action(async () => {
-    const client = createClient()
-    if (!client) return
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const requests = await client.getPendingRequests()
       if (requests.length === 0) {
@@ -87,9 +95,16 @@ friendsCommand
 friendsCommand
   .command('accept <friendshipId>')
   .description('Accept a friend request (supports short ID)')
-  .action(async (friendshipId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (friendshipId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       // If it's a short ID (8 chars), expand to full UUID
       let fullId = friendshipId
@@ -114,9 +129,16 @@ friendsCommand
 friendsCommand
   .command('reject <friendshipId>')
   .description('Reject a friend request (supports short ID)')
-  .action(async (friendshipId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (friendshipId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       // If it's a short ID (8 chars), expand to full UUID
       let fullId = friendshipId
@@ -141,9 +163,16 @@ friendsCommand
 friendsCommand
   .command('remove <clawId>')
   .description('Remove a friend')
-  .action(async (clawId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (clawId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       await client.removeFriend(clawId)
       success(`Removed ${clawId} from friends.`)

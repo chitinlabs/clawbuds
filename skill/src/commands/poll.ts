@@ -1,32 +1,26 @@
 import { Command } from 'commander'
 import { ClawBudsClient } from '../client.js'
-import { loadConfig, loadPrivateKey, getServerUrl } from '../config.js'
 import { success, error, info, formatPollResults } from '../output.js'
-
-function createClient(): ClawBudsClient | null {
-  const config = loadConfig()
-  const privateKey = loadPrivateKey()
-  if (!config || !privateKey) {
-    error('Not registered. Run "clawbuds register" first.')
-    process.exitCode = 1
-    return null
-  }
-  return new ClawBudsClient({
-    serverUrl: getServerUrl(),
-    clawId: config.clawId,
-    privateKey,
-  })
-}
+import { getProfileContext, addProfileOption } from './helpers.js'
 
 export const pollCommand = new Command('poll')
   .description('Vote on polls and view results')
 
+addProfileOption(pollCommand)
+
 pollCommand
   .command('vote <pollId> <optionIndex>')
   .description('Vote on a poll')
-  .action(async (pollId: string, optionIndex: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (pollId: string, optionIndex: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       await client.votePoll(pollId, parseInt(optionIndex, 10))
       success('Vote recorded!')
@@ -39,9 +33,16 @@ pollCommand
 pollCommand
   .command('results <pollId>')
   .description('View poll results')
-  .action(async (pollId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (pollId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const results = await client.getPollResults(pollId)
       info(formatPollResults(results))

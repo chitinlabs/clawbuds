@@ -1,9 +1,15 @@
 #!/usr/bin/env node
 
-import { loadConfig, loadPrivateKey, loadState, saveState } from './config.js'
+import {
+  listProfiles,
+  loadPrivateKey,
+  getProfileState,
+  saveProfileState,
+  loadState,
+  saveState,
+} from './config.js'
 import { appendToCache, updateLastSeq } from './cache.js'
 import { WsClient } from './ws-client.js'
-import { getServerUrl } from './config.js'
 import type { WsEvent, InboxEntry } from './types.js'
 import {
   createPlugin,
@@ -17,24 +23,45 @@ import {
 } from './notification-plugin.js'
 
 const POLL_DIGEST_MS = parseInt(process.env.CLAWBUDS_POLL_DIGEST_MS || '300000', 10) // default 5min
-const PLUGIN_TYPE = process.env.CLAWBUDS_NOTIFICATION_PLUGIN || (process.env.OPENCLAW_HOOKS_TOKEN ? 'openclaw' : 'console')
+const PLUGIN_TYPE =
+  process.env.CLAWBUDS_NOTIFICATION_PLUGIN || (process.env.OPENCLAW_HOOKS_TOKEN ? 'openclaw' : 'console')
 
 let notificationPlugin: NotificationPlugin | null = null
 
+// -- Profile connection tracking --
+
+interface ProfileConnection {
+  profileName: string
+  clawId: string
+  ws: WsClient
+  lastSeq: number
+}
+
+const profileConnections = new Map<string, ProfileConnection>()
+
 // -- Notification wrapper --
 
-async function notify(event: NotificationEvent): Promise<void> {
+async function notify(event: NotificationEvent, profileName: string): Promise<void> {
   if (notificationPlugin) {
-    await notificationPlugin.notify(event)
+    // Add profile context to notification
+    const eventWithProfile = {
+      ...event,
+      data: {
+        ...event.data,
+        _profile: profileName,
+      },
+    }
+    await notificationPlugin.notify(eventWithProfile)
   }
 }
 
-// -- Poll vote digest --
+// -- Poll vote digest (global across all profiles) --
 
 interface PollVote {
   pollId: string
   clawId: string
   optionIndex: number
+  profileName: string
 }
 
 const pollVoteBuffer: PollVote[] = []
@@ -42,54 +69,200 @@ let pollDigestTimer: ReturnType<typeof setInterval> | null = null
 
 function bufferPollVote(data: PollVote): void {
   pollVoteBuffer.push(data)
-  console.log(`[daemon] poll vote buffered (${pollVoteBuffer.length} pending, digest in ${Math.round(POLL_DIGEST_MS / 1000)}s)`) // eslint-disable-line no-console
+  console.log(
+    `[daemon:${data.profileName}] poll vote buffered (${pollVoteBuffer.length} pending, digest in ${Math.round(POLL_DIGEST_MS / 1000)}s)`,
+  ) // eslint-disable-line no-console
 }
 
 async function flushPollDigest(): Promise<void> {
   if (pollVoteBuffer.length === 0) return
 
-  // Group by pollId
-  const byPoll = new Map<string, PollVote[]>()
+  // Group by profile and pollId
+  const byProfile = new Map<string, Map<string, PollVote[]>>()
   for (const v of pollVoteBuffer) {
-    const list = byPoll.get(v.pollId) || []
-    list.push(v)
-    byPoll.set(v.pollId, list)
+    let profileMap = byProfile.get(v.profileName)
+    if (!profileMap) {
+      profileMap = new Map()
+      byProfile.set(v.profileName, profileMap)
+    }
+    const pollList = profileMap.get(v.pollId) || []
+    pollList.push(v)
+    profileMap.set(v.pollId, pollList)
   }
 
-  const lines: string[] = []
-  for (const [pollId, votes] of byPoll) {
-    const summary = votes.map((v) => `${v.clawId} voted option ${v.optionIndex}`).join(', ')
-    lines.push(`Poll ${pollId}: ${votes.length} new vote(s) — ${summary}`)
+  // Send notification for each profile
+  for (const [profileName, pollMap] of byProfile) {
+    const lines: string[] = []
+    let totalVotes = 0
+
+    for (const [pollId, votes] of pollMap) {
+      totalVotes += votes.length
+      const summary = votes.map((v) => `${v.clawId} voted option ${v.optionIndex}`).join(', ')
+      lines.push(`Poll ${pollId}: ${votes.length} new vote(s) — ${summary}`)
+    }
+
+    const message = `ClawBuds poll activity [${profileName}] (${totalVotes} vote(s) in the last ${Math.round(POLL_DIGEST_MS / 60000)} min):\n\n${lines.join('\n')}\n\nRun "clawbuds poll results <pollId> --profile ${profileName}" to see full results.`
+
+    await notify(
+      {
+        type: 'poll.voted',
+        data: { count: totalVotes, polls: pollMap.size },
+        summary: message,
+      },
+      profileName,
+    )
+
+    console.log(`[daemon:${profileName}] poll digest sent: ${totalVotes} vote(s) across ${pollMap.size} poll(s)`) // eslint-disable-line no-console
   }
 
-  const count = pollVoteBuffer.length
   pollVoteBuffer.length = 0
+}
 
-  const message = `ClawBuds poll activity (${count} vote(s) in the last ${Math.round(POLL_DIGEST_MS / 60000)} min):\n\n${lines.join('\n')}\n\nRun "clawbuds poll results <pollId>" to see full results.`
+// -- Profile connection management --
 
-  await notify({
-    type: 'poll.voted',
-    data: { count, polls: byPoll.size },
-    summary: message,
+function connectProfile(
+  profileName: string,
+  serverUrl: string,
+  clawId: string,
+  privateKey: string,
+  lastSeq: number,
+): void {
+  console.log(`[daemon:${profileName}] connecting to ${serverUrl} (lastSeq: ${lastSeq})`) // eslint-disable-line no-console
+
+  const ws = new WsClient({
+    serverUrl,
+    clawId,
+    privateKey,
+    lastSeq,
+    onEvent: async (event: WsEvent) => {
+      console.log(`[daemon:${profileName}] event: ${event.type}`, JSON.stringify(event.data)) // eslint-disable-line no-console
+      appendToCache(event)
+
+      // Update connection's lastSeq
+      const conn = profileConnections.get(profileName)
+      if (conn) {
+        conn.lastSeq = event.seq
+      }
+
+      if (!notificationPlugin || notificationPlugin.name === 'console') {
+        // For console plugin, just log to console (already done above)
+      } else {
+        // Notify via plugin
+        switch (event.type) {
+          case 'message.new':
+            updateLastSeq(event.seq)
+            await notify(
+              {
+                type: 'message.new',
+                data: event.data,
+                summary: formatMessageNotification(event.data as InboxEntry),
+              },
+              profileName,
+            )
+            break
+          case 'poll.voted':
+            bufferPollVote({
+              ...(event.data as { pollId: string; clawId: string; optionIndex: number }),
+              profileName,
+            })
+            break
+          case 'friend.request':
+            await notify(
+              {
+                type: 'friend.request',
+                data: event.data,
+                summary: formatFriendRequestNotification(event.data as { requesterId: string }),
+              },
+              profileName,
+            )
+            break
+          case 'friend.accepted':
+            await notify(
+              {
+                type: 'friend.accepted',
+                data: event.data,
+                summary: formatFriendAcceptedNotification(event.data as { accepterId: string }),
+              },
+              profileName,
+            )
+            break
+          case 'group.invited':
+            await notify(
+              {
+                type: 'group.invited',
+                data: event.data,
+                summary: formatGroupInvitedNotification(event.data as { groupName: string; inviterId: string }),
+              },
+              profileName,
+            )
+            break
+        }
+      }
+
+      // Log human-readable summaries for new event types
+      if (event.type === 'group.invited') {
+        console.log(`[daemon:${profileName}] Invited to group "${event.data.groupName}" by ${event.data.inviterId}`) // eslint-disable-line no-console
+      } else if (event.type === 'group.joined') {
+        console.log(`[daemon:${profileName}] ${event.data.clawId} joined group ${event.data.groupId}`) // eslint-disable-line no-console
+      } else if (event.type === 'group.left') {
+        console.log(`[daemon:${profileName}] ${event.data.clawId} left group ${event.data.groupId}`) // eslint-disable-line no-console
+      } else if (event.type === 'group.removed') {
+        console.log(`[daemon:${profileName}] Removed from group ${event.data.groupId} by ${event.data.removedBy}`) // eslint-disable-line no-console
+      } else if (event.type === 'e2ee.key_updated') {
+        console.log(`[daemon:${profileName}] E2EE key updated for ${event.data.clawId} (${event.data.fingerprint})`) // eslint-disable-line no-console
+      } else if (event.type === 'group.key_rotation_needed') {
+        console.log(`[daemon:${profileName}] Key rotation needed for group ${event.data.groupId}: ${event.data.reason}`) // eslint-disable-line no-console
+      }
+    },
+    onConnect: () => {
+      console.log(`[daemon:${profileName}] connected`) // eslint-disable-line no-console
+    },
+    onDisconnect: () => {
+      console.log(`[daemon:${profileName}] disconnected`) // eslint-disable-line no-console
+    },
   })
 
-  console.log(`[daemon] poll digest sent: ${count} vote(s) across ${byPoll.size} poll(s)`) // eslint-disable-line no-console
+  ws.connect()
+
+  profileConnections.set(profileName, {
+    profileName,
+    clawId,
+    ws,
+    lastSeq,
+  })
+}
+
+function disconnectProfile(profileName: string): void {
+  const conn = profileConnections.get(profileName)
+  if (conn) {
+    console.log(`[daemon:${profileName}] disconnecting...`) // eslint-disable-line no-console
+    conn.ws.close()
+
+    // Save final state
+    saveProfileState(profileName, {
+      lastSeq: conn.lastSeq,
+    })
+
+    profileConnections.delete(profileName)
+  }
 }
 
 // -- Main --
 
 async function main(): Promise<void> {
-  const config = loadConfig()
-  const privateKey = loadPrivateKey()
-  if (!config || !privateKey) {
-    console.error('Not registered. Run "clawbuds register" first.') // eslint-disable-line no-console
+  const profiles = listProfiles()
+
+  if (profiles.length === 0) {
+    console.error('No profiles registered. Run "clawbuds register" first.') // eslint-disable-line no-console
     process.exit(1)
   }
 
-  const state = loadState()
-
-  // Write PID
-  saveState({ ...state, daemonPid: process.pid })
+  // Write global daemon PID
+  const globalState = loadState()
+  saveState({
+    ...globalState,
+    _daemonPid: process.pid,
+  })
 
   // Initialize notification plugin
   try {
@@ -114,92 +287,47 @@ async function main(): Promise<void> {
     pollDigestTimer = setInterval(() => flushPollDigest(), POLL_DIGEST_MS)
   }
 
-  console.log(`[daemon] starting (PID: ${process.pid}, lastSeq: ${state.lastSeq})`) // eslint-disable-line no-console
+  console.log(`[daemon] starting (PID: ${process.pid}, managing ${profiles.length} profile(s))`) // eslint-disable-line no-console
 
-  const ws = new WsClient({
-    serverUrl: getServerUrl(),
-    clawId: config.clawId,
-    privateKey,
-    lastSeq: state.lastSeq,
-    onEvent: async (event: WsEvent) => {
-      console.log(`[daemon] event: ${event.type}`, JSON.stringify(event.data)) // eslint-disable-line no-console
-      appendToCache(event)
+  // Connect all profiles
+  for (const { name, profile } of profiles) {
+    const privateKey = loadPrivateKey(name)
+    if (!privateKey) {
+      console.error(`[daemon:${name}] private key not found, skipping`) // eslint-disable-line no-console
+      continue
+    }
 
-      if (!notificationPlugin || notificationPlugin.name === 'console') {
-        // For console plugin, just log to console (already done above)
-      } else {
-        // Notify via plugin
-        switch (event.type) {
-          case 'message.new':
-            updateLastSeq(event.seq)
-            await notify({
-              type: 'message.new',
-              data: event.data,
-              summary: formatMessageNotification(event.data as InboxEntry),
-            })
-            break
-          case 'poll.voted':
-            bufferPollVote(event.data as PollVote)
-            break
-          case 'friend.request':
-            await notify({
-              type: 'friend.request',
-              data: event.data,
-              summary: formatFriendRequestNotification(event.data as { requesterId: string }),
-            })
-            break
-          case 'friend.accepted':
-            await notify({
-              type: 'friend.accepted',
-              data: event.data,
-              summary: formatFriendAcceptedNotification(event.data as { accepterId: string }),
-            })
-            break
-          case 'group.invited':
-            await notify({
-              type: 'group.invited',
-              data: event.data,
-              summary: formatGroupInvitedNotification(event.data as { groupName: string; inviterId: string }),
-            })
-            break
-        }
-      }
-      // Log human-readable summaries for new event types
-      if (event.type === 'group.invited') {
-        console.log(`[daemon] Invited to group "${event.data.groupName}" by ${event.data.inviterId}`) // eslint-disable-line no-console
-      } else if (event.type === 'group.joined') {
-        console.log(`[daemon] ${event.data.clawId} joined group ${event.data.groupId}`) // eslint-disable-line no-console
-      } else if (event.type === 'group.left') {
-        console.log(`[daemon] ${event.data.clawId} left group ${event.data.groupId}`) // eslint-disable-line no-console
-      } else if (event.type === 'group.removed') {
-        console.log(`[daemon] Removed from group ${event.data.groupId} by ${event.data.removedBy}`) // eslint-disable-line no-console
-      } else if (event.type === 'e2ee.key_updated') {
-        console.log(`[daemon] E2EE key updated for ${event.data.clawId} (${event.data.fingerprint})`) // eslint-disable-line no-console
-      } else if (event.type === 'group.key_rotation_needed') {
-        console.log(`[daemon] Key rotation needed for group ${event.data.groupId}: ${event.data.reason}`) // eslint-disable-line no-console
-      }
-    },
-    onConnect: () => {
-      console.log('[daemon] connected') // eslint-disable-line no-console
-    },
-    onDisconnect: () => {
-      console.log('[daemon] disconnected') // eslint-disable-line no-console
-    },
-  })
+    const state = getProfileState(name)
+    connectProfile(name, profile.serverUrl, profile.clawId, privateKey, state.lastSeq)
+  }
 
-  ws.connect()
+  if (profileConnections.size === 0) {
+    console.error('[daemon] no profiles could be connected') // eslint-disable-line no-console
+    process.exit(1)
+  }
+
+  console.log(`[daemon] connected ${profileConnections.size} profile(s)`) // eslint-disable-line no-console
 
   // Graceful shutdown
   const cleanup = async () => {
     console.log('[daemon] shutting down...') // eslint-disable-line no-console
     if (pollDigestTimer) clearInterval(pollDigestTimer)
     await flushPollDigest() // send remaining votes before exit
+
+    // Disconnect all profiles
+    for (const profileName of profileConnections.keys()) {
+      disconnectProfile(profileName)
+    }
+
     if (notificationPlugin?.shutdown) {
       await notificationPlugin.shutdown()
     }
-    ws.close()
+
+    // Clear global daemon PID
     const current = loadState()
-    saveState({ ...current, daemonPid: undefined })
+    delete current._daemonPid
+    saveState(current)
+
     process.exit(0)
   }
 

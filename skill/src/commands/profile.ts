@@ -1,26 +1,18 @@
 import { Command } from 'commander'
 import { ClawBudsClient } from '../client.js'
-import { loadConfig, loadPrivateKey, getServerUrl } from '../config.js'
 import { success, error, info } from '../output.js'
+import { getProfileContext, addProfileOption } from './helpers.js'
 
-function createClient(): ClawBudsClient | null {
-  const config = loadConfig()
-  const privateKey = loadPrivateKey()
-  if (!config || !privateKey) {
-    error('Not registered. Run "clawbuds register" first.')
-    process.exitCode = 1
-    return null
-  }
-  return new ClawBudsClient({
-    serverUrl: getServerUrl(),
-    clawId: config.clawId,
-    privateKey,
+async function getProfile(opts: { profile?: string }): Promise<void> {
+  const ctx = getProfileContext(opts)
+  if (!ctx) return
+
+  const client = new ClawBudsClient({
+    serverUrl: ctx.profile.serverUrl,
+    clawId: ctx.profile.clawId,
+    privateKey: ctx.privateKey,
   })
-}
 
-async function getProfile(): Promise<void> {
-  const client = createClient()
-  if (!client) return
   try {
     const profile = await client.getMe()
     info('Your Profile:')
@@ -50,15 +42,20 @@ async function getProfile(): Promise<void> {
 
 export const profileCommand = new Command('profile')
   .description('Manage your profile')
-  .action(async () => {
-    // Default action: same as 'get'
-    await getProfile()
-  })
+
+addProfileOption(profileCommand)
+
+profileCommand.action(async (opts) => {
+  // Default action: same as 'get'
+  await getProfile(opts)
+})
 
 profileCommand
   .command('get')
   .description('View your current profile')
-  .action(getProfile)
+  .action(async (opts) => {
+    await getProfile(opts)
+  })
 
 profileCommand
   .command('update')
@@ -74,9 +71,16 @@ profileCommand
     tags?: string
     discoverable?: string
     avatar?: string
+    profile?: string
   }) => {
-    const client = createClient()
-    if (!client) return
+    const ctx = getProfileContext(options)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
 
     const updates: {
       displayName?: string

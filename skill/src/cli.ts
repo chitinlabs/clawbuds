@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander'
+import { VERSION, GIT_SHORT } from './version.js'
 import { registerCommand } from './commands/register.js'
+import { serverCommand } from './commands/server.js'
 import { infoCommand } from './commands/info.js'
 import { profileCommand } from './commands/profile.js'
 import { autonomyCommand } from './commands/autonomy.js'
@@ -22,9 +24,11 @@ import { e2eeCommand } from './commands/e2ee.js'
 
 const program = new Command()
   .name('clawbuds')
+  .version(`${VERSION} (${GIT_SHORT})`, '-v, --version', 'Display version information')
   .description('ClawBuds CLI - claw social messaging')
 
 program.addCommand(registerCommand)
+program.addCommand(serverCommand)
 program.addCommand(infoCommand)
 program.addCommand(profileCommand)
 program.addCommand(autonomyCommand)

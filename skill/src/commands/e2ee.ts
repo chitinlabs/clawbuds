@@ -1,48 +1,30 @@
 import { Command } from 'commander'
 import { ClawBudsClient } from '../client.js'
-import { loadConfig, loadPrivateKey, getServerUrl } from '../config.js'
 import { success, error, info } from '../output.js'
 import { ed25519PrivateToX25519, x25519GetPublicKey } from '@clawbuds/shared'
-
-function createClient(): ClawBudsClient | null {
-  const config = loadConfig()
-  const privateKey = loadPrivateKey()
-  if (!config || !privateKey) {
-    error('Not registered. Run "clawbuds register" first.')
-    process.exitCode = 1
-    return null
-  }
-  return new ClawBudsClient({
-    serverUrl: getServerUrl(),
-    clawId: config.clawId,
-    privateKey,
-  })
-}
+import { getProfileContext, addProfileOption } from './helpers.js'
 
 export const e2eeCommand = new Command('e2ee')
   .description('End-to-end encryption management')
 
+addProfileOption(e2eeCommand)
+
 e2eeCommand
   .command('setup')
   .description('Enable E2EE (derive X25519 key from Ed25519 and register)')
-  .action(async () => {
-    const config = loadConfig()
-    const privateKey = loadPrivateKey()
-    if (!config || !privateKey) {
-      error('Not registered. Run "clawbuds register" first.')
-      process.exitCode = 1
-      return
-    }
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
 
     const client = new ClawBudsClient({
-      serverUrl: getServerUrl(),
-      clawId: config.clawId,
-      privateKey,
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
     })
 
     try {
       // Derive X25519 key from Ed25519 private key
-      const x25519Private = ed25519PrivateToX25519(privateKey)
+      const x25519Private = ed25519PrivateToX25519(ctx.privateKey)
       const x25519Public = x25519GetPublicKey(x25519Private)
 
       const key = await client.registerE2eeKey(x25519Public)
@@ -58,23 +40,18 @@ e2eeCommand
 e2eeCommand
   .command('status')
   .description('Check E2EE status')
-  .action(async () => {
-    const config = loadConfig()
-    const privateKey = loadPrivateKey()
-    if (!config || !privateKey) {
-      error('Not registered. Run "clawbuds register" first.')
-      process.exitCode = 1
-      return
-    }
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
 
     const client = new ClawBudsClient({
-      serverUrl: getServerUrl(),
-      clawId: config.clawId,
-      privateKey,
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
     })
 
     try {
-      const key = await client.getE2eeKey(config.clawId)
+      const key = await client.getE2eeKey(ctx.profile.clawId)
       info('E2EE is enabled')
       info(`  Fingerprint:  ${key.keyFingerprint}`)
       info(`  Registered:   ${key.createdAt}`)
@@ -94,9 +71,16 @@ e2eeCommand
 e2eeCommand
   .command('disable')
   .description('Disable E2EE (delete your public key)')
-  .action(async () => {
-    const client = createClient()
-    if (!client) return
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       await client.deleteE2eeKey()
       success('E2EE disabled. Your public key has been removed.')
@@ -109,9 +93,16 @@ e2eeCommand
 e2eeCommand
   .command('fingerprint <clawId>')
   .description('Get E2EE fingerprint for a user')
-  .action(async (clawId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (clawId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const key = await client.getE2eeKey(clawId)
       info(`Fingerprint for ${clawId}: ${key.keyFingerprint}`)

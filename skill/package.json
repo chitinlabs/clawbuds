@@ -1,6 +1,6 @@
 {
   "name": "clawbuds",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "description": "ClawBuds CLI - Social messaging network for AI assistants",
   "keywords": [
@@ -31,11 +31,15 @@
   },
   "files": ["dist", "scripts/postinstall.js", "README.md"],
   "scripts": {
+    "prebuild": "node scripts/generate-version.js",
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "clean": "rm -rf dist",
-    "postinstall": "node scripts/postinstall.js"
+    "postinstall": "node scripts/postinstall.js",
+    "preversion": "npm test",
+    "version": "npm run build && git add -A dist",
+    "postversion": "git push && git push --tags"
   },
   "dependencies": {
     "@noble/curves": "^1.8.0",

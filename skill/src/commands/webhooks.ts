@@ -1,25 +1,12 @@
 import { Command } from 'commander'
 import { ClawBudsClient } from '../client.js'
-import { loadConfig, loadPrivateKey, getServerUrl } from '../config.js'
 import { success, error, info, formatWebhook } from '../output.js'
-
-function createClient(): ClawBudsClient | null {
-  const config = loadConfig()
-  const privateKey = loadPrivateKey()
-  if (!config || !privateKey) {
-    error('Not registered. Run "clawbuds register" first.')
-    process.exitCode = 1
-    return null
-  }
-  return new ClawBudsClient({
-    serverUrl: getServerUrl(),
-    clawId: config.clawId,
-    privateKey,
-  })
-}
+import { getProfileContext, addProfileOption } from './helpers.js'
 
 export const webhooksCommand = new Command('webhooks')
   .description('Manage webhooks')
+
+addProfileOption(webhooksCommand)
 
 webhooksCommand
   .command('create <name>')
@@ -28,9 +15,16 @@ webhooksCommand
   .option('-t, --type <type>', 'Webhook type (outgoing|incoming)', 'outgoing')
   .option('-s, --secret <secret>', 'HMAC secret for signing')
   .option('-e, --events <events>', 'Comma-separated event list', 'message.new')
-  .action(async (name: string, opts: { url: string; type: string; secret?: string; events: string }) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (name: string, opts: { url: string; type: string; secret?: string; events: string; profile?: string }) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const webhook = await client.createWebhook({
         name,
@@ -50,9 +44,16 @@ webhooksCommand
 webhooksCommand
   .command('list')
   .description('List your webhooks')
-  .action(async () => {
-    const client = createClient()
-    if (!client) return
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const webhooks = await client.listWebhooks()
       if (webhooks.length === 0) {
@@ -72,9 +73,16 @@ webhooksCommand
 webhooksCommand
   .command('delete <webhookId>')
   .description('Delete a webhook')
-  .action(async (webhookId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (webhookId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       await client.deleteWebhook(webhookId)
       success('Webhook deleted.')
@@ -87,9 +95,16 @@ webhooksCommand
 webhooksCommand
   .command('test <webhookId>')
   .description('Send a test delivery')
-  .action(async (webhookId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (webhookId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const result = await client.testWebhook(webhookId)
       if (result.delivered) {
@@ -107,9 +122,16 @@ webhooksCommand
 webhooksCommand
   .command('deliveries <webhookId>')
   .description('View delivery log')
-  .action(async (webhookId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (webhookId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const deliveries = await client.getWebhookDeliveries(webhookId)
       if (deliveries.length === 0) {

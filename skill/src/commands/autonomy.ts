@@ -1,29 +1,21 @@
 import { Command } from 'commander'
 import { ClawBudsClient } from '../client.js'
-import { loadConfig, loadPrivateKey, getServerUrl } from '../config.js'
 import { success, error, info } from '../output.js'
 import type { AutonomyLevel } from '../types.js'
-
-function createClient(): ClawBudsClient | null {
-  const config = loadConfig()
-  const privateKey = loadPrivateKey()
-  if (!config || !privateKey) {
-    error('Not registered. Run "clawbuds register" first.')
-    process.exitCode = 1
-    return null
-  }
-  return new ClawBudsClient({
-    serverUrl: getServerUrl(),
-    clawId: config.clawId,
-    privateKey,
-  })
-}
+import { getProfileContext, addProfileOption } from './helpers.js'
 
 const VALID_LEVELS: AutonomyLevel[] = ['notifier', 'drafter', 'autonomous', 'delegator']
 
-async function getAutonomyConfig(): Promise<void> {
-  const client = createClient()
-  if (!client) return
+async function getAutonomyConfig(opts: { profile?: string }): Promise<void> {
+  const ctx = getProfileContext(opts)
+  if (!ctx) return
+
+  const client = new ClawBudsClient({
+    serverUrl: ctx.profile.serverUrl,
+    clawId: ctx.profile.clawId,
+    privateKey: ctx.privateKey,
+  })
+
   try {
     const config = await client.getAutonomy()
     info('Autonomy Configuration:')
@@ -55,15 +47,20 @@ async function getAutonomyConfig(): Promise<void> {
 
 export const autonomyCommand = new Command('autonomy')
   .description('Manage autonomy level and configuration')
-  .action(async () => {
-    // Default action: same as 'get'
-    await getAutonomyConfig()
-  })
+
+addProfileOption(autonomyCommand)
+
+autonomyCommand.action(async (opts) => {
+  // Default action: same as 'get'
+  await getAutonomyConfig(opts)
+})
 
 autonomyCommand
   .command('get')
   .description('View current autonomy configuration')
-  .action(getAutonomyConfig)
+  .action(async (opts) => {
+    await getAutonomyConfig(opts)
+  })
 
 autonomyCommand
   .command('set')
@@ -73,9 +70,16 @@ autonomyCommand
   .action(async (options: {
     level?: string
     default?: string
+    profile?: string
   }) => {
-    const client = createClient()
-    if (!client) return
+    const ctx = getProfileContext(options)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
 
     if (!options.level && !options.default) {
       error('Must specify --level or --default')

@@ -1,25 +1,12 @@
 import { Command } from 'commander'
 import { ClawBudsClient } from '../client.js'
-import { loadConfig, loadPrivateKey, getServerUrl } from '../config.js'
 import { success, error, info, formatGroup, formatGroupMember, formatGroupInvitation, formatInboxEntry } from '../output.js'
-
-function createClient(): ClawBudsClient | null {
-  const config = loadConfig()
-  const privateKey = loadPrivateKey()
-  if (!config || !privateKey) {
-    error('Not registered. Run "clawbuds register" first.')
-    process.exitCode = 1
-    return null
-  }
-  return new ClawBudsClient({
-    serverUrl: getServerUrl(),
-    clawId: config.clawId,
-    privateKey,
-  })
-}
+import { getProfileContext, addProfileOption } from './helpers.js'
 
 export const groupsCommand = new Command('groups')
   .description('Manage groups')
+
+addProfileOption(groupsCommand)
 
 groupsCommand
   .command('create <name>')
@@ -27,9 +14,16 @@ groupsCommand
   .option('-d, --description <desc>', 'Group description')
   .option('-t, --type <type>', 'Group type (private|public)', 'private')
   .option('--encrypted', 'Enable E2EE for this group')
-  .action(async (name: string, opts: { description?: string; type?: string; encrypted?: boolean }) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (name: string, opts: { description?: string; type?: string; encrypted?: boolean; profile?: string }) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const group = await client.createGroup({
         name,
@@ -48,9 +42,16 @@ groupsCommand
 groupsCommand
   .command('list')
   .description('List your groups')
-  .action(async () => {
-    const client = createClient()
-    if (!client) return
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const groups = await client.listGroups()
       if (groups.length === 0) {
@@ -70,9 +71,16 @@ groupsCommand
 groupsCommand
   .command('info <groupId>')
   .description('Get group details')
-  .action(async (groupId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (groupId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const group = await client.getGroup(groupId)
       info(formatGroup(group))
@@ -90,9 +98,16 @@ groupsCommand
 groupsCommand
   .command('invite <groupId> <clawId>')
   .description('Invite a user to a group')
-  .action(async (groupId: string, clawId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (groupId: string, clawId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       await client.inviteToGroup(groupId, clawId)
       success(`Invited ${clawId} to the group.`)
@@ -105,9 +120,16 @@ groupsCommand
 groupsCommand
   .command('join <groupId>')
   .description('Accept an invitation / join a public group')
-  .action(async (groupId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (groupId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       await client.joinGroup(groupId)
       success('Joined the group.')
@@ -120,9 +142,16 @@ groupsCommand
 groupsCommand
   .command('leave <groupId>')
   .description('Leave a group')
-  .action(async (groupId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (groupId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       await client.leaveGroup(groupId)
       success('Left the group.')
@@ -135,9 +164,16 @@ groupsCommand
 groupsCommand
   .command('invitations')
   .description('List pending group invitations')
-  .action(async () => {
-    const client = createClient()
-    if (!client) return
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const invitations = await client.getGroupInvitations()
       if (invitations.length === 0) {
@@ -159,9 +195,16 @@ groupsCommand
 groupsCommand
   .command('send <groupId> <message>')
   .description('Send a message to a group')
-  .action(async (groupId: string, message: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (groupId: string, message: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const result = await client.sendGroupMessage(groupId, {
         blocks: [{ type: 'text', text: message }],
@@ -177,9 +220,16 @@ groupsCommand
   .command('messages <groupId>')
   .description('View group messages')
   .option('-l, --limit <n>', 'Max messages to show', '20')
-  .action(async (groupId: string, opts: { limit: string }) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (groupId: string, opts: { limit: string; profile?: string }) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const messages = await client.getGroupMessages(groupId, {
         limit: parseInt(opts.limit, 10),
@@ -204,9 +254,16 @@ groupsCommand
 groupsCommand
   .command('delete <groupId>')
   .description('Delete a group (owner only)')
-  .action(async (groupId: string) => {
-    const client = createClient()
-    if (!client) return
+  .action(async (groupId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       await client.deleteGroup(groupId)
       success('Group deleted.')

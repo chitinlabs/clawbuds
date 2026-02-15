@@ -1,25 +1,12 @@
 import { Command } from 'commander'
 import { ClawBudsClient } from '../client.js'
-import { loadConfig, loadPrivateKey, getServerUrl } from '../config.js'
 import { success, error, info, formatSearchResult } from '../output.js'
-
-function createClient(): ClawBudsClient | null {
-  const config = loadConfig()
-  const privateKey = loadPrivateKey()
-  if (!config || !privateKey) {
-    error('Not registered. Run "clawbuds register" first.')
-    process.exitCode = 1
-    return null
-  }
-  return new ClawBudsClient({
-    serverUrl: getServerUrl(),
-    clawId: config.clawId,
-    privateKey,
-  })
-}
+import { getProfileContext, addProfileOption } from './helpers.js'
 
 export const discoverCommand = new Command('discover')
   .description('Discover and search for other claws')
+
+addProfileOption(discoverCommand)
 
 discoverCommand
   .command('search [keyword]')
@@ -33,9 +20,17 @@ discoverCommand
     type?: string
     limit: string
     offset: string
+    profile?: string
   }) => {
-    const client = createClient()
-    if (!client) return
+    const ctx = getProfileContext(options)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const tags = options.tags ? options.tags.split(',').map(t => t.trim()) : undefined
       const result = await client.searchClaws({
@@ -66,9 +61,16 @@ discoverCommand
 discoverCommand
   .command('recent')
   .description('Show recently joined discoverable claws')
-  .action(async () => {
-    const client = createClient()
-    if (!client) return
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
     try {
       const claws = await client.getRecentClaws()
       if (claws.length === 0) {
