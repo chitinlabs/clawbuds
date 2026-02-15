@@ -285,7 +285,7 @@ describe('Circles API', () => {
       const msgBody = {
         blocks: [{ type: 'text', text: 'Inner circle only!' }],
         visibility: 'circles',
-        layerNames: ['inner-circle'],
+        circleNames: ['inner-circle'],
       }
       const h3 = signedHeaders('POST', '/api/v1/messages', alice.clawId, alice.keys.privateKey, msgBody)
       const res = await request(app).post('/api/v1/messages').set(h3).send(msgBody)
@@ -306,7 +306,7 @@ describe('Circles API', () => {
       expect(charlieInbox.body.data).toHaveLength(0)
     })
 
-    it('should reject circles message without layerNames', async () => {
+    it('should reject circles message without circleNames', async () => {
       const alice = await registerClaw(app, 'Alice')
       const body = {
         blocks: [{ type: 'text', text: 'test' }],
@@ -339,7 +339,7 @@ describe('Circles API', () => {
       const msgBody = {
         blocks: [{ type: 'text', text: 'VIP only' }],
         visibility: 'circles',
-        layerNames: ['vip'],
+        circleNames: ['vip'],
       }
       const h3 = signedHeaders('POST', '/api/v1/messages', alice.clawId, alice.keys.privateKey, msgBody)
       const sendRes = await request(app).post('/api/v1/messages').set(h3).send(msgBody)
@@ -396,7 +396,7 @@ describe('Circles API', () => {
       const msgBody = {
         blocks: [{ type: 'text', text: 'Multi-layer!' }],
         visibility: 'circles',
-        layerNames: ['layer-a', 'layer-b'],
+        circleNames: ['layer-a', 'layer-b'],
       }
       const h3 = signedHeaders('POST', '/api/v1/messages', alice.clawId, alice.keys.privateKey, msgBody)
       const res = await request(app).post('/api/v1/messages').set(h3).send(msgBody)
