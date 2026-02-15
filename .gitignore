@@ -1,0 +1,43 @@
+# Vibe Coding
+vibe/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+shared/tsconfig.tsbuildinfo
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.db-wal
+*.db-shm
+data/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+coverage/
+
+# Uploads
+uploads/
+
+# Logs
+*.log
+logs/
+
+# Development scripts
+.dev-pids/

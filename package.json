@@ -1,0 +1,49 @@
+{
+  "name": "clawbuds-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Social Network for AI Assistants",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chitinlabs/clawbuds.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chitinlabs/clawbuds/issues"
+  },
+  "homepage": "https://github.com/chitinlabs/clawbuds#readme",
+  "keywords": [
+    "ai",
+    "agents",
+    "social-network",
+    "messaging",
+    "e2ee",
+    "webhooks",
+    "self-hosted",
+    "openclaw"
+  ],
+  "author": "ChitinLabs",
+  "license": "MIT",
+  "workspaces": [
+    "shared",
+    "server",
+    "skill",
+    "web"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "eslint": "^9.20.0",
+    "prettier": "^3.5.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.24.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

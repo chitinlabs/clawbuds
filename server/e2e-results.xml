@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="65" failures="0" errors="0" time="3.46075223">
+    <testsuite name="tests/e2e/e2ee-flow.e2e.test.ts" timestamp="2026-02-12T03:17:23.861Z" hostname="ip-172-31-37-183" tests="9" failures="0" errors="0" skipped="0" time="0.599886335">
+        <testcase classname="tests/e2e/e2ee-flow.e2e.test.ts" name="E2E: Encrypted Message Flow &gt; Complete E2EE Lifecycle &gt; should complete full encrypted message exchange between Alice and Bob" time="0.217237594">
+        </testcase>
+        <testcase classname="tests/e2e/e2ee-flow.e2e.test.ts" name="E2E: Encrypted Message Flow &gt; Complete E2EE Lifecycle &gt; should handle bidirectional encrypted conversation" time="0.053059736">
+        </testcase>
+        <testcase classname="tests/e2e/e2ee-flow.e2e.test.ts" name="E2E: Encrypted Message Flow &gt; Complete E2EE Lifecycle &gt; should prevent unauthorized decryption by third party" time="0.035401525">
+        </testcase>
+        <testcase classname="tests/e2e/e2ee-flow.e2e.test.ts" name="E2E: Encrypted Message Flow &gt; Key Registration and Rotation &gt; should register, rotate, and verify key updates" time="0.03423156">
+        </testcase>
+        <testcase classname="tests/e2e/e2ee-flow.e2e.test.ts" name="E2E: Encrypted Message Flow &gt; Key Registration and Rotation &gt; should batch query keys for multiple users" time="0.0435606">
+        </testcase>
+        <testcase classname="tests/e2e/e2ee-flow.e2e.test.ts" name="E2E: Encrypted Message Flow &gt; Key Registration and Rotation &gt; should delete key and disable E2EE" time="0.033783319">
+        </testcase>
+        <testcase classname="tests/e2e/e2ee-flow.e2e.test.ts" name="E2E: Encrypted Message Flow &gt; Group E2EE with Sender Keys &gt; should complete group encrypted message flow" time="0.096227151">
+        </testcase>
+        <testcase classname="tests/e2e/e2ee-flow.e2e.test.ts" name="E2E: Encrypted Message Flow &gt; Group E2EE with Sender Keys &gt; should reject sender key upload from non-member" time="0.043779303">
+        </testcase>
+        <testcase classname="tests/e2e/e2ee-flow.e2e.test.ts" name="E2E: Encrypted Message Flow &gt; Group E2EE with Sender Keys &gt; should auto-increment sender key generations" time="0.040677606">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/e2e/group-messaging.e2e.test.ts" timestamp="2026-02-12T03:17:23.864Z" hostname="ip-172-31-37-183" tests="11" failures="0" errors="0" skipped="0" time="0.796932317">
+        <testcase classname="tests/e2e/group-messaging.e2e.test.ts" name="E2E: Group Messaging Flow &gt; Complete Group Messaging Lifecycle &gt; should deliver group message to all members" time="0.246769613">
+        </testcase>
+        <testcase classname="tests/e2e/group-messaging.e2e.test.ts" name="E2E: Group Messaging Flow &gt; Complete Group Messaging Lifecycle &gt; should support multi-sender conversation in group" time="0.069698171">
+        </testcase>
+        <testcase classname="tests/e2e/group-messaging.e2e.test.ts" name="E2E: Group Messaging Flow &gt; Complete Group Messaging Lifecycle &gt; should deliver messages only to current members" time="0.070598957">
+        </testcase>
+        <testcase classname="tests/e2e/group-messaging.e2e.test.ts" name="E2E: Group Messaging Flow &gt; Non-Member Restrictions &gt; should prevent non-member from sending messages" time="0.034179869">
+        </testcase>
+        <testcase classname="tests/e2e/group-messaging.e2e.test.ts" name="E2E: Group Messaging Flow &gt; Non-Member Restrictions &gt; should prevent non-member from reading message history" time="0.041729386">
+        </testcase>
+        <testcase classname="tests/e2e/group-messaging.e2e.test.ts" name="E2E: Group Messaging Flow &gt; Non-Member Restrictions &gt; should block messages after member is removed" time="0.059106195">
+        </testcase>
+        <testcase classname="tests/e2e/group-messaging.e2e.test.ts" name="E2E: Group Messaging Flow &gt; Non-Member Restrictions &gt; should block messages after member leaves" time="0.041642918">
+        </testcase>
+        <testcase classname="tests/e2e/group-messaging.e2e.test.ts" name="E2E: Group Messaging Flow &gt; Encrypted Group Messages &gt; should support encrypted flag on group creation" time="0.02584296">
+        </testcase>
+        <testcase classname="tests/e2e/group-messaging.e2e.test.ts" name="E2E: Group Messaging Flow &gt; Encrypted Group Messages &gt; should support sending encrypted content in group messages" time="0.045294843">
+        </testcase>
+        <testcase classname="tests/e2e/group-messaging.e2e.test.ts" name="E2E: Group Messaging Flow &gt; Message History and Pagination &gt; should return messages in reverse chronological order" time="0.070418018">
+        </testcase>
+        <testcase classname="tests/e2e/group-messaging.e2e.test.ts" name="E2E: Group Messaging Flow &gt; Message History and Pagination &gt; should support limit parameter for pagination" time="0.089688729">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/e2e/group-permissions.e2e.test.ts" timestamp="2026-02-12T03:17:23.865Z" hostname="ip-172-31-37-183" tests="16" failures="0" errors="0" skipped="0" time="1.036250465">
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Role-Based Access Control &gt; should enforce owner/admin/member permission hierarchy" time="0.287290545">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Role-Based Access Control &gt; should allow admin to remove member but not other admins" time="0.10287222">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Role-Based Access Control &gt; should only allow owner to promote/demote members" time="0.083290001">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Role-Based Access Control &gt; should prevent changing owner role" time="0.031834332">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Group Deletion &gt; should only allow owner to delete group" time="0.052284585">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Owner Leave Restriction &gt; should prevent owner from leaving the group" time="0.031244114">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Public vs Private Groups &gt; should allow joining public group without invitation" time="0.029815084">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Public vs Private Groups &gt; should require invitation for private group" time="0.036413031">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Member Limit Enforcement &gt; should enforce max member limit" time="0.052772261">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Member Limit Enforcement &gt; should allow joining after member leaves" time="0.049591916">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Invitation Workflow &gt; should support full invitation lifecycle: invite -&gt; view -&gt; accept" time="0.062025017">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Invitation Workflow &gt; should support invitation rejection" time="0.047182757">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Invitation Workflow &gt; should prevent duplicate invitations" time="0.033577362">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Invitation Workflow &gt; should prevent inviting existing members" time="0.046175792">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Group Update Permissions &gt; should allow owner and admin to update group info" time="0.049340531">
+        </testcase>
+        <testcase classname="tests/e2e/group-permissions.e2e.test.ts" name="E2E: Group Permission Management &gt; Group Update Permissions &gt; should prevent member from updating group info" time="0.037702898">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/e2e/webhook-inbound.e2e.test.ts" timestamp="2026-02-12T03:17:23.867Z" hostname="ip-172-31-37-183" tests="10" failures="0" errors="0" skipped="0" time="0.535384896">
+        <testcase classname="tests/e2e/webhook-inbound.e2e.test.ts" name="E2E: Webhook Inbound Message Flow &gt; Complete Inbound Webhook Flow &gt; should deliver external message to all friends via public visibility" time="0.179828318">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-inbound.e2e.test.ts" name="E2E: Webhook Inbound Message Flow &gt; Complete Inbound Webhook Flow &gt; should deliver to specific recipients via toClawIds" time="0.077493436">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-inbound.e2e.test.ts" name="E2E: Webhook Inbound Message Flow &gt; HMAC Signature Verification &gt; should reject request with missing signature header" time="0.034732022">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-inbound.e2e.test.ts" name="E2E: Webhook Inbound Message Flow &gt; HMAC Signature Verification &gt; should reject request with invalid signature" time="0.031523358">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-inbound.e2e.test.ts" name="E2E: Webhook Inbound Message Flow &gt; HMAC Signature Verification &gt; should reject signature computed with wrong secret" time="0.032128121">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-inbound.e2e.test.ts" name="E2E: Webhook Inbound Message Flow &gt; HMAC Signature Verification &gt; should reject when payload is tampered after signing" time="0.030715546">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-inbound.e2e.test.ts" name="E2E: Webhook Inbound Message Flow &gt; Webhook State Validation &gt; should reject incoming request on outgoing webhook" time="0.031828533">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-inbound.e2e.test.ts" name="E2E: Webhook Inbound Message Flow &gt; Webhook State Validation &gt; should reject when webhook is disabled" time="0.037515752">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-inbound.e2e.test.ts" name="E2E: Webhook Inbound Message Flow &gt; Webhook State Validation &gt; should reject for non-existent webhook id" time="0.02891613">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-inbound.e2e.test.ts" name="E2E: Webhook Inbound Message Flow &gt; Webhook CRUD Integration &gt; should complete full webhook lifecycle: create -&gt; use -&gt; list deliveries -&gt; delete" time="0.04867075">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/e2e/webhook-outbound.e2e.test.ts" timestamp="2026-02-12T03:17:23.869Z" hostname="ip-172-31-37-183" tests="19" failures="0" errors="0" skipped="0" time="0.492298217">
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; Outgoing Webhook CRUD &gt; should create outgoing webhook with URL and events" time="0.123249925">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; Outgoing Webhook CRUD &gt; should require URL for outgoing webhooks" time="0.026525423">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; Outgoing Webhook CRUD &gt; should update webhook URL and events" time="0.027253091">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; Outgoing Webhook CRUD &gt; should prevent other users from accessing your webhooks" time="0.052897824">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; Circuit Breaker Mechanism &gt; should auto-disable webhook after 10 consecutive failures" time="0.018596337">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; Circuit Breaker Mechanism &gt; should reset failure count when re-enabling webhook" time="0.023231138">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; Delivery Log &gt; should track delivery attempts" time="0.017452718">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; Delivery Log &gt; should prevent non-owner from viewing delivery log" time="0.027289998">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; SSRF Protection &gt; should block localhost (http://localhost:8080/admin)" time="0.016821299">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; SSRF Protection &gt; should block 127.0.0.1 (http://127.0.0.1:8080/admin)" time="0.014701584">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; SSRF Protection &gt; should block 10.x.x.x (http://10.0.0.1/internal)" time="0.014482786">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; SSRF Protection &gt; should block 172.16.x.x (http://172.16.0.1/internal)" time="0.016320134">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; SSRF Protection &gt; should block 192.168.x.x (http://192.168.1.1/router)" time="0.015189095">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; SSRF Protection &gt; should block AWS metadata (http://169.254.169.254/latest/meta-data/)" time="0.015078435">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; SSRF Protection &gt; should block GCP metadata (http://metadata.google.internal/computeMetadata/v1/)" time="0.016146741">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; SSRF Protection &gt; should block IPv6 localhost (http://[::1]:8080/admin)" time="0.01479155">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; SSRF Protection &gt; should block file protocol (file:///etc/passwd)" time="0.01607903">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; SSRF Protection &gt; should block SSRF on webhook URL update" time="0.024219367">
+        </testcase>
+        <testcase classname="tests/e2e/webhook-outbound.e2e.test.ts" name="E2E: Webhook Outbound Events Flow &gt; HMAC Signature Generation &gt; should generate valid HMAC-SHA256 signatures for outgoing payloads" time="0.009522843">
+        </testcase>
+    </testsuite>
+</testsuites>

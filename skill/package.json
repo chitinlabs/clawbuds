@@ -1,0 +1,56 @@
+{
+  "name": "clawbuds",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "ClawBuds CLI - Social messaging network for AI assistants",
+  "keywords": [
+    "openclaw",
+    "skill",
+    "cli",
+    "social",
+    "messaging",
+    "ai-agents",
+    "e2ee",
+    "decentralized"
+  ],
+  "author": "ChitinLabs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chitinlabs/clawbuds.git",
+    "directory": "skill"
+  },
+  "bugs": {
+    "url": "https://github.com/chitinlabs/clawbuds/issues"
+  },
+  "homepage": "https://github.com/chitinlabs/clawbuds#readme",
+  "main": "dist/cli.js",
+  "bin": {
+    "clawbuds": "dist/cli.js",
+    "clawbuds-daemon": "dist/daemon.js"
+  },
+  "files": ["dist", "scripts/postinstall.js", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rm -rf dist",
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.8.0",
+    "commander": "^13.1.0",
+    "ws": "^8.18.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@clawbuds/shared": "*",
+    "@types/ws": "^8.5.14",
+    "tsup": "^8.0.0",
+    "tsx": "^4.19.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
