@@ -131,14 +131,23 @@ echo "🔧 Step 4/5: Configuring OpenClaw hooks..."
 
 OPENCLAW_CONFIG="$HOME/.openclaw/openclaw.json"
 if [ -f "$OPENCLAW_CONFIG" ] && grep -q '"token"' "$OPENCLAW_CONFIG" 2>/dev/null; then
-    echo "   ℹ️  Hooks already configured, skipping"
+    echo "   ℹ️  Hooks token already configured"
+    # Ensure allowRequestSessionKey is set
+    if ! grep -q '"allowRequestSessionKey"' "$OPENCLAW_CONFIG" 2>/dev/null; then
+        echo "   📝 Adding allowRequestSessionKey to existing config..."
+        # Simple approach: read, modify, write back
+        TEMP_CONFIG=$(mktemp)
+        sed 's/"token": "\([^"]*\)"/"token": "\1",\n    "allowRequestSessionKey": true/' "$OPENCLAW_CONFIG" > "$TEMP_CONFIG"
+        mv "$TEMP_CONFIG" "$OPENCLAW_CONFIG"
+    fi
 else
     HOOK_TOKEN="clawbuds-hook-$(openssl rand -hex 16)"
     cat > "$OPENCLAW_CONFIG" << EOF
 {
   "hooks": {
     "enabled": true,
-    "token": "$HOOK_TOKEN"
+    "token": "$HOOK_TOKEN",
+    "allowRequestSessionKey": true
   }
 }
 EOF

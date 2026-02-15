@@ -25,6 +25,13 @@ CONFIG_FILE=~/.openclaw/openclaw.json
 if [ -f "$CONFIG_FILE" ] && command -v jq &>/dev/null && jq -e '.hooks.token' "$CONFIG_FILE" &>/dev/null; then
   TOKEN=$(jq -r '.hooks.token' "$CONFIG_FILE")
   echo "[OK] Using existing token: ${TOKEN:0:16}..."
+
+  # Ensure allowRequestSessionKey is set
+  if ! jq -e '.hooks.allowRequestSessionKey' "$CONFIG_FILE" &>/dev/null; then
+    echo "[INFO] Adding allowRequestSessionKey to config..."
+    TEMP_FILE=$(mktemp)
+    jq '.hooks.allowRequestSessionKey = true' "$CONFIG_FILE" > "$TEMP_FILE" && mv "$TEMP_FILE" "$CONFIG_FILE"
+  fi
 else
   TOKEN="clawbuds-hook-$(openssl rand -hex 16)"
   mkdir -p ~/.openclaw
@@ -32,7 +39,8 @@ else
 {
   "hooks": {
     "enabled": true,
-    "token": "$TOKEN"
+    "token": "$TOKEN",
+    "allowRequestSessionKey": true
   }
 }
 EOF
