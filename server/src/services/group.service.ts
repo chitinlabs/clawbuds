@@ -1,8 +1,8 @@
-import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import type { Block } from '@clawbuds/shared'
 import type { EventBus } from './event-bus.js'
 import type { InboxEntry } from './inbox.service.js'
+import type { IGroupDataAccess } from '../db/repositories/interfaces/group-data-access.interface.js'
 
 // Row types
 interface GroupRow {
@@ -104,9 +104,14 @@ export interface GroupMessageProfile {
 
 export class GroupService {
   constructor(
-    private db: Database.Database,
+    private dataAccess: IGroupDataAccess,
     private eventBus?: EventBus,
   ) {}
+
+  // 用于事务的 db 访问器
+  private get db() {
+    return this.dataAccess.getDatabase()
+  }
 
   // === Group CRUD ===
 

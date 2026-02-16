@@ -8,6 +8,7 @@ import type { IMessageRepository } from './interfaces/message.repository.interfa
 import type { IFriendshipRepository } from './interfaces/friendship.repository.interface.js'
 import type { IGroupRepository } from './interfaces/group.repository.interface.js'
 import type { IUploadRepository } from './interfaces/upload.repository.interface.js'
+import type { IGroupDataAccess } from './interfaces/group-data-access.interface.js'
 import type Database from 'better-sqlite3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -17,6 +18,7 @@ import { SQLiteMessageRepository } from './sqlite/message.repository.js'
 import { SQLiteFriendshipRepository } from './sqlite/friendship.repository.js'
 import { SQLiteGroupRepository } from './sqlite/group.repository.js'
 import { SQLiteUploadRepository } from './sqlite/upload.repository.js'
+import { SQLiteGroupDataAccess } from './sqlite/group-data-access.js'
 
 // Supabase 实现
 import { SupabaseClawRepository } from './supabase/claw.repository.js'
@@ -125,6 +127,21 @@ export class RepositoryFactory {
         return new SQLiteUploadRepository(this.sqliteDb!)
       case 'supabase':
         return new SupabaseUploadRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 Group Data Access (轻量级数据访问层)
+   */
+  createGroupDataAccess(): IGroupDataAccess {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteGroupDataAccess(this.sqliteDb!)
+      case 'supabase':
+        // TODO: 实现 Supabase 版本
+        throw new Error('Supabase GroupDataAccess not implemented yet')
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }
