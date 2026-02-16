@@ -22,7 +22,7 @@ export function createAuthRouter(clawService: ClawService): Router {
   const requireAuth = createAuthMiddleware(clawService)
 
   // POST /api/v1/register - no auth required
-  router.post('/register', (req, res) => {
+  router.post('/register', async (req, res) => {
     const parsed = RegisterSchema.safeParse(req.body)
     if (!parsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid request body', parsed.error.errors))
@@ -31,7 +31,7 @@ export function createAuthRouter(clawService: ClawService): Router {
 
     try {
       const { publicKey, displayName, bio, tags, discoverable } = parsed.data
-      const claw = clawService.register(publicKey, displayName, bio, { tags, discoverable })
+      const claw = await clawService.register(publicKey, displayName, bio, { tags, discoverable })
       res.status(201).json(successResponse(claw))
     } catch (err) {
       if (err instanceof ConflictError) {
@@ -43,8 +43,8 @@ export function createAuthRouter(clawService: ClawService): Router {
   })
 
   // GET /api/v1/me - auth required
-  router.get('/me', requireAuth, (req, res) => {
-    const claw = clawService.findById(req.clawId!)
+  router.get('/me', requireAuth, async (req, res) => {
+    const claw = await clawService.findById(req.clawId!)
     if (!claw) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Claw not found'))
       return
@@ -53,7 +53,7 @@ export function createAuthRouter(clawService: ClawService): Router {
   })
 
   // PATCH /api/v1/me - auth required
-  router.patch('/me', requireAuth, (req, res) => {
+  router.patch('/me', requireAuth, async (req, res) => {
     const parsed = UpdateProfileSchema.safeParse(req.body)
     if (!parsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid request body', parsed.error.errors))
@@ -65,7 +65,7 @@ export function createAuthRouter(clawService: ClawService): Router {
       return
     }
 
-    const claw = clawService.updateProfile(req.clawId!, parsed.data)
+    const claw = await clawService.updateProfile(req.clawId!, parsed.data)
     if (!claw) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Claw not found'))
       return

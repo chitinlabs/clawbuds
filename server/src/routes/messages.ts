@@ -93,7 +93,7 @@ export function createMessagesRouter(
   })
 
   // GET /api/v1/messages/:id - get message by id
-  router.get('/:id', requireAuth, (req, res) => {
+  router.get('/:id', requireAuth, async (req, res) => {
     const parsed = MessageIdSchema.safeParse(req.params.id)
     if (!parsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid message ID format'))
@@ -101,7 +101,8 @@ export function createMessagesRouter(
     }
 
     const message = messageService.findById(parsed.data)
-    if (!message || !messageService.canViewMessage(message, req.clawId!)) {
+    const canView = message ? await messageService.canViewMessage(message, req.clawId!) : false
+    if (!message || !canView) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Message not found'))
       return
     }
@@ -110,7 +111,7 @@ export function createMessagesRouter(
   })
 
   // PATCH /api/v1/messages/:id - edit message
-  router.patch('/:id', requireAuth, (req, res) => {
+  router.patch('/:id', requireAuth, async (req, res) => {
     const idParsed = MessageIdSchema.safeParse(req.params.id)
     if (!idParsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid message ID format'))
@@ -126,7 +127,7 @@ export function createMessagesRouter(
     }
 
     try {
-      const updated = messageService.editMessage(idParsed.data, req.clawId!, bodyParsed.data.blocks)
+      const updated = await messageService.editMessage(idParsed.data, req.clawId!, bodyParsed.data.blocks)
       res.json(successResponse(updated))
     } catch (err) {
       handleMessageError(err, res)
@@ -134,7 +135,7 @@ export function createMessagesRouter(
   })
 
   // DELETE /api/v1/messages/:id - delete own message
-  router.delete('/:id', requireAuth, (req, res) => {
+  router.delete('/:id', requireAuth, async (req, res) => {
     const parsed = MessageIdSchema.safeParse(req.params.id)
     if (!parsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid message ID format'))
@@ -142,7 +143,7 @@ export function createMessagesRouter(
     }
 
     try {
-      messageService.deleteMessage(parsed.data, req.clawId!)
+      await messageService.deleteMessage(parsed.data, req.clawId!)
       res.json(successResponse({ deleted: true }))
     } catch (err) {
       handleMessageError(err, res)
@@ -150,7 +151,7 @@ export function createMessagesRouter(
   })
 
   // GET /api/v1/messages/:id/thread - get thread
-  router.get('/:id/thread', requireAuth, (req, res) => {
+  router.get('/:id/thread', requireAuth, async (req, res) => {
     const parsed = MessageIdSchema.safeParse(req.params.id)
     if (!parsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid message ID format'))
@@ -158,7 +159,7 @@ export function createMessagesRouter(
     }
 
     try {
-      const messages = messageService.getThread(parsed.data, req.clawId!)
+      const messages = await messageService.getThread(parsed.data, req.clawId!)
       res.json(successResponse(messages))
     } catch (err) {
       handleMessageError(err, res)
@@ -166,7 +167,7 @@ export function createMessagesRouter(
   })
 
   // POST /api/v1/messages/:id/reactions - add reaction
-  router.post('/:id/reactions', requireAuth, (req, res) => {
+  router.post('/:id/reactions', requireAuth, async (req, res) => {
     const idParsed = MessageIdSchema.safeParse(req.params.id)
     if (!idParsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid message ID format'))
@@ -182,7 +183,8 @@ export function createMessagesRouter(
     try {
       // Verify message access
       const message = messageService.findById(idParsed.data)
-      if (!message || !messageService.canViewMessage(message, req.clawId!)) {
+      const canView = message ? await messageService.canViewMessage(message, req.clawId!) : false
+      if (!message || !canView) {
         res.status(404).json(errorResponse('NOT_FOUND', 'Message not found'))
         return
       }

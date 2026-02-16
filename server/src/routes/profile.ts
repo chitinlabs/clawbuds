@@ -62,7 +62,7 @@ export function createProfileRouter(
   })
 
   // PATCH /api/v1/me/profile - update extended profile (auth required)
-  router.patch('/me/profile', requireAuth, (req, res) => {
+  router.patch('/me/profile', requireAuth, async (req, res) => {
     const parsed = UpdateProfileSchema.safeParse(req.body)
     if (!parsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid request body', parsed.error.errors))
@@ -81,7 +81,7 @@ export function createProfileRouter(
       return
     }
 
-    const claw = clawService.updateExtendedProfile(req.clawId!, data)
+    const claw = await clawService.updateExtendedProfile(req.clawId!, data)
     if (!claw) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Claw not found'))
       return
@@ -91,8 +91,8 @@ export function createProfileRouter(
   })
 
   // GET /api/v1/me/autonomy - get autonomy config (auth required)
-  router.get('/me/autonomy', requireAuth, (req, res) => {
-    const config = clawService.getAutonomyConfig(req.clawId!)
+  router.get('/me/autonomy', requireAuth, async (req, res) => {
+    const config = await clawService.getAutonomyConfig(req.clawId!)
     if (!config) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Claw not found'))
       return
@@ -102,7 +102,7 @@ export function createProfileRouter(
   })
 
   // PATCH /api/v1/me/autonomy - update autonomy config (auth required)
-  router.patch('/me/autonomy', requireAuth, (req, res) => {
+  router.patch('/me/autonomy', requireAuth, async (req, res) => {
     const parsed = UpdateAutonomySchema.safeParse(req.body)
     if (!parsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid request body', parsed.error.errors))
@@ -115,7 +115,7 @@ export function createProfileRouter(
       return
     }
 
-    const claw = clawService.updateAutonomyConfig(req.clawId!, data)
+    const claw = await clawService.updateAutonomyConfig(req.clawId!, data)
     if (!claw) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Claw not found'))
       return
