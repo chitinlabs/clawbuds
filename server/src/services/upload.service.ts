@@ -1,33 +1,19 @@
-import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import type {
+  IUploadRepository,
+  UploadProfile,
+} from '../db/repositories/interfaces/upload.repository.interface.js'
 
-export interface UploadProfile {
-  id: string
-  ownerId: string
-  filename: string
-  mimeType: string
-  size: number
-  path: string
-  createdAt: string
-}
-
-interface UploadRow {
-  id: string
-  owner_id: string
-  filename: string
-  mime_type: string
-  size: number
-  path: string
-  created_at: string
-}
+// Re-export types for convenience
+export type { UploadProfile } from '../db/repositories/interfaces/upload.repository.interface.js'
 
 export class UploadService {
   private uploadDir: string
 
   constructor(
-    private db: Database.Database,
+    private uploadRepository: IUploadRepository,
     uploadDir: string,
   ) {
     this.uploadDir = uploadDir
@@ -40,52 +26,43 @@ export class UploadService {
     return this.uploadDir
   }
 
-  upload(ownerId: string, filename: string, mimeType: string, size: number, storedPath: string): UploadProfile {
+  async upload(
+    ownerId: string,
+    filename: string,
+    mimeType: string,
+    size: number,
+    storedPath: string,
+  ): Promise<UploadProfile> {
     const id = randomUUID()
-    const row = this.db
-      .prepare(
-        `INSERT INTO uploads (id, owner_id, filename, mime_type, size, path)
-         VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
-      )
-      .get(id, ownerId, filename, mimeType, size, storedPath) as UploadRow
-
-    return rowToProfile(row)
+    return await this.uploadRepository.create({
+      id,
+      ownerId,
+      filename,
+      mimeType,
+      size,
+      path: storedPath,
+    })
   }
 
-  findById(id: string): UploadProfile | null {
-    const row = this.db
-      .prepare('SELECT * FROM uploads WHERE id = ?')
-      .get(id) as UploadRow | undefined
-    return row ? rowToProfile(row) : null
+  async findById(id: string): Promise<UploadProfile | null> {
+    return await this.uploadRepository.findById(id)
   }
 
-  getFilePath(id: string): string | null {
-    const upload = this.findById(id)
+  async getFilePath(id: string): Promise<string | null> {
+    const upload = await this.findById(id)
     if (!upload) return null
     return join(this.uploadDir, upload.path)
   }
 
-  deleteUpload(id: string, ownerId: string): void {
-    const upload = this.findById(id)
+  async deleteUpload(id: string, ownerId: string): Promise<void> {
+    const upload = await this.findById(id)
     if (!upload) {
       throw new UploadError('NOT_FOUND', 'Upload not found')
     }
     if (upload.ownerId !== ownerId) {
       throw new UploadError('NOT_AUTHORIZED', 'Can only delete your own uploads')
     }
-    this.db.prepare('DELETE FROM uploads WHERE id = ?').run(id)
-  }
-}
-
-function rowToProfile(row: UploadRow): UploadProfile {
-  return {
-    id: row.id,
-    ownerId: row.owner_id,
-    filename: row.filename,
-    mimeType: row.mime_type,
-    size: row.size,
-    path: row.path,
-    createdAt: row.created_at,
+    await this.uploadRepository.delete(id, ownerId)
   }
 }
 

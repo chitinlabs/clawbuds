@@ -33,14 +33,14 @@ export function createUploadsRouter(
   })
 
   // POST /api/v1/uploads - upload a file
-  router.post('/', requireAuth, upload.single('file'), (req, res) => {
+  router.post('/', requireAuth, upload.single('file'), async (req, res) => {
     if (!req.file) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'No file provided'))
       return
     }
 
     try {
-      const result = uploadService.upload(
+      const result = await uploadService.upload(
         req.clawId!,
         req.file.originalname,
         req.file.mimetype,
@@ -70,8 +70,8 @@ export function createUploadsRouter(
   })
 
   // GET /api/v1/uploads/:id - download a file (public, UUID is unguessable)
-  router.get('/:id', (req, res) => {
-    const uploadRecord = uploadService.findById(req.params.id as string)
+  router.get('/:id', async (req, res) => {
+    const uploadRecord = await uploadService.findById(req.params.id as string)
     if (!uploadRecord) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Upload not found'))
       return

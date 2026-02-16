@@ -7,6 +7,7 @@ import type { IClawRepository } from './interfaces/claw.repository.interface.js'
 import type { IMessageRepository } from './interfaces/message.repository.interface.js'
 import type { IFriendshipRepository } from './interfaces/friendship.repository.interface.js'
 import type { IGroupRepository } from './interfaces/group.repository.interface.js'
+import type { IUploadRepository } from './interfaces/upload.repository.interface.js'
 import type Database from 'better-sqlite3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -15,12 +16,14 @@ import { SQLiteClawRepository } from './sqlite/claw.repository.js'
 import { SQLiteMessageRepository } from './sqlite/message.repository.js'
 import { SQLiteFriendshipRepository } from './sqlite/friendship.repository.js'
 import { SQLiteGroupRepository } from './sqlite/group.repository.js'
+import { SQLiteUploadRepository } from './sqlite/upload.repository.js'
 
 // Supabase 实现
 import { SupabaseClawRepository } from './supabase/claw.repository.js'
 import { SupabaseMessageRepository } from './supabase/message.repository.js'
 import { SupabaseFriendshipRepository } from './supabase/friendship.repository.js'
 import { SupabaseGroupRepository } from './supabase/group.repository.js'
+import { SupabaseUploadRepository } from './supabase/upload.repository.js'
 
 export type DatabaseType = 'sqlite' | 'supabase'
 
@@ -108,6 +111,20 @@ export class RepositoryFactory {
         return new SQLiteGroupRepository(this.sqliteDb!)
       case 'supabase':
         return new SupabaseGroupRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 Upload Repository
+   */
+  createUploadRepository(): IUploadRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteUploadRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseUploadRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }
