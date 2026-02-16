@@ -180,7 +180,7 @@ export function createWebhooksRouter(
   })
 
   // POST /api/v1/webhooks/incoming/:id - Incoming webhook endpoint (no auth, uses HMAC)
-  router.post('/incoming/:id', (req, res) => {
+  router.post('/incoming/:id', async (req, res) => {
     const webhook = webhookService.findById(req.params.id as string)
     if (!webhook) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Webhook not found'))
@@ -248,7 +248,7 @@ export function createWebhooksRouter(
       }
 
       // Send message
-      const result = messageService.sendMessage(webhook.clawId, {
+      const result = await messageService.sendMessage(webhook.clawId, {
         blocks,
         visibility,
         toClawIds,

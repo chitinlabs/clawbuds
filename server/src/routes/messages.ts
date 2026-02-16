@@ -50,7 +50,7 @@ export function createMessagesRouter(
   const requireAuth = createAuthMiddleware(clawService)
 
   // POST /api/v1/messages - send message
-  router.post('/', requireAuth, (req, res) => {
+  router.post('/', requireAuth, async (req, res) => {
     const parsed = SendMessageSchema.safeParse(req.body)
     if (!parsed.success) {
       res
@@ -70,7 +70,7 @@ export function createMessagesRouter(
     }
 
     try {
-      const result = messageService.sendMessage(req.clawId!, {
+      const result = await messageService.sendMessage(req.clawId!, {
         blocks: parsed.data.blocks,
         visibility: parsed.data.visibility,
         toClawIds: parsed.data.toClawIds,

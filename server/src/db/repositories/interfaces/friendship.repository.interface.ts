@@ -12,6 +12,8 @@ export interface FriendProfile {
   avatarUrl?: string
   status: FriendshipStatus
   createdAt: string
+  friendshipId?: string // 友谊记录 ID
+  friendsSince?: string // 成为好友的时间（accepted_at）
 }
 
 export interface FriendRequest {
@@ -22,7 +24,37 @@ export interface FriendRequest {
   updatedAt: string
 }
 
+export interface FriendshipRecord {
+  id: string
+  requesterId: string
+  accepterId: string
+  status: FriendshipStatus
+  createdAt: string
+  acceptedAt: string | null
+}
+
 export interface IFriendshipRepository {
+  // ========== 根据 ID 操作（用于向后兼容）==========
+  /**
+   * 根据友谊 ID 查找记录
+   */
+  findById(friendshipId: string): Promise<FriendshipRecord | null>
+
+  /**
+   * 根据双方 ID 查找友谊记录
+   */
+  findByClawIds(clawId1: string, clawId2: string): Promise<FriendshipRecord | null>
+
+  /**
+   * 根据友谊 ID 接受请求
+   */
+  acceptFriendRequestById(friendshipId: string): Promise<void>
+
+  /**
+   * 根据友谊 ID 拒绝请求
+   */
+  rejectFriendRequestById(friendshipId: string): Promise<void>
+
   // ========== 创建 ==========
   /**
    * 发送好友请求

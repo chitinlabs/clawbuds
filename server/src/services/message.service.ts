@@ -77,55 +77,58 @@ export class MessageService {
     private pollService?: PollService,
   ) {}
 
-  sendMessage(fromClawId: string, input: SendMessageInput): SendMessageResult {
+  async sendMessage(fromClawId: string, input: SendMessageInput): Promise<SendMessageResult> {
+    // Determine recipients (async operations must be done outside transaction)
+    let recipientIds: string[]
+
+    if (input.visibility === 'public') {
+      const friends = await this.friendshipService.listFriends(fromClawId)
+      recipientIds = friends.map((f) => f.clawId)
+    } else if (input.visibility === 'circles') {
+      if (!input.circleNames || input.circleNames.length === 0) {
+        throw new MessageError('MISSING_CIRCLES', 'Layers messages require circleNames')
+      }
+      recipientIds = this.circleService.getFriendIdsByCircles(fromClawId, input.circleNames)
+    } else {
+      // Direct
+      if (!input.toClawIds || input.toClawIds.length === 0) {
+        throw new MessageError('MISSING_RECIPIENTS', 'Direct messages require recipients')
+      }
+      // Deduplicate and filter self
+      recipientIds = [...new Set(input.toClawIds)]
+      for (const recipientId of recipientIds) {
+        if (recipientId === fromClawId) {
+          throw new MessageError('INVALID_RECIPIENT', 'Cannot send a message to yourself')
+        }
+        const areFriends = await this.friendshipService.areFriends(fromClawId, recipientId)
+        if (!areFriends) {
+          throw new MessageError(
+            'NOT_FRIENDS',
+            'One or more recipients are not your friends',
+          )
+        }
+      }
+    }
+
+    // Resolve thread fields (async operations must be done outside transaction)
+    let replyToId: string | null = null
+    let threadId: string | null = null
+
+    if (input.replyTo) {
+      const parent = this.db.prepare('SELECT * FROM messages WHERE id = ?').get(input.replyTo) as MessageRow | undefined
+      if (!parent) {
+        throw new MessageError('NOT_FOUND', 'Reply-to message not found')
+      }
+      const parentProfile = rowToProfile(parent)
+      const canView = await this.canViewMessage(parentProfile, fromClawId)
+      if (!canView) {
+        throw new MessageError('NOT_FOUND', 'Reply-to message not found')
+      }
+      replyToId = parent.id
+      threadId = parent.thread_id || parent.id
+    }
+
     const result = this.db.transaction(() => {
-      // Determine recipients
-      let recipientIds: string[]
-
-      if (input.visibility === 'public') {
-        const friends = this.friendshipService.listFriends(fromClawId)
-        recipientIds = friends.map((f) => f.clawId)
-      } else if (input.visibility === 'circles') {
-        if (!input.circleNames || input.circleNames.length === 0) {
-          throw new MessageError('MISSING_CIRCLES', 'Layers messages require circleNames')
-        }
-        recipientIds = this.circleService.getFriendIdsByCircles(fromClawId, input.circleNames)
-      } else {
-        // Direct
-        if (!input.toClawIds || input.toClawIds.length === 0) {
-          throw new MessageError('MISSING_RECIPIENTS', 'Direct messages require recipients')
-        }
-        // Deduplicate and filter self
-        recipientIds = [...new Set(input.toClawIds)]
-        for (const recipientId of recipientIds) {
-          if (recipientId === fromClawId) {
-            throw new MessageError('INVALID_RECIPIENT', 'Cannot send a message to yourself')
-          }
-          if (!this.friendshipService.areFriends(fromClawId, recipientId)) {
-            throw new MessageError(
-              'NOT_FRIENDS',
-              'One or more recipients are not your friends',
-            )
-          }
-        }
-      }
-
-      // Resolve thread fields
-      let replyToId: string | null = null
-      let threadId: string | null = null
-
-      if (input.replyTo) {
-        const parent = this.db.prepare('SELECT * FROM messages WHERE id = ?').get(input.replyTo) as MessageRow | undefined
-        if (!parent) {
-          throw new MessageError('NOT_FOUND', 'Reply-to message not found')
-        }
-        const parentProfile = rowToProfile(parent)
-        if (!this.canViewMessage(parentProfile, fromClawId)) {
-          throw new MessageError('NOT_FOUND', 'Reply-to message not found')
-        }
-        replyToId = parent.id
-        threadId = parent.thread_id || parent.id
-      }
 
       // Handle poll blocks: create poll and inject pollId
       let blocks = input.blocks
@@ -209,7 +212,7 @@ export class MessageService {
     return row ? rowToProfile(row) : null
   }
 
-  editMessage(messageId: string, clawId: string, blocks: Block[]): MessageProfile {
+  async editMessage(messageId: string, clawId: string, blocks: Block[]): Promise<MessageProfile> {
     const message = this.findById(messageId)
     if (!message) {
       throw new MessageError('NOT_FOUND', 'Message not found')
@@ -232,7 +235,7 @@ export class MessageService {
 
     // Emit to all recipients
     if (this.eventBus) {
-      const recipients = this.getMessageRecipients(messageId, message)
+      const recipients = await this.getMessageRecipients(messageId, message)
       for (const recipientId of recipients) {
         this.eventBus.emit('message.edited', { recipientId, message: updated })
       }
@@ -241,7 +244,7 @@ export class MessageService {
     return updated
   }
 
-  deleteMessage(messageId: string, clawId: string): void {
+  async deleteMessage(messageId: string, clawId: string): Promise<void> {
     const message = this.findById(messageId)
     if (!message) {
       throw new MessageError('NOT_FOUND', 'Message not found')
@@ -251,7 +254,7 @@ export class MessageService {
     }
 
     // Get recipients before deletion
-    const recipients = this.getMessageRecipients(messageId, message)
+    const recipients = await this.getMessageRecipients(messageId, message)
 
     // CASCADE will clean up message_recipients and inbox_entries
     this.db.prepare('DELETE FROM messages WHERE id = ?').run(messageId)
@@ -264,10 +267,11 @@ export class MessageService {
     }
   }
 
-  getThread(threadId: string, clawId: string): MessageProfile[] {
+  async getThread(threadId: string, clawId: string): Promise<MessageProfile[]> {
     // First, get the root message (the threadId IS the root message id)
     const root = this.findById(threadId)
-    if (!root || !this.canViewMessage(root, clawId)) {
+    const canView = !root ? false : await this.canViewMessage(root, clawId)
+    if (!root || !canView) {
       throw new MessageError('NOT_FOUND', 'Thread not found')
     }
 
@@ -279,12 +283,12 @@ export class MessageService {
     return [root, ...rows.map(rowToProfile)]
   }
 
-  canViewMessage(message: MessageProfile, clawId: string): boolean {
+  async canViewMessage(message: MessageProfile, clawId: string): Promise<boolean> {
     // Sender can always view
     if (message.fromClawId === clawId) return true
 
     if (message.visibility === 'public') {
-      return this.friendshipService.areFriends(message.fromClawId, clawId)
+      return await this.friendshipService.areFriends(message.fromClawId, clawId)
     }
 
     if (message.visibility === 'direct') {
@@ -306,7 +310,7 @@ export class MessageService {
     return false
   }
 
-  private getMessageRecipients(messageId: string, message: MessageProfile): string[] {
+  private async getMessageRecipients(messageId: string, message: MessageProfile): Promise<string[]> {
     if (message.visibility === 'direct') {
       const rows = this.db
         .prepare('SELECT recipient_id FROM message_recipients WHERE message_id = ?')
@@ -315,7 +319,8 @@ export class MessageService {
     }
 
     if (message.visibility === 'public') {
-      return this.friendshipService.listFriends(message.fromClawId).map((f) => f.clawId)
+      const friends = await this.friendshipService.listFriends(message.fromClawId)
+      return friends.map((f) => f.clawId)
     }
 
     if (message.visibility === 'circles' && message.circles) {

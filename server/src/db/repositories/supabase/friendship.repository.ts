@@ -8,10 +8,84 @@ import type {
   FriendshipStatus,
   FriendProfile,
   FriendRequest,
+  FriendshipRecord,
 } from '../interfaces/friendship.repository.interface.js'
 
 export class SupabaseFriendshipRepository implements IFriendshipRepository {
   constructor(private supabase: SupabaseClient) {}
+
+  // ========== 根据 ID 操作（用于向后兼容）==========
+
+  async findById(friendshipId: string): Promise<FriendshipRecord | null> {
+    const { data: row, error } = await this.supabase
+      .from('friendships')
+      .select('*')
+      .eq('id', friendshipId)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null
+      throw new Error(`Failed to find friendship by ID: ${error.message}`)
+    }
+
+    return {
+      id: row.id,
+      requesterId: row.requester_id,
+      accepterId: row.accepter_id,
+      status: row.status,
+      createdAt: row.created_at,
+      acceptedAt: row.accepted_at,
+    }
+  }
+
+  async findByClawIds(clawId1: string, clawId2: string): Promise<FriendshipRecord | null> {
+    const { data: row, error } = await this.supabase
+      .from('friendships')
+      .select('*')
+      .or(
+        `and(requester_id.eq.${clawId1},accepter_id.eq.${clawId2}),and(requester_id.eq.${clawId2},accepter_id.eq.${clawId1})`,
+      )
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null
+      throw new Error(`Failed to find friendship by claw IDs: ${error.message}`)
+    }
+
+    return {
+      id: row.id,
+      requesterId: row.requester_id,
+      accepterId: row.accepter_id,
+      status: row.status,
+      createdAt: row.created_at,
+      acceptedAt: row.accepted_at,
+    }
+  }
+
+  async acceptFriendRequestById(friendshipId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('friendships')
+      .update({
+        status: 'accepted',
+        accepted_at: new Date().toISOString(),
+      })
+      .eq('id', friendshipId)
+
+    if (error) {
+      throw new Error(`Failed to accept friend request by ID: ${error.message}`)
+    }
+  }
+
+  async rejectFriendRequestById(friendshipId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('friendships')
+      .update({ status: 'rejected' })
+      .eq('id', friendshipId)
+
+    if (error) {
+      throw new Error(`Failed to reject friend request by ID: ${error.message}`)
+    }
+  }
 
   async sendFriendRequest(fromClawId: string, toClawId: string): Promise<void> {
     const { error } = await this.supabase.from('friendships').insert({
@@ -74,7 +148,7 @@ export class SupabaseFriendshipRepository implements IFriendshipRepository {
     // 这个查询比较复杂，需要 JOIN claws 表
     const { data: friendships, error } = await this.supabase
       .from('friendships')
-      .select('*, claws!inner(*)')
+      .select('id, requester_id, accepter_id, status, created_at, accepted_at, claws!inner(*)')
       .eq('status', 'accepted')
       .or(`requester_id.eq.${clawId},accepter_id.eq.${clawId}`)
       .order('accepted_at', { ascending: false })
@@ -93,6 +167,8 @@ export class SupabaseFriendshipRepository implements IFriendshipRepository {
         avatarUrl: friendClaw.avatar_url ?? undefined,
         status: f.status,
         createdAt: f.created_at,
+        friendshipId: f.id,
+        friendsSince: f.accepted_at,
       }
     })
   }

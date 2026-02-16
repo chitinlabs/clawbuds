@@ -9,6 +9,7 @@ import type {
   FriendshipStatus,
   FriendProfile,
   FriendRequest,
+  FriendshipRecord,
 } from '../interfaces/friendship.repository.interface.js'
 import { randomUUID } from 'node:crypto'
 
@@ -23,6 +24,71 @@ interface FriendshipRow {
 
 export class SQLiteFriendshipRepository implements IFriendshipRepository {
   constructor(private db: Database.Database) {}
+
+  // ========== 根据 ID 操作（用于向后兼容）==========
+
+  async findById(friendshipId: string): Promise<FriendshipRecord | null> {
+    const row = this.db
+      .prepare('SELECT * FROM friendships WHERE id = ?')
+      .get(friendshipId) as FriendshipRow | undefined
+
+    if (!row) {
+      return null
+    }
+
+    return {
+      id: row.id,
+      requesterId: row.requester_id,
+      accepterId: row.accepter_id,
+      status: row.status,
+      createdAt: row.created_at,
+      acceptedAt: row.accepted_at,
+    }
+  }
+
+  async findByClawIds(clawId1: string, clawId2: string): Promise<FriendshipRecord | null> {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM friendships
+         WHERE (requester_id = ? AND accepter_id = ?)
+            OR (requester_id = ? AND accepter_id = ?)
+         LIMIT 1`,
+      )
+      .get(clawId1, clawId2, clawId2, clawId1) as FriendshipRow | undefined
+
+    if (!row) {
+      return null
+    }
+
+    return {
+      id: row.id,
+      requesterId: row.requester_id,
+      accepterId: row.accepter_id,
+      status: row.status,
+      createdAt: row.created_at,
+      acceptedAt: row.accepted_at,
+    }
+  }
+
+  async acceptFriendRequestById(friendshipId: string): Promise<void> {
+    this.db
+      .prepare(
+        `UPDATE friendships
+         SET status = 'accepted', accepted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         WHERE id = ?`,
+      )
+      .run(friendshipId)
+  }
+
+  async rejectFriendRequestById(friendshipId: string): Promise<void> {
+    this.db
+      .prepare(
+        `UPDATE friendships
+         SET status = 'rejected'
+         WHERE id = ?`,
+      )
+      .run(friendshipId)
+  }
 
   // ========== 创建 ==========
 
@@ -78,7 +144,8 @@ export class SQLiteFriendshipRepository implements IFriendshipRepository {
   async listFriends(clawId: string): Promise<FriendProfile[]> {
     const rows = this.db
       .prepare(
-        `SELECT c.claw_id, c.display_name, c.bio, c.avatar_url, f.status, f.created_at
+        `SELECT c.claw_id, c.display_name, c.bio, c.avatar_url, f.status, f.created_at,
+                f.id as friendship_id, f.accepted_at as friends_since
          FROM friendships f
          JOIN claws c ON (
            CASE
@@ -97,6 +164,8 @@ export class SQLiteFriendshipRepository implements IFriendshipRepository {
       avatar_url: string | null
       status: FriendshipStatus
       created_at: string
+      friendship_id: string
+      friends_since: string
     }>
 
     return rows.map((row) => ({
@@ -106,6 +175,8 @@ export class SQLiteFriendshipRepository implements IFriendshipRepository {
       avatarUrl: row.avatar_url ?? undefined,
       status: row.status,
       createdAt: row.created_at,
+      friendshipId: row.friendship_id,
+      friendsSince: row.friends_since,
     }))
   }
 

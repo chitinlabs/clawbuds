@@ -23,7 +23,7 @@ export function createFriendsRouter(
   const requireAuth = createAuthMiddleware(clawService)
 
   // POST /api/v1/friends/request - send friend request
-  router.post('/request', requireAuth, (req, res) => {
+  router.post('/request', requireAuth, async (req, res) => {
     const parsed = FriendRequestSchema.safeParse(req.body)
     if (!parsed.success) {
       res
@@ -33,7 +33,7 @@ export function createFriendsRouter(
     }
 
     try {
-      const friendship = friendshipService.sendRequest(req.clawId!, parsed.data.clawId)
+      const friendship = await friendshipService.sendRequest(req.clawId!, parsed.data.clawId)
       res.status(201).json(successResponse(friendship))
     } catch (err) {
       if (err instanceof FriendshipError) {
@@ -54,13 +54,13 @@ export function createFriendsRouter(
   })
 
   // GET /api/v1/friends/requests - get pending requests
-  router.get('/requests', requireAuth, (req, res) => {
-    const requests = friendshipService.getPendingRequests(req.clawId!)
+  router.get('/requests', requireAuth, async (req, res) => {
+    const requests = await friendshipService.getPendingRequests(req.clawId!)
     res.json(successResponse(requests))
   })
 
   // POST /api/v1/friends/accept - accept friend request
-  router.post('/accept', requireAuth, (req, res) => {
+  router.post('/accept', requireAuth, async (req, res) => {
     const parsed = AcceptRejectSchema.safeParse(req.body)
     if (!parsed.success) {
       res
@@ -70,7 +70,7 @@ export function createFriendsRouter(
     }
 
     try {
-      const friendship = friendshipService.acceptRequest(req.clawId!, parsed.data.friendshipId)
+      const friendship = await friendshipService.acceptRequest(req.clawId!, parsed.data.friendshipId)
       res.json(successResponse(friendship))
     } catch (err) {
       if (err instanceof FriendshipError) {
@@ -89,7 +89,7 @@ export function createFriendsRouter(
   })
 
   // POST /api/v1/friends/reject - reject friend request
-  router.post('/reject', requireAuth, (req, res) => {
+  router.post('/reject', requireAuth, async (req, res) => {
     const parsed = AcceptRejectSchema.safeParse(req.body)
     if (!parsed.success) {
       res
@@ -99,7 +99,7 @@ export function createFriendsRouter(
     }
 
     try {
-      const friendship = friendshipService.rejectRequest(req.clawId!, parsed.data.friendshipId)
+      const friendship = await friendshipService.rejectRequest(req.clawId!, parsed.data.friendshipId)
       res.json(successResponse(friendship))
     } catch (err) {
       if (err instanceof FriendshipError) {
@@ -118,7 +118,7 @@ export function createFriendsRouter(
   })
 
   // DELETE /api/v1/friends/:clawId - remove friend
-  router.delete('/:clawId', requireAuth, (req, res) => {
+  router.delete('/:clawId', requireAuth, async (req, res) => {
     const parsed = ClawIdSchema.safeParse(req.params.clawId)
     if (!parsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid claw ID format'))
@@ -126,7 +126,7 @@ export function createFriendsRouter(
     }
 
     try {
-      friendshipService.removeFriend(req.clawId!, parsed.data)
+      await friendshipService.removeFriend(req.clawId!, parsed.data)
       res.json(successResponse({ removed: true }))
     } catch (err) {
       if (err instanceof FriendshipError) {
@@ -138,8 +138,8 @@ export function createFriendsRouter(
   })
 
   // GET /api/v1/friends - list friends
-  router.get('/', requireAuth, (req, res) => {
-    const friends = friendshipService.listFriends(req.clawId!)
+  router.get('/', requireAuth, async (req, res) => {
+    const friends = await friendshipService.listFriends(req.clawId!)
     res.json(successResponse(friends))
   })
 
