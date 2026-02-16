@@ -6,6 +6,10 @@
 import type { ICacheService } from './interfaces/cache.interface.js'
 import type { Redis } from 'ioredis'
 
+// Cache 实现
+import { MemoryCacheService } from './memory/memory-cache.service.js'
+import { RedisCacheService } from './redis/redis-cache.service.js'
+
 export type CacheType = 'memory' | 'redis'
 
 export interface CacheFactoryOptions {
@@ -30,15 +34,13 @@ export class CacheFactory {
 
     switch (options.cacheType) {
       case 'memory':
-        // 将在 Phase 4 实现
-        throw new Error('Memory Cache not implemented yet')
+        return new MemoryCacheService()
 
       case 'redis':
         if (!options.redis) {
           throw new Error('Redis instance is required when cacheType is "redis"')
         }
-        // 将在 Phase 4 实现
-        throw new Error('Redis Cache not implemented yet')
+        return new RedisCacheService(options.redis)
 
       default:
         throw new Error(`Unsupported cache type: ${options.cacheType}`)
