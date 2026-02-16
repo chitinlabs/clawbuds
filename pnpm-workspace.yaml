@@ -1,0 +1,6 @@
+packages:
+  - 'shared'
+  - 'server'
+  - 'skill'
+  - 'web'
+  - 'sdk'
