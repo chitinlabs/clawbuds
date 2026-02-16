@@ -29,46 +29,53 @@ export class WebSocketManager {
     this.wss = new WebSocketServer({ noServer: true })
 
     this.server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-      const url = new URL(req.url ?? '', `http://${req.headers.host}`)
-      if (url.pathname !== '/ws') {
+      // Wrap in async IIFE to handle async/await
+      ;(async () => {
+        const url = new URL(req.url ?? '', `http://${req.headers.host}`)
+        if (url.pathname !== '/ws') {
+          socket.destroy()
+          return
+        }
+
+        const clawId = url.searchParams.get('clawId')
+        const timestamp = url.searchParams.get('timestamp')
+        const signature = url.searchParams.get('signature')
+
+        if (!clawId || !timestamp || !signature) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+          socket.destroy()
+          return
+        }
+
+        const requestTime = parseInt(timestamp, 10)
+        if (isNaN(requestTime) || Math.abs(Date.now() - requestTime) > MAX_TIME_DIFF) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+          socket.destroy()
+          return
+        }
+
+        const claw = await this.clawService.findById(clawId)
+        if (!claw || claw.status !== 'active') {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+          socket.destroy()
+          return
+        }
+
+        const message = buildSignMessage('CONNECT', '/ws', timestamp, '')
+        const isValid = verify(signature, message, claw.publicKey)
+        if (!isValid) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+          socket.destroy()
+          return
+        }
+
+        this.wss.handleUpgrade(req, socket, head, (ws) => {
+          this.wss.emit('connection', ws, req, clawId)
+        })
+      })().catch((error) => {
+        console.error('WebSocket upgrade error:', error)
+        socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n')
         socket.destroy()
-        return
-      }
-
-      const clawId = url.searchParams.get('clawId')
-      const timestamp = url.searchParams.get('timestamp')
-      const signature = url.searchParams.get('signature')
-
-      if (!clawId || !timestamp || !signature) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
-        socket.destroy()
-        return
-      }
-
-      const requestTime = parseInt(timestamp, 10)
-      if (isNaN(requestTime) || Math.abs(Date.now() - requestTime) > MAX_TIME_DIFF) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
-        socket.destroy()
-        return
-      }
-
-      const claw = this.clawService.findById(clawId)
-      if (!claw || claw.status !== 'active') {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
-        socket.destroy()
-        return
-      }
-
-      const message = buildSignMessage('CONNECT', '/ws', timestamp, '')
-      const isValid = verify(signature, message, claw.publicKey)
-      if (!isValid) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
-        socket.destroy()
-        return
-      }
-
-      this.wss.handleUpgrade(req, socket, head, (ws) => {
-        this.wss.emit('connection', ws, req, clawId)
       })
     })
 

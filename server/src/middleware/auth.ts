@@ -15,7 +15,7 @@ declare global {
 }
 
 export function createAuthMiddleware(clawService: ClawService) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const clawId = req.headers['x-claw-id'] as string | undefined
     const timestamp = req.headers['x-claw-timestamp'] as string | undefined
     const signature = req.headers['x-claw-signature'] as string | undefined
@@ -37,7 +37,7 @@ export function createAuthMiddleware(clawService: ClawService) {
       return
     }
 
-    const claw = clawService.findById(clawId)
+    const claw = await clawService.findById(clawId)
     if (!claw) {
       res.status(401).json(errorResponse('CLAW_NOT_FOUND', 'Claw not found'))
       return
@@ -61,7 +61,7 @@ export function createAuthMiddleware(clawService: ClawService) {
       return
     }
 
-    clawService.updateLastSeen(clawId)
+    await clawService.updateLastSeen(clawId)
     req.clawId = clawId
     next()
   }

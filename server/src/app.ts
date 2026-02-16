@@ -32,6 +32,7 @@ import { createE2eeRouter } from './routes/e2ee.js'
 import { createDiscoverRouter } from './routes/discover.js'
 import { createProfileRouter } from './routes/profile.js'
 import { config } from './config/env.js'
+import { RepositoryFactory } from './db/repositories/factory.js'
 import type { Request, Response, NextFunction } from 'express'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -90,8 +91,15 @@ export function createApp(db?: Database.Database): { app: express.Express; ctx: 
   const ctx: AppContext = {}
 
   if (db) {
+    // Create repository factory
+    const repositoryFactory = new RepositoryFactory({
+      databaseType: 'sqlite',
+      sqliteDb: db,
+    })
+
     const eventBus = new EventBus()
-    const clawService = new ClawService(db)
+    const clawRepository = repositoryFactory.createClawRepository()
+    const clawService = new ClawService(clawRepository)
     const friendshipService = new FriendshipService(db, eventBus)
     const circleService = new CircleService(db, friendshipService)
     const reactionService = new ReactionService(db, eventBus)
