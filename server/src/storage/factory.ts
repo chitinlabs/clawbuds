@@ -6,6 +6,10 @@
 import type { IStorageService } from './interfaces/storage.interface.js'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+// Storage 实现
+import { LocalStorageService } from './local/local-storage.service.js'
+import { SupabaseStorageService } from './supabase/supabase-storage.service.js'
+
 export type StorageType = 'local' | 'supabase'
 
 export interface LocalStorageConfig {
@@ -33,15 +37,16 @@ export class StorageFactory {
         if (!options.localConfig) {
           throw new Error('Local storage config is required when storageType is "local"')
         }
-        // 将在 Phase 3 实现
-        throw new Error('Local Storage not implemented yet')
+        return new LocalStorageService({
+          rootDir: options.localConfig.baseDir,
+          baseUrl: options.localConfig.publicUrl,
+        })
 
       case 'supabase':
         if (!options.supabaseClient) {
           throw new Error('Supabase client is required when storageType is "supabase"')
         }
-        // 将在 Phase 3 实现
-        throw new Error('Supabase Storage not implemented yet')
+        return new SupabaseStorageService(options.supabaseClient)
 
       default:
         throw new Error(`Unsupported storage type: ${options.storageType}`)
