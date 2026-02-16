@@ -6,15 +6,19 @@
 import type { IRealtimeService } from './interfaces/realtime.interface.js'
 import type { Redis } from 'ioredis'
 
+// Realtime 实现
+import { WebSocketRealtimeService } from './websocket/websocket-realtime.service.js'
+import { RedisPubSubRealtimeService } from './redis/redis-pubsub-realtime.service.js'
+
 export type RealtimeType = 'websocket' | 'redis-pubsub'
 
 export interface RealtimeFactoryOptions {
   realtimeType: RealtimeType
-  // WebSocket 相关配置
-  wsManager?: any // WebSocketManager 类型，将在实现时定义
+  // WebSocket 相关配置（已实现，使用内置的 WebSocketRealtimeService）
   // Redis Pub/Sub 相关配置
   redisPublisher?: Redis
   redisSubscriber?: Redis
+  keyPrefix?: string
 }
 
 /**
@@ -28,11 +32,7 @@ export class RealtimeFactory {
   static create(options: RealtimeFactoryOptions): IRealtimeService {
     switch (options.realtimeType) {
       case 'websocket':
-        if (!options.wsManager) {
-          throw new Error('WebSocket Manager is required when realtimeType is "websocket"')
-        }
-        // 将在 Phase 5 实现
-        throw new Error('WebSocket Realtime Service not implemented yet')
+        return new WebSocketRealtimeService()
 
       case 'redis-pubsub':
         if (!options.redisPublisher || !options.redisSubscriber) {
@@ -40,8 +40,11 @@ export class RealtimeFactory {
             'Redis publisher and subscriber are required when realtimeType is "redis-pubsub"'
           )
         }
-        // 将在 Phase 5 实现
-        throw new Error('Redis Pub/Sub Realtime Service not implemented yet')
+        return new RedisPubSubRealtimeService({
+          publisher: options.redisPublisher,
+          subscriber: options.redisSubscriber,
+          keyPrefix: options.keyPrefix,
+        })
 
       default:
         throw new Error(`Unsupported realtime type: ${options.realtimeType}`)
