@@ -10,6 +10,18 @@ import type { IGroupRepository } from './interfaces/group.repository.interface.j
 import type Database from 'better-sqlite3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+// SQLite 实现
+import { SQLiteClawRepository } from './sqlite/claw.repository.js'
+import { SQLiteMessageRepository } from './sqlite/message.repository.js'
+import { SQLiteFriendshipRepository } from './sqlite/friendship.repository.js'
+import { SQLiteGroupRepository } from './sqlite/group.repository.js'
+
+// Supabase 实现
+import { SupabaseClawRepository } from './supabase/claw.repository.js'
+import { SupabaseMessageRepository } from './supabase/message.repository.js'
+import { SupabaseFriendshipRepository } from './supabase/friendship.repository.js'
+import { SupabaseGroupRepository } from './supabase/group.repository.js'
+
 export type DatabaseType = 'sqlite' | 'supabase'
 
 export interface RepositoryFactoryOptions {
@@ -51,11 +63,9 @@ export class RepositoryFactory {
   createClawRepository(): IClawRepository {
     switch (this.databaseType) {
       case 'sqlite':
-        // 将在 Phase 2 实现
-        throw new Error('SQLite Claw Repository not implemented yet')
+        return new SQLiteClawRepository(this.sqliteDb!)
       case 'supabase':
-        // 将在 Phase 2 实现
-        throw new Error('Supabase Claw Repository not implemented yet')
+        return new SupabaseClawRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }
@@ -67,9 +77,9 @@ export class RepositoryFactory {
   createMessageRepository(): IMessageRepository {
     switch (this.databaseType) {
       case 'sqlite':
-        throw new Error('SQLite Message Repository not implemented yet')
+        return new SQLiteMessageRepository(this.sqliteDb!)
       case 'supabase':
-        throw new Error('Supabase Message Repository not implemented yet')
+        return new SupabaseMessageRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }
@@ -81,9 +91,9 @@ export class RepositoryFactory {
   createFriendshipRepository(): IFriendshipRepository {
     switch (this.databaseType) {
       case 'sqlite':
-        throw new Error('SQLite Friendship Repository not implemented yet')
+        return new SQLiteFriendshipRepository(this.sqliteDb!)
       case 'supabase':
-        throw new Error('Supabase Friendship Repository not implemented yet')
+        return new SupabaseFriendshipRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }
@@ -95,9 +105,9 @@ export class RepositoryFactory {
   createGroupRepository(): IGroupRepository {
     switch (this.databaseType) {
       case 'sqlite':
-        throw new Error('SQLite Group Repository not implemented yet')
+        return new SQLiteGroupRepository(this.sqliteDb!)
       case 'supabase':
-        throw new Error('Supabase Group Repository not implemented yet')
+        return new SupabaseGroupRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }
