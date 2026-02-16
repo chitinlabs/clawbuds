@@ -251,4 +251,139 @@ export class SupabaseMessageRepository implements IMessageRepository {
 
     return (count ?? 0) > 0
   }
+
+  // ========== 底层数据访问方法 ==========
+
+  async isMessageRecipient(messageId: string, clawId: string): Promise<boolean> {
+    const { count, error } = await this.supabase
+      .from('message_recipients')
+      .select('*', { count: 'exact', head: true })
+      .eq('message_id', messageId)
+      .eq('recipient_id', clawId)
+
+    if (error) {
+      throw new Error(`Failed to check message recipient: ${error.message}`)
+    }
+
+    return (count ?? 0) > 0
+  }
+
+  async findMessageRecipientIds(messageId: string): Promise<string[]> {
+    const { data: rows, error } = await this.supabase
+      .from('message_recipients')
+      .select('recipient_id')
+      .eq('message_id', messageId)
+
+    if (error) {
+      throw new Error(`Failed to find message recipients: ${error.message}`)
+    }
+
+    return (rows || []).map((r) => r.recipient_id)
+  }
+
+  async findInboxEntry(
+    recipientId: string,
+    messageId: string,
+  ): Promise<{
+    id: string
+    seq: number
+    status: string
+    message: {
+      id: string
+      fromClawId: string
+      fromDisplayName: string
+      blocks: Block[]
+      visibility: string
+      contentWarning: string | null
+      createdAt: string
+    }
+    createdAt: string
+  } | null> {
+    const { data: row, error } = await this.supabase
+      .from('inbox_entries')
+      .select(
+        `
+        id, seq, status, created_at,
+        messages (
+          id, from_claw_id, blocks_json, visibility, content_warning, created_at
+        ),
+        claws!messages_from_claw_id_fkey (
+          display_name
+        )
+      `,
+      )
+      .eq('recipient_id', recipientId)
+      .eq('message_id', messageId)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null
+      throw new Error(`Failed to find inbox entry: ${error.message}`)
+    }
+
+    if (!row || !row.messages || !row.claws) return null
+
+    const message = Array.isArray(row.messages) ? row.messages[0] : row.messages
+    const claw = Array.isArray(row.claws) ? row.claws[0] : row.claws
+
+    return {
+      id: row.id,
+      seq: row.seq,
+      status: row.status,
+      message: {
+        id: message.id,
+        fromClawId: message.from_claw_id,
+        fromDisplayName: claw.display_name,
+        blocks: message.blocks_json,
+        visibility: message.visibility,
+        contentWarning: message.content_warning,
+        createdAt: message.created_at,
+      },
+      createdAt: row.created_at,
+    }
+  }
+
+  async incrementSeqCounter(clawId: string): Promise<number> {
+    // PostgreSQL UPSERT with RETURNING
+    const { data: row, error } = await this.supabase.rpc('increment_seq_counter', {
+      p_claw_id: clawId,
+    })
+
+    if (error) {
+      throw new Error(`Failed to increment seq counter: ${error.message}`)
+    }
+
+    return row as number
+  }
+
+  async insertMessageWithRecipients(data: {
+    messageId: string
+    fromClawId: string
+    blocks: Block[]
+    visibility: MessageVisibility
+    circles?: string[]
+    contentWarning?: string
+    replyToId?: string
+    threadId?: string
+    recipientIds: string[]
+  }): Promise<MessageProfile> {
+    // 在 PostgreSQL 中使用 RPC 函数实现事务
+    const { data: result, error } = await this.supabase.rpc('insert_message_with_recipients', {
+      p_message_id: data.messageId,
+      p_from_claw_id: data.fromClawId,
+      p_blocks_json: data.blocks,
+      p_visibility: data.visibility,
+      p_circles_json: data.circles ?? null,
+      p_content_warning: data.contentWarning ?? null,
+      p_reply_to_id: data.replyToId ?? null,
+      p_thread_id: data.threadId ?? null,
+      p_recipient_ids: data.recipientIds,
+    })
+
+    if (error) {
+      throw new Error(`Failed to insert message with recipients: ${error.message}`)
+    }
+
+    return result as MessageProfile
+  }
 }

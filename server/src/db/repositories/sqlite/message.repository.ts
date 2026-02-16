@@ -242,4 +242,174 @@ export class SQLiteMessageRepository implements IMessageRepository {
       .get(messageId)
     return result !== undefined
   }
+
+  // ========== 底层数据访问方法 ==========
+
+  async isMessageRecipient(messageId: string, clawId: string): Promise<boolean> {
+    const result = this.db
+      .prepare('SELECT 1 FROM message_recipients WHERE message_id = ? AND recipient_id = ? LIMIT 1')
+      .get(messageId, clawId)
+    return result !== undefined
+  }
+
+  async findMessageRecipientIds(messageId: string): Promise<string[]> {
+    const rows = this.db
+      .prepare('SELECT recipient_id FROM message_recipients WHERE message_id = ?')
+      .all(messageId) as { recipient_id: string }[]
+    return rows.map((r) => r.recipient_id)
+  }
+
+  async findInboxEntry(
+    recipientId: string,
+    messageId: string,
+  ): Promise<{
+    id: string
+    seq: number
+    status: string
+    message: {
+      id: string
+      fromClawId: string
+      fromDisplayName: string
+      blocks: Block[]
+      visibility: string
+      contentWarning: string | null
+      createdAt: string
+    }
+    createdAt: string
+  } | null> {
+    const row = this.db
+      .prepare(
+        `SELECT
+          ie.id, ie.seq, ie.status, ie.created_at,
+          m.id AS message_id, m.from_claw_id, m.blocks_json,
+          m.visibility, m.content_warning, m.created_at AS msg_created_at,
+          c.display_name
+        FROM inbox_entries ie
+        JOIN messages m ON m.id = ie.message_id
+        JOIN claws c ON c.claw_id = m.from_claw_id
+        WHERE ie.recipient_id = ? AND ie.message_id = ?`,
+      )
+      .get(recipientId, messageId) as
+      | {
+          id: string
+          seq: number
+          status: string
+          created_at: string
+          message_id: string
+          from_claw_id: string
+          blocks_json: string
+          visibility: string
+          content_warning: string | null
+          msg_created_at: string
+          display_name: string
+        }
+      | undefined
+
+    if (!row) return null
+
+    return {
+      id: row.id,
+      seq: row.seq,
+      status: row.status,
+      message: {
+        id: row.message_id,
+        fromClawId: row.from_claw_id,
+        fromDisplayName: row.display_name,
+        blocks: JSON.parse(row.blocks_json),
+        visibility: row.visibility,
+        contentWarning: row.content_warning,
+        createdAt: row.msg_created_at,
+      },
+      createdAt: row.created_at,
+    }
+  }
+
+  async incrementSeqCounter(clawId: string): Promise<number> {
+    const row = this.db
+      .prepare(
+        `INSERT INTO seq_counters (claw_id, seq) VALUES (?, 1)
+         ON CONFLICT(claw_id) DO UPDATE SET seq = seq + 1
+         RETURNING seq`,
+      )
+      .get(clawId) as { seq: number }
+    return row.seq
+  }
+
+  async insertMessageWithRecipients(data: {
+    messageId: string
+    fromClawId: string
+    blocks: Block[]
+    visibility: MessageVisibility
+    circles?: string[]
+    contentWarning?: string
+    replyToId?: string
+    threadId?: string
+    recipientIds: string[]
+  }): Promise<MessageProfile> {
+    return new Promise((resolve, reject) => {
+      try {
+        const result = this.db.transaction(() => {
+          const blocksJson = JSON.stringify(data.blocks)
+          const circlesJson = data.circles ? JSON.stringify(data.circles) : null
+
+          // 插入消息
+          this.db
+            .prepare(
+              `INSERT INTO messages (id, from_claw_id, blocks_json, visibility, circles_json, content_warning, reply_to_id, thread_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .run(
+              data.messageId,
+              data.fromClawId,
+              blocksJson,
+              data.visibility,
+              circlesJson,
+              data.contentWarning ?? null,
+              data.replyToId ?? null,
+              data.threadId ?? null,
+            )
+
+          // 插入接收者(仅 direct 消息)
+          if (data.visibility === 'direct' && data.recipientIds.length > 0) {
+            const insertRecipient = this.db.prepare(
+              'INSERT INTO message_recipients (message_id, recipient_id) VALUES (?, ?)',
+            )
+            for (const recipientId of data.recipientIds) {
+              insertRecipient.run(data.messageId, recipientId)
+            }
+          }
+
+          // 插入收件箱条目
+          if (data.recipientIds.length > 0) {
+            const insertInbox = this.db.prepare(
+              'INSERT INTO inbox_entries (id, recipient_id, message_id, seq) VALUES (?, ?, ?, ?)',
+            )
+
+            for (const recipientId of data.recipientIds) {
+              const seqRow = this.db
+                .prepare(
+                  `INSERT INTO seq_counters (claw_id, seq) VALUES (?, 1)
+                   ON CONFLICT(claw_id) DO UPDATE SET seq = seq + 1
+                   RETURNING seq`,
+                )
+                .get(recipientId) as { seq: number }
+
+              insertInbox.run(randomUUID(), recipientId, data.messageId, seqRow.seq)
+            }
+          }
+
+          // 查询插入的消息
+          const messageRow = this.db
+            .prepare('SELECT * FROM messages WHERE id = ?')
+            .get(data.messageId) as MessageRow
+
+          return this.rowToMessage(messageRow)
+        })()
+
+        resolve(result)
+      } catch (error) {
+        reject(error)
+      }
+    })
+  }
 }

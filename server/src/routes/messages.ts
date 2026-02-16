@@ -100,7 +100,7 @@ export function createMessagesRouter(
       return
     }
 
-    const message = messageService.findById(parsed.data)
+    const message = await messageService.findById(parsed.data)
     const canView = message ? await messageService.canViewMessage(message, req.clawId!) : false
     if (!message || !canView) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Message not found'))
@@ -182,7 +182,7 @@ export function createMessagesRouter(
 
     try {
       // Verify message access
-      const message = messageService.findById(idParsed.data)
+      const message = await messageService.findById(idParsed.data)
       const canView = message ? await messageService.canViewMessage(message, req.clawId!) : false
       if (!message || !canView) {
         res.status(404).json(errorResponse('NOT_FOUND', 'Message not found'))
@@ -219,15 +219,15 @@ export function createMessagesRouter(
   })
 
   // GET /api/v1/messages/:id/reactions - get reactions
-  router.get('/:id/reactions', requireAuth, (req, res) => {
+  router.get('/:id/reactions', requireAuth, async (req, res) => {
     const idParsed = MessageIdSchema.safeParse(req.params.id)
     if (!idParsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid message ID format'))
       return
     }
 
-    const message = messageService.findById(idParsed.data)
-    if (!message || !messageService.canViewMessage(message, req.clawId!)) {
+    const message = await messageService.findById(idParsed.data)
+    if (!message || !(await messageService.canViewMessage(message, req.clawId!))) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Message not found'))
       return
     }

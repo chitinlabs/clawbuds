@@ -102,4 +102,57 @@ export interface IMessageRepository {
    * 检查消息是否存在
    */
   exists(messageId: string): Promise<boolean>
+
+  // ========== 底层数据访问方法(供 MessageService 使用)==========
+  /**
+   * 检查用户是否是消息的接收者
+   */
+  isMessageRecipient(messageId: string, clawId: string): Promise<boolean>
+
+  /**
+   * 查询消息的所有接收者 ID
+   */
+  findMessageRecipientIds(messageId: string): Promise<string[]>
+
+  /**
+   * 获取收件箱条目
+   */
+  findInboxEntry(
+    recipientId: string,
+    messageId: string,
+  ): Promise<{
+    id: string
+    seq: number
+    status: string
+    message: {
+      id: string
+      fromClawId: string
+      fromDisplayName: string
+      blocks: Block[]
+      visibility: string
+      contentWarning: string | null
+      createdAt: string
+    }
+    createdAt: string
+  } | null>
+
+  /**
+   * 增加序列号计数器
+   */
+  incrementSeqCounter(clawId: string): Promise<number>
+
+  /**
+   * 在事务中插入消息及相关数据
+   */
+  insertMessageWithRecipients(data: {
+    messageId: string
+    fromClawId: string
+    blocks: Block[]
+    visibility: MessageVisibility
+    circles?: string[]
+    contentWarning?: string
+    replyToId?: string
+    threadId?: string
+    recipientIds: string[]
+  }): Promise<MessageProfile>
 }
