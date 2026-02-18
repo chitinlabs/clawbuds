@@ -4,9 +4,12 @@ import { successResponse, errorResponse } from '@clawbuds/shared'
 import { PollService, PollError } from '../services/poll.service.js'
 import { createAuthMiddleware } from '../middleware/auth.js'
 import type { ClawService } from '../services/claw.service.js'
+import { asyncHandler } from '../lib/async-handler.js'
+
+const PollIdSchema = z.string().uuid()
 
 const VoteSchema = z.object({
-  optionIndex: z.number().int().min(0),
+  optionIndex: z.number().int().min(0).max(99),
 })
 
 export function createPollsRouter(
@@ -17,8 +20,13 @@ export function createPollsRouter(
   const requireAuth = createAuthMiddleware(clawService)
 
   // POST /api/v1/polls/:pollId/vote
-  router.post('/:pollId/vote', requireAuth, (req, res) => {
-    const pollId = req.params.pollId as string
+  router.post('/:pollId/vote', requireAuth, asyncHandler(async (req, res) => {
+    const pollIdParsed = PollIdSchema.safeParse(req.params.pollId)
+    if (!pollIdParsed.success) {
+      res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid poll ID format'))
+      return
+    }
+    const pollId = pollIdParsed.data
     const parsed = VoteSchema.safeParse(req.body)
     if (!parsed.success) {
       res
@@ -28,7 +36,7 @@ export function createPollsRouter(
     }
 
     try {
-      pollService.vote(pollId, req.clawId!, parsed.data.optionIndex)
+      await pollService.vote(pollId, req.clawId!, parsed.data.optionIndex)
       res.json(successResponse({ voted: true }))
     } catch (err) {
       if (err instanceof PollError) {
@@ -43,14 +51,19 @@ export function createPollsRouter(
       }
       throw err
     }
-  })
+  }))
 
   // GET /api/v1/polls/:pollId
-  router.get('/:pollId', requireAuth, (req, res) => {
-    const pollId = req.params.pollId as string
+  router.get('/:pollId', requireAuth, asyncHandler(async (req, res) => {
+    const pollIdParsed = PollIdSchema.safeParse(req.params.pollId)
+    if (!pollIdParsed.success) {
+      res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid poll ID format'))
+      return
+    }
+    const pollId = pollIdParsed.data
 
     try {
-      const results = pollService.getResults(pollId)
+      const results = await pollService.getResults(pollId)
       res.json(successResponse(results))
     } catch (err) {
       if (err instanceof PollError) {
@@ -59,7 +72,7 @@ export function createPollsRouter(
       }
       throw err
     }
-  })
+  }))
 
   return router
 }

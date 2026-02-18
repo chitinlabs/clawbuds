@@ -5,6 +5,8 @@ import { verify, buildSignMessage } from '@clawbuds/shared'
 import type { ClawService } from '../services/claw.service.js'
 import type { InboxService } from '../services/inbox.service.js'
 import type { EventBus } from '../services/event-bus.js'
+import type { IRealtimeService, RealtimeMessage } from '../realtime/interfaces/realtime.interface.js'
+import { WebSocketRealtimeService } from '../realtime/websocket/websocket-realtime.service.js'
 
 const MAX_TIME_DIFF = 5 * 60 * 1000 // 5 minutes
 const HEARTBEAT_INTERVAL = 30_000
@@ -19,13 +21,16 @@ export class WebSocketManager {
   private wss: WebSocketServer
   private clients = new Map<string, WsClient>()
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
+  private realtimeService: IRealtimeService
 
   constructor(
     private server: Server,
     private clawService: ClawService,
     private inboxService: InboxService,
     private eventBus: EventBus,
+    realtimeService?: IRealtimeService,
   ) {
+    this.realtimeService = realtimeService ?? new WebSocketRealtimeService()
     this.wss = new WebSocketServer({ noServer: true })
 
     this.server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
@@ -89,6 +94,16 @@ export class WebSocketManager {
       const client: WsClient = { ws: _ws, clawId, alive: true }
       this.clients.set(clawId, client)
 
+      // Register connection with realtime service
+      if (this.realtimeService instanceof WebSocketRealtimeService) {
+        // WebSocket mode: register directly so sendToUser() can find this connection
+        this.realtimeService.registerConnection(clawId, _ws)
+      } else {
+        // Redis PubSub mode: subscribe to this user's channel
+        // When another node publishes to this user, we receive it here and forward to the local WebSocket
+        this.subscribeUserChannel(clawId, _ws)
+      }
+
       _ws.on('pong', () => {
         client.alive = true
       })
@@ -108,6 +123,10 @@ export class WebSocketManager {
         // Only remove if this is still the active client for this clawId
         if (this.clients.get(clawId)?.ws === _ws) {
           this.clients.delete(clawId)
+          // Unsubscribe from Redis channel when disconnected
+          if (!(this.realtimeService instanceof WebSocketRealtimeService)) {
+            this.unsubscribeUserChannel(clawId)
+          }
         }
       })
     })
@@ -178,27 +197,59 @@ export class WebSocketManager {
   }
 
   private sendTo(clawId: string, payload: Record<string, unknown>): void {
-    const client = this.clients.get(clawId)
-    if (client && client.ws.readyState === WebSocket.OPEN) {
-      client.ws.send(JSON.stringify(payload))
+    const message: RealtimeMessage = {
+      type: payload.type as string,
+      payload,
+      timestamp: new Date().toISOString(),
     }
+
+    // Always use IRealtimeService for delivery
+    // - WebSocket mode: sends payload to local connection via registerConnection()
+    // - Redis PubSub mode: publishes to Redis channel for cross-node delivery
+    this.realtimeService.sendToUser(clawId, message).catch(() => {
+      // Ignore delivery errors for offline users
+    })
   }
 
-  private handleCatchUp(client: WsClient, lastSeq: number): void {
-    const entries = this.inboxService.getInbox(client.clawId, {
+  /**
+   * Redis PubSub mode: subscribe to a user's channel so we can deliver
+   * cross-node messages to their local WebSocket connection.
+   */
+  private subscribeUserChannel(clawId: string, ws: WebSocket): void {
+    const channelKey = `user:${clawId}`
+    this.realtimeService.subscribe(channelKey, (msg: RealtimeMessage) => {
+      // Deliver the payload to the local WebSocket client
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(msg.payload))
+      }
+    }).catch(() => {
+      // Ignore subscription errors
+    })
+  }
+
+  /**
+   * Redis PubSub mode: unsubscribe when user disconnects.
+   */
+  private unsubscribeUserChannel(clawId: string): void {
+    const channelKey = `user:${clawId}`
+    this.realtimeService.unsubscribe(channelKey).catch(() => {
+      // Ignore unsubscription errors
+    })
+  }
+
+  private async handleCatchUp(client: WsClient, lastSeq: number): Promise<void> {
+    const entries = await this.inboxService.getInbox(client.clawId, {
       status: 'all',
       afterSeq: lastSeq,
       limit: 100,
     })
 
     for (const entry of entries) {
-      client.ws.send(
-        JSON.stringify({
-          type: 'message.new',
-          data: entry,
-          seq: entry.seq,
-        }),
-      )
+      this.sendTo(client.clawId, {
+        type: 'message.new',
+        data: entry,
+        seq: entry.seq,
+      })
     }
   }
 
@@ -214,6 +265,10 @@ export class WebSocketManager {
         client.ws.ping()
       }
     }, HEARTBEAT_INTERVAL)
+  }
+
+  getRealtimeService(): IRealtimeService {
+    return this.realtimeService
   }
 
   close(): void {

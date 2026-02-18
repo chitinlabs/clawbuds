@@ -71,6 +71,8 @@ export class SupabaseUploadRepository implements IUploadRepository {
 
     if (error) {
       if (error.code === 'PGRST116') return null
+      // Invalid UUID format — treat as not found
+      if (error.code === '22P02') return null
       throw new Error(`Failed to find upload: ${error.message}`)
     }
 

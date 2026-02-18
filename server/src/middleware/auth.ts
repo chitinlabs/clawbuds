@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express'
 import { verify, buildSignMessage } from '@clawbuds/shared'
 import { errorResponse } from '@clawbuds/shared'
 import type { ClawService } from '../services/claw.service.js'
+import { securityLog, AuditEvent } from '../lib/audit-logger.js'
 
 const MAX_TIME_DIFF = 5 * 60 * 1000 // 5 minutes
 
@@ -57,6 +58,17 @@ export function createAuthMiddleware(clawService: ClawService) {
     const isValid = verify(signature, message, claw.publicKey)
 
     if (!isValid) {
+      // Security log: invalid signature (potential attack)
+      securityLog({
+        event: AuditEvent.INVALID_SIGNATURE,
+        clawId,
+        action: 'Authentication failed: invalid signature',
+        severity: 'medium',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { method: req.method, path: fullPath },
+      })
+
       res.status(401).json(errorResponse('INVALID_SIGNATURE', 'Invalid signature'))
       return
     }

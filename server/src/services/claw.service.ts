@@ -1,6 +1,8 @@
 import { generateClawId } from '@clawbuds/shared'
 import type { AutonomyLevel, AutonomyConfig, NotificationPreferences, Claw } from '@clawbuds/shared'
 import type { IClawRepository } from '../db/repositories/interfaces/claw.repository.interface.js'
+import type { ICacheService } from '../cache/interfaces/cache.interface.js'
+import { config } from '../config/env.js'
 
 export type ClawStatus = 'active' | 'suspended' | 'deactivated'
 
@@ -13,7 +15,10 @@ export interface RegisterOptions {
 }
 
 export class ClawService {
-  constructor(private clawRepository: IClawRepository) {}
+  constructor(
+    private clawRepository: IClawRepository,
+    private cache?: ICacheService,
+  ) {}
 
   async register(publicKey: string, displayName: string, bio?: string, options?: RegisterOptions): Promise<ClawProfile> {
     const existing = await this.findByPublicKey(publicKey)
@@ -29,6 +34,7 @@ export class ClawService {
     }
 
     return await this.clawRepository.register({
+      clawId,
       publicKey,
       displayName,
       bio,
@@ -38,7 +44,15 @@ export class ClawService {
   }
 
   async findById(clawId: string): Promise<ClawProfile | null> {
-    return await this.clawRepository.findById(clawId)
+    if (this.cache) {
+      const cached = await this.cache.get<ClawProfile>(`claw:${clawId}`)
+      if (cached) return cached
+    }
+    const claw = await this.clawRepository.findById(clawId)
+    if (claw && this.cache) {
+      await this.cache.set(`claw:${clawId}`, claw, config.cacheTtlClaw)
+    }
+    return claw
   }
 
   async findByPublicKey(publicKey: string): Promise<ClawProfile | null> {
@@ -49,7 +63,9 @@ export class ClawService {
     clawId: string,
     updates: { displayName?: string; bio?: string },
   ): Promise<ClawProfile | null> {
-    return await this.clawRepository.updateProfile(clawId, updates)
+    const result = await this.clawRepository.updateProfile(clawId, updates)
+    if (result && this.cache) await this.cache.del(`claw:${clawId}`)
+    return result
   }
 
   async updateExtendedProfile(
@@ -62,7 +78,9 @@ export class ClawService {
       avatarUrl?: string
     },
   ): Promise<ClawProfile | null> {
-    return await this.clawRepository.updateProfile(clawId, updates)
+    const result = await this.clawRepository.updateProfile(clawId, updates)
+    if (result && this.cache) await this.cache.del(`claw:${clawId}`)
+    return result
   }
 
   async getAutonomyConfig(clawId: string): Promise<{ autonomyLevel: AutonomyLevel; autonomyConfig: AutonomyConfig } | null> {
@@ -84,6 +102,19 @@ export class ClawService {
 
   async updateLastSeen(clawId: string): Promise<void> {
     await this.clawRepository.updateLastSeen(clawId)
+  }
+
+  async savePushSubscription(clawId: string, data: {
+    id: string
+    endpoint: string
+    keyP256dh: string
+    keyAuth: string
+  }): Promise<{ id: string; endpoint: string }> {
+    return await this.clawRepository.savePushSubscription(clawId, data)
+  }
+
+  async deletePushSubscription(clawId: string, endpoint: string): Promise<boolean> {
+    return await this.clawRepository.deletePushSubscription(clawId, endpoint)
   }
 }
 

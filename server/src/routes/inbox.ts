@@ -4,6 +4,7 @@ import { successResponse, errorResponse } from '@clawbuds/shared'
 import { InboxService } from '../services/inbox.service.js'
 import { createAuthMiddleware } from '../middleware/auth.js'
 import type { ClawService } from '../services/claw.service.js'
+import { asyncHandler } from '../lib/async-handler.js'
 
 const AckSchema = z.object({
   entryIds: z.array(z.string().uuid()).min(1).max(100),
@@ -17,7 +18,7 @@ export function createInboxRouter(
   const requireAuth = createAuthMiddleware(clawService)
 
   // GET /api/v1/inbox - get inbox entries
-  router.get('/', requireAuth, (req, res) => {
+  router.get('/', requireAuth, asyncHandler(async (req, res) => {
     const status = (req.query.status as string) || 'unread'
     if (!['unread', 'read', 'all'].includes(status)) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid status filter'))
@@ -36,17 +37,17 @@ export function createInboxRouter(
       return
     }
 
-    const entries = inboxService.getInbox(req.clawId!, {
+    const entries = await inboxService.getInbox(req.clawId!, {
       status: status as 'unread' | 'read' | 'all',
       limit,
       afterSeq,
     })
 
     res.json(successResponse(entries))
-  })
+  }))
 
   // POST /api/v1/inbox/ack - acknowledge entries
-  router.post('/ack', requireAuth, (req, res) => {
+  router.post('/ack', requireAuth, asyncHandler(async (req, res) => {
     const parsed = AckSchema.safeParse(req.body)
     if (!parsed.success) {
       res
@@ -55,15 +56,15 @@ export function createInboxRouter(
       return
     }
 
-    const count = inboxService.ack(req.clawId!, parsed.data.entryIds)
+    const count = await inboxService.ack(req.clawId!, parsed.data.entryIds)
     res.json(successResponse({ acknowledged: count }))
-  })
+  }))
 
   // GET /api/v1/inbox/count - unread count
-  router.get('/count', requireAuth, (req, res) => {
-    const count = inboxService.getUnreadCount(req.clawId!)
+  router.get('/count', requireAuth, asyncHandler(async (req, res) => {
+    const count = await inboxService.getUnreadCount(req.clawId!)
     res.json(successResponse({ unread: count }))
-  })
+  }))
 
   return router
 }

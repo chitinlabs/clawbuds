@@ -7,7 +7,8 @@ import type { ClawService } from '../services/claw.service.js'
 import type { ReactionService } from '../services/reaction.service.js'
 
 const ClawIdSchema = z.string().regex(/^claw_[0-9a-f]{16}$/)
-const MessageIdSchema = z.string().regex(/^[0-9a-f]{32}$/)
+// Accept both 32-char hex (SQLite) and dashed UUID (Supabase)
+const MessageIdSchema = z.string().regex(/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/)
 const EmojiSchema = z.string().min(1).max(32)
 
 const SendMessageSchema = z.object({
@@ -189,7 +190,7 @@ export function createMessagesRouter(
         return
       }
 
-      reactionService.addReaction(idParsed.data, req.clawId!, emojiParsed.data)
+      await reactionService.addReaction(idParsed.data, req.clawId!, emojiParsed.data)
       res.status(201).json(successResponse({ added: true }))
     } catch (err) {
       handleMessageError(err, res)
@@ -197,7 +198,7 @@ export function createMessagesRouter(
   })
 
   // DELETE /api/v1/messages/:id/reactions/:emoji - remove reaction
-  router.delete('/:id/reactions/:emoji', requireAuth, (req, res) => {
+  router.delete('/:id/reactions/:emoji', requireAuth, async (req, res) => {
     const idParsed = MessageIdSchema.safeParse(req.params.id)
     if (!idParsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid message ID format'))
@@ -211,7 +212,7 @@ export function createMessagesRouter(
     }
 
     try {
-      reactionService.removeReaction(idParsed.data, req.clawId!, emojiParsed.data)
+      await reactionService.removeReaction(idParsed.data, req.clawId!, emojiParsed.data)
       res.json(successResponse({ removed: true }))
     } catch (err) {
       handleMessageError(err, res)
@@ -232,7 +233,7 @@ export function createMessagesRouter(
       return
     }
 
-    const reactions = reactionService.getReactions(idParsed.data)
+    const reactions = await reactionService.getReactions(idParsed.data)
     res.json(successResponse(reactions))
   })
 

@@ -15,20 +15,16 @@ import type {
 export class SQLiteGroupDataAccess implements IGroupDataAccess {
   constructor(private db: Database.Database) {}
 
-  getDatabase(): Database.Database {
-    return this.db
-  }
-
   // ========== 群组表操作 ==========
 
-  findGroupById(groupId: string): GroupRow | null {
+  async findGroupById(groupId: string): Promise<GroupRow | null> {
     const row = this.db
       .prepare('SELECT * FROM groups WHERE id = ?')
       .get(groupId) as GroupRow | undefined
     return row || null
   }
 
-  findGroupsByMemberId(clawId: string): GroupRow[] {
+  async findGroupsByMemberId(clawId: string): Promise<GroupRow[]> {
     return this.db
       .prepare(
         `SELECT g.* FROM groups g
@@ -39,7 +35,7 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
       .all(clawId) as GroupRow[]
   }
 
-  insertGroup(data: {
+  async insertGroup(data: {
     id: string
     name: string
     description: string
@@ -47,7 +43,7 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
     type: 'private' | 'public'
     max_members: number
     encrypted: boolean
-  }): void {
+  }): Promise<void> {
     this.db
       .prepare(
         `INSERT INTO groups (id, name, description, owner_id, type, max_members, encrypted)
@@ -64,7 +60,7 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
       )
   }
 
-  updateGroup(
+  async updateGroup(
     groupId: string,
     updates: {
       name?: string
@@ -73,7 +69,7 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
       max_members?: number
       avatar_url?: string | null
     },
-  ): void {
+  ): Promise<void> {
     const fields: string[] = []
     const values: any[] = []
 
@@ -106,11 +102,11 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
     this.db.prepare(`UPDATE groups SET ${fields.join(', ')} WHERE id = ?`).run(...values)
   }
 
-  deleteGroup(groupId: string): void {
+  async deleteGroup(groupId: string): Promise<void> {
     this.db.prepare('DELETE FROM groups WHERE id = ?').run(groupId)
   }
 
-  countGroupMembers(groupId: string): number {
+  async countGroupMembers(groupId: string): Promise<number> {
     const result = this.db
       .prepare('SELECT COUNT(*) as count FROM group_members WHERE group_id = ?')
       .get(groupId) as { count: number }
@@ -119,40 +115,40 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
 
   // ========== 成员表操作 ==========
 
-  findGroupMemberById(memberId: string): GroupMemberRow | null {
+  async findGroupMemberById(memberId: string): Promise<GroupMemberRow | null> {
     const row = this.db
       .prepare('SELECT * FROM group_members WHERE id = ?')
       .get(memberId) as GroupMemberRow | undefined
     return row || null
   }
 
-  findGroupMember(groupId: string, clawId: string): GroupMemberRow | null {
+  async findGroupMember(groupId: string, clawId: string): Promise<GroupMemberRow | null> {
     const row = this.db
       .prepare('SELECT * FROM group_members WHERE group_id = ? AND claw_id = ?')
       .get(groupId, clawId) as GroupMemberRow | undefined
     return row || null
   }
 
-  findGroupMembers(groupId: string): GroupMemberRow[] {
+  async findGroupMembers(groupId: string): Promise<GroupMemberRow[]> {
     return this.db
       .prepare('SELECT * FROM group_members WHERE group_id = ? ORDER BY joined_at ASC')
       .all(groupId) as GroupMemberRow[]
   }
 
-  findGroupMemberIds(groupId: string): string[] {
+  async findGroupMemberIds(groupId: string): Promise<string[]> {
     const rows = this.db
       .prepare('SELECT claw_id FROM group_members WHERE group_id = ?')
       .all(groupId) as { claw_id: string }[]
     return rows.map((r) => r.claw_id)
   }
 
-  insertGroupMember(data: {
+  async insertGroupMember(data: {
     id: string
     group_id: string
     claw_id: string
     role: 'owner' | 'admin' | 'member'
     invited_by?: string | null
-  }): void {
+  }): Promise<void> {
     this.db
       .prepare(
         `INSERT INTO group_members (id, group_id, claw_id, role, invited_by)
@@ -161,13 +157,13 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
       .run(data.id, data.group_id, data.claw_id, data.role, data.invited_by ?? null)
   }
 
-  updateGroupMemberRole(groupId: string, clawId: string, role: 'admin' | 'member'): void {
+  async updateGroupMemberRole(groupId: string, clawId: string, role: 'admin' | 'member'): Promise<void> {
     this.db
       .prepare('UPDATE group_members SET role = ? WHERE group_id = ? AND claw_id = ?')
       .run(role, groupId, clawId)
   }
 
-  deleteGroupMember(groupId: string, clawId: string): void {
+  async deleteGroupMember(groupId: string, clawId: string): Promise<void> {
     this.db
       .prepare('DELETE FROM group_members WHERE group_id = ? AND claw_id = ?')
       .run(groupId, clawId)
@@ -175,14 +171,14 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
 
   // ========== 邀请表操作 ==========
 
-  findGroupInvitationById(invitationId: string): GroupInvitationRow | null {
+  async findGroupInvitationById(invitationId: string): Promise<GroupInvitationRow | null> {
     const row = this.db
       .prepare('SELECT * FROM group_invitations WHERE id = ?')
       .get(invitationId) as GroupInvitationRow | undefined
     return row || null
   }
 
-  findPendingGroupInvitation(groupId: string, inviteeId: string): GroupInvitationRow | null {
+  async findPendingGroupInvitation(groupId: string, inviteeId: string): Promise<GroupInvitationRow | null> {
     const row = this.db
       .prepare(
         `SELECT * FROM group_invitations
@@ -192,7 +188,7 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
     return row || null
   }
 
-  findPendingGroupInvitations(clawId: string): GroupInvitationRow[] {
+  async findPendingGroupInvitations(clawId: string): Promise<GroupInvitationRow[]> {
     return this.db
       .prepare(
         `SELECT * FROM group_invitations
@@ -202,12 +198,12 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
       .all(clawId) as GroupInvitationRow[]
   }
 
-  insertGroupInvitation(data: {
+  async insertGroupInvitation(data: {
     id: string
     group_id: string
     inviter_id: string
     invitee_id: string
-  }): void {
+  }): Promise<void> {
     this.db
       .prepare(
         `INSERT INTO group_invitations (id, group_id, inviter_id, invitee_id, status)
@@ -216,7 +212,7 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
       .run(data.id, data.group_id, data.inviter_id, data.invitee_id)
   }
 
-  acceptGroupInvitation(invitationId: string): void {
+  async acceptGroupInvitation(invitationId: string): Promise<void> {
     this.db
       .prepare(
         `UPDATE group_invitations
@@ -226,7 +222,7 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
       .run(invitationId)
   }
 
-  rejectGroupInvitation(invitationId: string): void {
+  async rejectGroupInvitation(invitationId: string): Promise<void> {
     this.db
       .prepare(
         `UPDATE group_invitations
@@ -238,28 +234,29 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
 
   // ========== 群组消息表操作 ==========
 
-  findGroupMessageById(messageId: string): GroupMessageRow | null {
+  async findGroupMessageById(messageId: string): Promise<GroupMessageRow | null> {
     const row = this.db
-      .prepare('SELECT * FROM group_messages WHERE id = ?')
+      .prepare('SELECT * FROM messages WHERE id = ?')
       .get(messageId) as GroupMessageRow | undefined
     return row || null
   }
 
-  findGroupMessages(groupId: string, limit: number, afterSeq?: number): GroupMessageRow[] {
+  async findGroupMessages(groupId: string, limit: number, afterSeq?: number): Promise<GroupMessageRow[]> {
     if (afterSeq !== undefined) {
-      // TODO: 需要实现基于 seq 的查询
       return this.db
         .prepare(
-          `SELECT * FROM group_messages
-           WHERE group_id = ?
-           ORDER BY created_at DESC
+          `SELECT m.* FROM messages m
+           JOIN inbox_entries ie ON ie.message_id = m.id
+           WHERE m.group_id = ? AND ie.seq > ?
+           GROUP BY m.id
+           ORDER BY m.created_at DESC
            LIMIT ?`,
         )
-        .all(groupId, limit) as GroupMessageRow[]
+        .all(groupId, afterSeq, limit) as GroupMessageRow[]
     } else {
       return this.db
         .prepare(
-          `SELECT * FROM group_messages
+          `SELECT * FROM messages
            WHERE group_id = ?
            ORDER BY created_at DESC
            LIMIT ?`,
@@ -268,7 +265,7 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
     }
   }
 
-  insertGroupMessage(data: {
+  async insertGroupMessage(data: {
     id: string
     from_claw_id: string
     group_id: string
@@ -276,11 +273,11 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
     content_warning?: string | null
     reply_to_id?: string | null
     thread_id?: string | null
-  }): void {
+  }): Promise<void> {
     this.db
       .prepare(
-        `INSERT INTO group_messages (id, from_claw_id, group_id, blocks_json, content_warning, reply_to_id, thread_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO messages (id, from_claw_id, group_id, blocks_json, visibility, content_warning, reply_to_id, thread_id)
+         VALUES (?, ?, ?, ?, 'group', ?, ?, ?)`,
       )
       .run(
         data.id,
@@ -293,18 +290,18 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
       )
   }
 
-  deleteGroupMessage(messageId: string): void {
-    this.db.prepare('DELETE FROM group_messages WHERE id = ?').run(messageId)
+  async deleteGroupMessage(messageId: string): Promise<void> {
+    this.db.prepare('DELETE FROM messages WHERE id = ?').run(messageId)
   }
 
   // ========== 收件箱操作 ==========
 
-  insertInboxEntry(data: {
+  async insertInboxEntry(data: {
     id: string
     recipient_id: string
     message_id: string
     seq: number
-  }): void {
+  }): Promise<void> {
     this.db
       .prepare(
         `INSERT INTO inbox_entries (id, recipient_id, message_id, seq)
@@ -313,10 +310,10 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
       .run(data.id, data.recipient_id, data.message_id, data.seq)
   }
 
-  findInboxEntry(
+  async findInboxEntry(
     recipientId: string,
     messageId: string,
-  ): {
+  ): Promise<{
     id: string
     seq: number
     status: string
@@ -328,7 +325,7 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
     content_warning: string | null
     msg_created_at: string
     display_name: string
-  } | null {
+  } | null> {
     const row = this.db
       .prepare(
         `SELECT
@@ -362,7 +359,7 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
 
   // ========== 序列号计数器 ==========
 
-  incrementSeqCounter(clawId: string): number {
+  async incrementSeqCounter(clawId: string): Promise<number> {
     const row = this.db
       .prepare(
         `INSERT INTO seq_counters (claw_id, seq) VALUES (?, 1)
@@ -375,14 +372,14 @@ export class SQLiteGroupDataAccess implements IGroupDataAccess {
 
   // ========== 辅助查询 ==========
 
-  getClawDisplayName(clawId: string): string | null {
+  async getClawDisplayName(clawId: string): Promise<string | null> {
     const row = this.db
       .prepare('SELECT display_name FROM claws WHERE claw_id = ?')
       .get(clawId) as { display_name: string } | undefined
     return row?.display_name || null
   }
 
-  getGroupName(groupId: string): string | null {
+  async getGroupName(groupId: string): Promise<string | null> {
     const row = this.db
       .prepare('SELECT name FROM groups WHERE id = ?')
       .get(groupId) as { name: string } | undefined

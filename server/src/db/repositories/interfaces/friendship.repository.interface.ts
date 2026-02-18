@@ -3,7 +3,7 @@
  * 好友关系数据访问接口
  */
 
-export type FriendshipStatus = 'pending' | 'accepted' | 'blocked'
+export type FriendshipStatus = 'pending' | 'accepted' | 'rejected' | 'blocked'
 
 export interface FriendProfile {
   clawId: string

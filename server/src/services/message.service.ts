@@ -57,7 +57,7 @@ export class MessageService {
       if (!input.circleNames || input.circleNames.length === 0) {
         throw new MessageError('MISSING_CIRCLES', 'Layers messages require circleNames')
       }
-      recipientIds = this.circleService.getFriendIdsByCircles(fromClawId, input.circleNames)
+      recipientIds = await this.circleService.getFriendIdsByCircles(fromClawId, input.circleNames)
     } else {
       // Direct
       if (!input.toClawIds || input.toClawIds.length === 0) {
@@ -97,15 +97,18 @@ export class MessageService {
     }
 
     // Handle poll blocks: create poll and inject pollId
-    let blocks = input.blocks
+    let blocks: Block[] = input.blocks
     if (this.pollService) {
-      blocks = blocks.map((block) => {
+      const processedBlocks: Block[] = []
+      for (const block of blocks) {
         if (block.type === 'poll') {
-          const poll = this.pollService!.createPoll(block.question, (block as { options: string[] }).options)
-          return { ...block, pollId: poll.id }
+          const poll = await this.pollService!.createPoll(block.question, (block as { options: string[] }).options)
+          processedBlocks.push({ ...block, pollId: poll.id } as Block)
+        } else {
+          processedBlocks.push(block)
         }
-        return block
-      })
+      }
+      blocks = processedBlocks
     }
 
     // Insert message with recipients (Repository handles transaction)
@@ -126,7 +129,7 @@ export class MessageService {
     if (this.pollService) {
       for (const block of blocks) {
         if (block.type === 'poll' && 'pollId' in block) {
-          this.pollService.linkToMessage((block as { pollId: string }).pollId, messageId)
+          await this.pollService.linkToMessage((block as { pollId: string }).pollId, messageId)
         }
       }
     }
@@ -231,7 +234,7 @@ export class MessageService {
     if (message.visibility === 'circles') {
       // Check if viewer is in any of the layers this message was sent to
       if (!message.circles || message.circles.length === 0) return false
-      const memberIds = this.circleService.getFriendIdsByCircles(message.fromClawId, message.circles)
+      const memberIds = await this.circleService.getFriendIdsByCircles(message.fromClawId, message.circles)
       return memberIds.includes(clawId)
     }
 
@@ -249,7 +252,7 @@ export class MessageService {
     }
 
     if (message.visibility === 'circles' && message.circles) {
-      return this.circleService.getFriendIdsByCircles(message.fromClawId, message.circles)
+      return await this.circleService.getFriendIdsByCircles(message.fromClawId, message.circles)
     }
 
     return []

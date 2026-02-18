@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
-import type Database from 'better-sqlite3'
 import { generateKeyPair, sign, buildSignMessage } from '@clawbuds/shared'
-import { createApp } from '../src/app.js'
-import { createTestDatabase } from '../src/db/database.js'
+import { createTestContext, destroyTestContext, getAvailableRepositoryTypes, generateWebhookSignature, type TestContext } from './e2e/helpers.js'
 import { WebhookService } from '../src/services/webhook.service.js'
+import { SqliteWebhookRepository } from '../src/db/repositories/sqlite/webhook.repository.js'
 
 function signedHeaders(
   method: string,
@@ -30,7 +29,7 @@ interface TestClaw {
 }
 
 async function registerClaw(
-  app: ReturnType<typeof createApp>['app'],
+  app: TestContext['app'],
   name: string,
 ): Promise<TestClaw> {
   const keys = generateKeyPair()
@@ -41,17 +40,17 @@ async function registerClaw(
   return { clawId: res.body.data.clawId, keys }
 }
 
-describe('Webhooks API', () => {
-  let db: Database.Database
-  let app: ReturnType<typeof createApp>['app']
+describe.each(getAvailableRepositoryTypes())('Webhooks API [%s]', (repositoryType) => {
+  let tc: TestContext
+  let app: TestContext['app']
 
   beforeEach(() => {
-    db = createTestDatabase()
-    ;({ app } = createApp(db))
+    tc = createTestContext({ repositoryType })
+    app = tc.app
   })
 
   afterEach(() => {
-    db.close()
+    destroyTestContext(tc)
   })
 
   describe('CRUD', () => {
@@ -68,7 +67,7 @@ describe('Webhooks API', () => {
       const res = await request(app).post('/api/v1/webhooks').set(h).send(body)
 
       expect(res.status).toBe(201)
-      expect(res.body.data.id).toMatch(/^whk_/)
+      expect(res.body.data.id).toBeTruthy()
       expect(res.body.data.name).toBe('My Webhook')
       expect(res.body.data.type).toBe('outgoing')
       expect(res.body.data.url).toBe('https://example.com/webhook')
@@ -100,7 +99,7 @@ describe('Webhooks API', () => {
       expect(res.body.error.code).toBe('MISSING_URL')
     })
 
-    it('should list webhooks for a claw', async () => {
+    it('should list webhooks for a claw (secrets redacted)', async () => {
       const alice = await registerClaw(app, 'Alice')
 
       // Create two webhooks
@@ -117,9 +116,13 @@ describe('Webhooks API', () => {
 
       expect(res.status).toBe(200)
       expect(res.body.data).toHaveLength(2)
+      // Secret must NOT be exposed in list responses
+      for (const webhook of res.body.data) {
+        expect(webhook.secret).toBeUndefined()
+      }
     })
 
-    it('should get webhook by id', async () => {
+    it('should get webhook by id (secret redacted)', async () => {
       const alice = await registerClaw(app, 'Alice')
 
       const body = { type: 'outgoing', name: 'Test', url: 'https://example.com/hook' }
@@ -132,6 +135,8 @@ describe('Webhooks API', () => {
 
       expect(res.status).toBe(200)
       expect(res.body.data.id).toBe(webhookId)
+      // Secret must NOT be exposed in detail responses
+      expect(res.body.data.secret).toBeUndefined()
     })
 
     it('should not let others see your webhook', async () => {
@@ -149,7 +154,7 @@ describe('Webhooks API', () => {
       expect(res.status).toBe(403)
     })
 
-    it('should update webhook', async () => {
+    it('should update webhook (secret redacted)', async () => {
       const alice = await registerClaw(app, 'Alice')
 
       const body = { type: 'outgoing', name: 'Test', url: 'https://example.com/hook' }
@@ -164,6 +169,8 @@ describe('Webhooks API', () => {
       expect(res.status).toBe(200)
       expect(res.body.data.url).toBe('https://example.com/new-hook')
       expect(res.body.data.events).toEqual(['message.new'])
+      // Secret must NOT be exposed in update responses
+      expect(res.body.data.secret).toBeUndefined()
     })
 
     it('should delete webhook', async () => {
@@ -218,8 +225,8 @@ describe('Webhooks API', () => {
   })
 
   describe('HMAC Signature', () => {
-    it('should generate and verify HMAC signature', () => {
-      const service = new WebhookService(db)
+    it.skipIf(repositoryType !== 'sqlite')('should generate and verify HMAC signature', () => {
+      const service = new WebhookService(new SqliteWebhookRepository(tc.db!))
       const secret = 'test-secret'
       const payload = JSON.stringify({ event: 'test', data: {} })
 
@@ -255,8 +262,7 @@ describe('Webhooks API', () => {
       // Send incoming webhook with HMAC signature (no toClawIds = public message to all friends)
       const incomingBody = { text: 'Hello from external service' }
       const bodyStr = JSON.stringify(incomingBody)
-      const service = new WebhookService(db)
-      const signature = service.generateSignature(webhook.secret, bodyStr)
+      const signature = generateWebhookSignature(webhook.secret, bodyStr)
 
       const res = await request(app)
         .post(`/api/v1/webhooks/incoming/${webhook.id}`)
@@ -322,8 +328,7 @@ describe('Webhooks API', () => {
       const createRes = await request(app).post('/api/v1/webhooks').set(h1).send(createBody)
       const webhook = createRes.body.data
 
-      const service = new WebhookService(db)
-      const signature = service.generateSignature(webhook.secret, JSON.stringify({ text: 'Hello' }))
+      const signature = generateWebhookSignature(webhook.secret, JSON.stringify({ text: 'Hello' }))
 
       const res = await request(app)
         .post(`/api/v1/webhooks/incoming/${webhook.id}`)
@@ -367,8 +372,7 @@ describe('Webhooks API', () => {
       // Send to both Bob and Charlie
       const incomingBody = { text: 'Notification for all', toClawIds: [bob.clawId, charlie.clawId] }
       const bodyStr = JSON.stringify(incomingBody)
-      const service = new WebhookService(db)
-      const signature = service.generateSignature(webhook.secret, bodyStr)
+      const signature = generateWebhookSignature(webhook.secret, bodyStr)
 
       const res = await request(app)
         .post(`/api/v1/webhooks/incoming/${webhook.id}`)
@@ -414,8 +418,7 @@ describe('Webhooks API', () => {
       // Send with visibility: public
       const incomingBody = { text: 'Public announcement', visibility: 'public' as const }
       const bodyStr = JSON.stringify(incomingBody)
-      const service = new WebhookService(db)
-      const signature = service.generateSignature(webhook.secret, bodyStr)
+      const signature = generateWebhookSignature(webhook.secret, bodyStr)
 
       const res = await request(app)
         .post(`/api/v1/webhooks/incoming/${webhook.id}`)
@@ -446,7 +449,7 @@ describe('Webhooks API', () => {
   })
 
   describe('Disable/Enable', () => {
-    it('should reset failure count when re-enabling', async () => {
+    it.skipIf(repositoryType !== 'sqlite')('should reset failure count when re-enabling', async () => {
       const alice = await registerClaw(app, 'Alice')
 
       const body = { type: 'outgoing', name: 'Test', url: 'https://example.com/hook' }
@@ -455,7 +458,7 @@ describe('Webhooks API', () => {
       const webhookId = createRes.body.data.id
 
       // Simulate failures by directly updating DB
-      db.prepare('UPDATE webhooks SET failure_count = 5, active = 0 WHERE id = ?').run(webhookId)
+      tc.db!.prepare('UPDATE webhooks SET failure_count = 5, active = 0 WHERE id = ?').run(webhookId)
 
       // Re-enable
       const updateBody = { active: true }
@@ -469,13 +472,13 @@ describe('Webhooks API', () => {
   })
 
   describe('Circuit Breaker', () => {
-    it('should auto-disable webhook after 10 consecutive failures', async () => {
-      const service = new WebhookService(db)
+    it.skipIf(repositoryType !== 'sqlite')('should auto-disable webhook after 10 consecutive failures', async () => {
+      const service = new WebhookService(new SqliteWebhookRepository(tc.db!))
 
       const alice = await registerClaw(app, 'Alice')
 
       // Create webhook via service with an invalid port (will fail quickly)
-      const webhook = service.create({
+      const webhook = await service.create({
         clawId: alice.clawId,
         type: 'outgoing',
         name: 'Breaker Test',
@@ -483,7 +486,7 @@ describe('Webhooks API', () => {
       })
 
       // Simulate 9 failures
-      db.prepare('UPDATE webhooks SET failure_count = 9 WHERE id = ?').run(webhook.id)
+      tc.db!.prepare('UPDATE webhooks SET failure_count = 9 WHERE id = ?').run(webhook.id)
 
       // Deliver should fail and trigger circuit breaker
       await service.deliver(
@@ -493,7 +496,7 @@ describe('Webhooks API', () => {
       )
 
       // Check webhook is disabled
-      const updated = service.findById(webhook.id)
+      const updated = await service.findById(webhook.id)
       expect(updated!.active).toBe(false)
       expect(updated!.failureCount).toBe(10)
     }, 15000) // Increase timeout to 15s just in case

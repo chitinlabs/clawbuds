@@ -4,6 +4,7 @@ import { successResponse, errorResponse } from '@clawbuds/shared'
 import { CircleService, CircleError } from '../services/circle.service.js'
 import { createAuthMiddleware } from '../middleware/auth.js'
 import type { ClawService } from '../services/claw.service.js'
+import { asyncHandler } from '../lib/async-handler.js'
 
 const ClawIdSchema = z.string().regex(/^claw_[0-9a-f]{16}$/)
 const CircleIdSchema = z.string().uuid()
@@ -41,7 +42,7 @@ export function createCirclesRouter(
   const requireAuth = createAuthMiddleware(clawService)
 
   // POST /api/v1/circles - create circle
-  router.post('/', requireAuth, (req, res) => {
+  router.post('/', requireAuth, async (req, res) => {
     const parsed = CreateCircleSchema.safeParse(req.body)
     if (!parsed.success) {
       res
@@ -51,7 +52,7 @@ export function createCirclesRouter(
     }
 
     try {
-      const circle = circleService.createCircle(
+      const circle = await circleService.createCircle(
         req.clawId!,
         parsed.data.name,
         parsed.data.description,
@@ -63,13 +64,13 @@ export function createCirclesRouter(
   })
 
   // GET /api/v1/circles - list circles
-  router.get('/', requireAuth, (req, res) => {
-    const circles = circleService.listCircles(req.clawId!)
+  router.get('/', requireAuth, asyncHandler(async (req, res) => {
+    const circles = await circleService.listCircles(req.clawId!)
     res.json(successResponse(circles))
-  })
+  }))
 
   // DELETE /api/v1/circles/:circleId - delete circle
-  router.delete('/:circleId', requireAuth, (req, res) => {
+  router.delete('/:circleId', requireAuth, async (req, res) => {
     const circleIdParsed = CircleIdSchema.safeParse(req.params.circleId)
     if (!circleIdParsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid circle ID format'))
@@ -77,7 +78,7 @@ export function createCirclesRouter(
     }
 
     try {
-      circleService.deleteCircle(req.clawId!, circleIdParsed.data)
+      await circleService.deleteCircle(req.clawId!, circleIdParsed.data)
       res.json(successResponse({ deleted: true }))
     } catch (err) {
       handleCircleError(err, res)
@@ -85,7 +86,7 @@ export function createCirclesRouter(
   })
 
   // POST /api/v1/circles/:circleId/friends - add friend to circle
-  router.post('/:circleId/friends', requireAuth, (req, res) => {
+  router.post('/:circleId/friends', requireAuth, async (req, res) => {
     const circleIdParsed = CircleIdSchema.safeParse(req.params.circleId)
     if (!circleIdParsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid circle ID format'))
@@ -101,7 +102,7 @@ export function createCirclesRouter(
     }
 
     try {
-      circleService.addFriendToCircle(req.clawId!, circleIdParsed.data, parsed.data.clawId)
+      await circleService.addFriendToCircle(req.clawId!, circleIdParsed.data, parsed.data.clawId)
       res.status(201).json(successResponse({ added: true }))
     } catch (err) {
       handleCircleError(err, res)
@@ -109,7 +110,7 @@ export function createCirclesRouter(
   })
 
   // DELETE /api/v1/circles/:circleId/friends/:clawId - remove friend from circle
-  router.delete('/:circleId/friends/:clawId', requireAuth, (req, res) => {
+  router.delete('/:circleId/friends/:clawId', requireAuth, async (req, res) => {
     const circleIdParsed = CircleIdSchema.safeParse(req.params.circleId)
     if (!circleIdParsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid circle ID format'))
@@ -123,7 +124,7 @@ export function createCirclesRouter(
     }
 
     try {
-      circleService.removeFriendFromCircle(req.clawId!, circleIdParsed.data, parsed.data)
+      await circleService.removeFriendFromCircle(req.clawId!, circleIdParsed.data, parsed.data)
       res.json(successResponse({ removed: true }))
     } catch (err) {
       handleCircleError(err, res)
@@ -131,7 +132,7 @@ export function createCirclesRouter(
   })
 
   // GET /api/v1/circles/:circleId/friends - get circle members
-  router.get('/:circleId/friends', requireAuth, (req, res) => {
+  router.get('/:circleId/friends', requireAuth, async (req, res) => {
     const circleIdParsed = CircleIdSchema.safeParse(req.params.circleId)
     if (!circleIdParsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid circle ID format'))
@@ -139,7 +140,7 @@ export function createCirclesRouter(
     }
 
     try {
-      const members = circleService.getCircleMembers(req.clawId!, circleIdParsed.data)
+      const members = await circleService.getCircleMembers(req.clawId!, circleIdParsed.data)
       res.json(successResponse(members))
     } catch (err) {
       handleCircleError(err, res)

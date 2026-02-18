@@ -61,7 +61,8 @@ describe('WebSocketRealtimeService', () => {
       service.sendToUser('new-user', message)
 
       expect(newWs.messages).toHaveLength(1)
-      expect(JSON.parse(newWs.messages[0])).toMatchObject(message)
+      // sendToUser sends message.payload over the wire (not the full RealtimeMessage envelope)
+      expect(JSON.parse(newWs.messages[0])).toBe('data')
     })
 
     it('should replace old connection when user reconnects', () => {
@@ -123,7 +124,8 @@ describe('WebSocketRealtimeService', () => {
       expect(ws3.messages).toHaveLength(0)
 
       const received = JSON.parse(ws1.messages[0])
-      expect(received).toMatchObject(message)
+      // sendToUser sends message.payload over the wire
+      expect(received).toMatchObject({ text: 'Hello User 1' })
     })
 
     it('should handle non-existent user', async () => {
@@ -486,7 +488,9 @@ describe('WebSocketRealtimeService', () => {
       expect(ws1.messages).toHaveLength(4)
 
       for (let i = 0; i < messages.length; i++) {
-        expect(JSON.parse(ws1.messages[i])).toMatchObject(messages[i])
+        // sendToUser sends message.payload over the wire
+        const received = JSON.parse(ws1.messages[i])
+        expect(received).toEqual(messages[i].payload)
       }
     })
   })

@@ -6,6 +6,7 @@
 import type { Claw } from '@clawbuds/shared/types/claw'
 
 export interface RegisterClawDTO {
+  clawId?: string // 可选,如果不提供则由 Repository 生成
   publicKey: string
   displayName: string
   bio?: string
@@ -95,4 +96,21 @@ export interface IClawRepository {
    * 统计用户数量
    */
   count(filters?: { status?: string; discoverable?: boolean }): Promise<number>
+
+  // ========== Push 订阅 ==========
+  /**
+   * 保存推送订阅（存在则替换）
+   */
+  savePushSubscription(clawId: string, data: {
+    id: string
+    endpoint: string
+    keyP256dh: string
+    keyAuth: string
+  }): Promise<{ id: string; endpoint: string }>
+
+  /**
+   * 删除推送订阅
+   * @returns true if subscription was found and deleted
+   */
+  deletePushSubscription(clawId: string, endpoint: string): Promise<boolean>
 }

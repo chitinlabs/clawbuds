@@ -1,9 +1,10 @@
--- Supabase Schema for ClawBuds
--- 对应 SQLite 数据库结构，使用 PostgreSQL 语法
+-- Supabase Schema for ClawBuds (FIXED VERSION)
+-- 修复ID类型：claw_id 使用 TEXT 类型以支持 claw_xxx 格式
+-- 其他ID继续使用 UUID 类型
 
 -- Claws 表（用户）
 CREATE TABLE IF NOT EXISTS claws (
-    claw_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    claw_id TEXT PRIMARY KEY,  -- 修复：UUID → TEXT，移除DEFAULT
     public_key TEXT NOT NULL UNIQUE,
     display_name TEXT NOT NULL,
     bio TEXT DEFAULT '',
@@ -28,8 +29,8 @@ CREATE INDEX IF NOT EXISTS idx_claws_display_name ON claws(LOWER(display_name));
 -- Friendships 表（好友关系）
 CREATE TABLE IF NOT EXISTS friendships (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    requester_id UUID NOT NULL REFERENCES claws(claw_id),
-    accepter_id UUID NOT NULL REFERENCES claws(claw_id),
+    requester_id TEXT NOT NULL REFERENCES claws(claw_id),  -- 修复：UUID → TEXT
+    accepter_id TEXT NOT NULL REFERENCES claws(claw_id),   -- 修复：UUID → TEXT
     status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'accepted', 'rejected', 'blocked')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     accepted_at TIMESTAMPTZ,
@@ -40,10 +41,14 @@ CREATE TABLE IF NOT EXISTS friendships (
 CREATE INDEX IF NOT EXISTS idx_friendships_requester ON friendships(requester_id, status);
 CREATE INDEX IF NOT EXISTS idx_friendships_accepter ON friendships(accepter_id, status);
 
+-- 防止 A→B 和 B→A 同时存在两条好友关系（等价于 SQLite 的 idx_friendships_pair）
+CREATE UNIQUE INDEX IF NOT EXISTS idx_friendships_pair
+ON friendships (LEAST(requester_id, accepter_id), GREATEST(requester_id, accepter_id));
+
 -- Messages 表（消息）
 CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    from_claw_id UUID NOT NULL REFERENCES claws(claw_id),
+    from_claw_id TEXT NOT NULL REFERENCES claws(claw_id),  -- 修复：UUID → TEXT
     blocks_json JSONB NOT NULL,
     visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public', 'direct', 'circles', 'group')),
     circles_json JSONB,
@@ -65,7 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, created_at D
 -- Message Recipients 表（私信接收者）
 CREATE TABLE IF NOT EXISTS message_recipients (
     message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-    recipient_id UUID NOT NULL REFERENCES claws(claw_id),
+    recipient_id TEXT NOT NULL REFERENCES claws(claw_id),  -- 修复：UUID → TEXT
     PRIMARY KEY (message_id, recipient_id)
 );
 
@@ -76,7 +81,7 @@ CREATE TABLE IF NOT EXISTS groups (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     description TEXT DEFAULT '',
-    owner_id UUID NOT NULL REFERENCES claws(claw_id),
+    owner_id TEXT NOT NULL REFERENCES claws(claw_id),  -- 修复：UUID → TEXT
     type TEXT NOT NULL DEFAULT 'private' CHECK(type IN ('private', 'public')),
     max_members INTEGER NOT NULL DEFAULT 100,
     encrypted BOOLEAN NOT NULL DEFAULT FALSE,
@@ -92,21 +97,54 @@ CREATE INDEX IF NOT EXISTS idx_groups_type ON groups(type);
 CREATE TABLE IF NOT EXISTS group_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    claw_id UUID NOT NULL REFERENCES claws(claw_id),
+    claw_id TEXT NOT NULL REFERENCES claws(claw_id),    -- 修复：UUID → TEXT
     role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('owner', 'admin', 'member')),
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    invited_by UUID REFERENCES claws(claw_id),
+    invited_by TEXT REFERENCES claws(claw_id),           -- 修复：UUID → TEXT
     UNIQUE(group_id, claw_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
 CREATE INDEX IF NOT EXISTS idx_group_members_claw ON group_members(claw_id);
 
+-- Group Invitations 表（群组邀请）
+CREATE TABLE IF NOT EXISTS group_invitations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    inviter_id TEXT NOT NULL REFERENCES claws(claw_id), -- 修复：UUID → TEXT
+    invitee_id TEXT NOT NULL REFERENCES claws(claw_id), -- 修复：UUID → TEXT
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'accepted', 'rejected')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    responded_at TIMESTAMPTZ,
+    UNIQUE(group_id, invitee_id, status)
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_invitations_invitee ON group_invitations(invitee_id, status);
+CREATE INDEX IF NOT EXISTS idx_group_invitations_group ON group_invitations(group_id, status);
+
+-- Group Sender Keys 表（群组加密密钥）
+CREATE TABLE IF NOT EXISTS group_sender_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    sender_id TEXT NOT NULL REFERENCES claws(claw_id),    -- 修复：UUID → TEXT
+    recipient_id TEXT NOT NULL REFERENCES claws(claw_id), -- 修复：UUID → TEXT
+    encrypted_key TEXT NOT NULL,
+    key_generation INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(group_id, sender_id, recipient_id, key_generation)
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_sender_keys_group ON group_sender_keys(group_id, sender_id);
+CREATE INDEX IF NOT EXISTS idx_group_sender_keys_recipient ON group_sender_keys(recipient_id);
+
+-- 注意：群组消息复用 messages 表（visibility='group', group_id 非空），
+-- 不再使用独立的 group_messages 表。
+
 -- Inbox Entries 表（收件箱）
 CREATE TABLE IF NOT EXISTS inbox_entries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    recipient_id UUID NOT NULL REFERENCES claws(claw_id),
-    message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    recipient_id TEXT NOT NULL REFERENCES claws(claw_id), -- 修复：UUID → TEXT
+    message_id UUID NOT NULL,  -- 引用 messages 表（群组消息也存储在 messages 中）
     seq BIGINT NOT NULL,
     status TEXT NOT NULL DEFAULT 'unread' CHECK(status IN ('unread', 'read', 'acked')),
     read_at TIMESTAMPTZ,
@@ -120,14 +158,471 @@ CREATE INDEX IF NOT EXISTS idx_inbox_recipient_status ON inbox_entries(recipient
 
 -- Sequence Counters 表（序列计数器）
 CREATE TABLE IF NOT EXISTS seq_counters (
-    claw_id UUID PRIMARY KEY REFERENCES claws(claw_id),
+    claw_id TEXT PRIMARY KEY REFERENCES claws(claw_id), -- 修复：UUID → TEXT
     seq BIGINT NOT NULL DEFAULT 0
 );
 
--- Row Level Security (RLS) 策略
--- 注意：实际使用时需要根据需求配置 RLS 策略
+-- Uploads 表（上传文件）
+CREATE TABLE IF NOT EXISTS uploads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id TEXT NOT NULL REFERENCES claws(claw_id),  -- 修复：UUID → TEXT
+    filename TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    size BIGINT NOT NULL,
+    path TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_uploads_owner ON uploads(owner_id, created_at DESC);
+
+-- Reactions 表（消息反应）
+CREATE TABLE IF NOT EXISTS reactions (
+    message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    claw_id TEXT NOT NULL REFERENCES claws(claw_id),  -- 修复：UUID → TEXT
+    emoji TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (message_id, claw_id, emoji)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reactions_message ON reactions(message_id);
+
+-- Polls 表（投票）
+CREATE TABLE IF NOT EXISTS polls (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    message_id UUID REFERENCES messages(id) ON DELETE CASCADE,
+    question TEXT NOT NULL,
+    options_json JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_polls_message ON polls(message_id);
+
+-- Poll Votes 表（投票选项）
+CREATE TABLE IF NOT EXISTS poll_votes (
+    poll_id UUID NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+    claw_id TEXT NOT NULL REFERENCES claws(claw_id),  -- 修复：UUID → TEXT
+    option_index INTEGER NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (poll_id, claw_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_poll_votes_poll ON poll_votes(poll_id);
+
+-- E2EE Keys 表（端到端加密公钥）
+CREATE TABLE IF NOT EXISTS e2ee_keys (
+    claw_id TEXT PRIMARY KEY REFERENCES claws(claw_id), -- 修复：UUID → TEXT
+    x25519_public_key TEXT NOT NULL,
+    key_fingerprint TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    rotated_at TIMESTAMPTZ
+);
+
+-- Webhooks 表（Webhook 注册）
+CREATE TABLE IF NOT EXISTS webhooks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    claw_id TEXT NOT NULL REFERENCES claws(claw_id),  -- 修复：UUID → TEXT
+    type TEXT NOT NULL CHECK(type IN ('outgoing', 'incoming')),
+    name TEXT NOT NULL,
+    url TEXT,
+    secret TEXT NOT NULL,
+    events JSONB NOT NULL DEFAULT '["*"]'::jsonb,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    failure_count INTEGER NOT NULL DEFAULT 0,
+    last_triggered_at TIMESTAMPTZ,
+    last_status_code INTEGER,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(claw_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_webhooks_claw ON webhooks(claw_id, active);
+
+-- Webhook Deliveries 表（Webhook 投递日志）
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    webhook_id UUID NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    status_code INTEGER,
+    response_body TEXT,
+    duration_ms INTEGER,
+    success BOOLEAN NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, created_at DESC);
+
+-- Circles 表（好友圈子/分组）
+CREATE TABLE IF NOT EXISTS circles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id TEXT NOT NULL REFERENCES claws(claw_id),  -- 修复：UUID → TEXT
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_circles_owner_name ON circles(owner_id, name);
+
+-- Friend Circles 表（好友与圈子的关联）
+CREATE TABLE IF NOT EXISTS friend_circles (
+    circle_id UUID NOT NULL REFERENCES circles(id) ON DELETE CASCADE,
+    friend_claw_id TEXT NOT NULL,  -- 修复：UUID → TEXT（注意：这里没有外键约束）
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (circle_id, friend_claw_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_friend_circles_circle ON friend_circles(circle_id);
+
+-- Push Subscriptions 表（推送订阅）
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    claw_id TEXT NOT NULL REFERENCES claws(claw_id) ON DELETE CASCADE,  -- 修复：UUID → TEXT
+    endpoint TEXT NOT NULL,
+    key_p256dh TEXT NOT NULL,
+    key_auth TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(claw_id, endpoint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subs_claw ON push_subscriptions(claw_id);
+
+-- Claw Stats 表（用户统计）
+CREATE TABLE IF NOT EXISTS claw_stats (
+    claw_id TEXT PRIMARY KEY REFERENCES claws(claw_id) ON DELETE CASCADE,  -- 修复：UUID → TEXT
+    messages_sent INTEGER NOT NULL DEFAULT 0,
+    messages_received INTEGER NOT NULL DEFAULT 0,
+    friends_count INTEGER NOT NULL DEFAULT 0,
+    last_message_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ========== Row Level Security (RLS) ==========
+-- 所有表启用 RLS，提供纵深防御。
+-- 服务端使用 service_role key 自动绕过 RLS，因此不影响正常运行。
+-- 以下策略确保：即使非 service_role 客户端（anon/authenticated）访问 Supabase，
+-- 也无法读写任何数据（除非未来显式添加宽松策略）。
+
+-- 核心表
 ALTER TABLE claws ENABLE ROW LEVEL SECURITY;
 ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE message_recipients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE group_invitations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE group_sender_keys ENABLE ROW LEVEL SECURITY;
+
+-- 收件箱与序列
+ALTER TABLE inbox_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE seq_counters ENABLE ROW LEVEL SECURITY;
+
+-- 上传
+ALTER TABLE uploads ENABLE ROW LEVEL SECURITY;
+
+-- 反应与投票
+ALTER TABLE reactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE polls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE poll_votes ENABLE ROW LEVEL SECURITY;
+
+-- E2EE
+ALTER TABLE e2ee_keys ENABLE ROW LEVEL SECURITY;
+
+-- Webhooks
+ALTER TABLE webhooks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE webhook_deliveries ENABLE ROW LEVEL SECURITY;
+
+-- Circles
+ALTER TABLE circles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE friend_circles ENABLE ROW LEVEL SECURITY;
+
+-- 推送与统计
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE claw_stats ENABLE ROW LEVEL SECURITY;
+
+-- ========== RLS 策略：默认拒绝所有非 service_role 访问 ==========
+-- service_role 自动绕过 RLS，无需为其创建策略。
+-- 以下策略为 authenticated/anon 角色创建"拒绝全部"规则，
+-- 确保只有通过服务端（service_role）才能操作数据。
+
+-- claws: 只允许用户查看自己的资料
+CREATE POLICY "claws_select_own" ON claws FOR SELECT
+  USING (auth.uid()::text = claw_id);
+CREATE POLICY "claws_deny_insert" ON claws FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "claws_update_own" ON claws FOR UPDATE
+  USING (auth.uid()::text = claw_id);
+CREATE POLICY "claws_deny_delete" ON claws FOR DELETE
+  USING (false);
+
+-- friendships: 只允许参与方查看
+CREATE POLICY "friendships_select_own" ON friendships FOR SELECT
+  USING (auth.uid()::text IN (requester_id, accepter_id));
+CREATE POLICY "friendships_deny_insert" ON friendships FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "friendships_deny_update" ON friendships FOR UPDATE
+  USING (false);
+CREATE POLICY "friendships_deny_delete" ON friendships FOR DELETE
+  USING (false);
+
+-- messages: 只允许发送者查看自己发的消息
+CREATE POLICY "messages_select_own" ON messages FOR SELECT
+  USING (auth.uid()::text = from_claw_id);
+CREATE POLICY "messages_deny_insert" ON messages FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "messages_deny_update" ON messages FOR UPDATE
+  USING (false);
+CREATE POLICY "messages_deny_delete" ON messages FOR DELETE
+  USING (false);
+
+-- message_recipients: 只允许收件人查看
+CREATE POLICY "message_recipients_select_own" ON message_recipients FOR SELECT
+  USING (auth.uid()::text = recipient_id);
+CREATE POLICY "message_recipients_deny_insert" ON message_recipients FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "message_recipients_deny_delete" ON message_recipients FOR DELETE
+  USING (false);
+
+-- groups: 只允许成员查看（通过 group_members 子查询）
+CREATE POLICY "groups_select_member" ON groups FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM group_members gm
+    WHERE gm.group_id = groups.id AND gm.claw_id = auth.uid()::text
+  ));
+CREATE POLICY "groups_deny_insert" ON groups FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "groups_deny_update" ON groups FOR UPDATE
+  USING (false);
+CREATE POLICY "groups_deny_delete" ON groups FOR DELETE
+  USING (false);
+
+-- group_members: 只允许同组成员查看
+CREATE POLICY "group_members_select_member" ON group_members FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM group_members gm2
+    WHERE gm2.group_id = group_members.group_id AND gm2.claw_id = auth.uid()::text
+  ));
+CREATE POLICY "group_members_deny_insert" ON group_members FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "group_members_deny_update" ON group_members FOR UPDATE
+  USING (false);
+CREATE POLICY "group_members_deny_delete" ON group_members FOR DELETE
+  USING (false);
+
+-- group_invitations: 只允许邀请人和被邀请人查看
+CREATE POLICY "group_invitations_select_own" ON group_invitations FOR SELECT
+  USING (auth.uid()::text IN (inviter_id, invitee_id));
+CREATE POLICY "group_invitations_deny_insert" ON group_invitations FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "group_invitations_deny_update" ON group_invitations FOR UPDATE
+  USING (false);
+CREATE POLICY "group_invitations_deny_delete" ON group_invitations FOR DELETE
+  USING (false);
+
+-- group_sender_keys: 只允许发送者和接收者查看
+CREATE POLICY "group_sender_keys_select_own" ON group_sender_keys FOR SELECT
+  USING (auth.uid()::text IN (sender_id, recipient_id));
+CREATE POLICY "group_sender_keys_deny_insert" ON group_sender_keys FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "group_sender_keys_deny_update" ON group_sender_keys FOR UPDATE
+  USING (false);
+CREATE POLICY "group_sender_keys_deny_delete" ON group_sender_keys FOR DELETE
+  USING (false);
+
+-- inbox_entries: 只允许收件人查看
+CREATE POLICY "inbox_entries_select_own" ON inbox_entries FOR SELECT
+  USING (auth.uid()::text = recipient_id);
+CREATE POLICY "inbox_entries_deny_insert" ON inbox_entries FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "inbox_entries_deny_update" ON inbox_entries FOR UPDATE
+  USING (false);
+CREATE POLICY "inbox_entries_deny_delete" ON inbox_entries FOR DELETE
+  USING (false);
+
+-- seq_counters: 只允许本人查看
+CREATE POLICY "seq_counters_select_own" ON seq_counters FOR SELECT
+  USING (auth.uid()::text = claw_id);
+CREATE POLICY "seq_counters_deny_insert" ON seq_counters FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "seq_counters_deny_update" ON seq_counters FOR UPDATE
+  USING (false);
+
+-- uploads: 只允许上传者查看
+CREATE POLICY "uploads_select_own" ON uploads FOR SELECT
+  USING (auth.uid()::text = owner_id);
+CREATE POLICY "uploads_deny_insert" ON uploads FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "uploads_deny_delete" ON uploads FOR DELETE
+  USING (false);
+
+-- reactions: 只允许本人查看自己的反应
+CREATE POLICY "reactions_select_own" ON reactions FOR SELECT
+  USING (auth.uid()::text = claw_id);
+CREATE POLICY "reactions_deny_insert" ON reactions FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "reactions_deny_delete" ON reactions FOR DELETE
+  USING (false);
+
+-- polls: 拒绝所有非 service_role 访问
+CREATE POLICY "polls_deny_all" ON polls FOR ALL
+  USING (false);
+
+-- poll_votes: 只允许本人查看自己的投票
+CREATE POLICY "poll_votes_select_own" ON poll_votes FOR SELECT
+  USING (auth.uid()::text = claw_id);
+CREATE POLICY "poll_votes_deny_insert" ON poll_votes FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "poll_votes_deny_delete" ON poll_votes FOR DELETE
+  USING (false);
+
+-- e2ee_keys: 只允许本人查看自己的密钥
+CREATE POLICY "e2ee_keys_select_own" ON e2ee_keys FOR SELECT
+  USING (auth.uid()::text = claw_id);
+CREATE POLICY "e2ee_keys_deny_insert" ON e2ee_keys FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "e2ee_keys_deny_update" ON e2ee_keys FOR UPDATE
+  USING (false);
+CREATE POLICY "e2ee_keys_deny_delete" ON e2ee_keys FOR DELETE
+  USING (false);
+
+-- webhooks: 只允许所有者查看
+CREATE POLICY "webhooks_select_own" ON webhooks FOR SELECT
+  USING (auth.uid()::text = claw_id);
+CREATE POLICY "webhooks_deny_insert" ON webhooks FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "webhooks_deny_update" ON webhooks FOR UPDATE
+  USING (false);
+CREATE POLICY "webhooks_deny_delete" ON webhooks FOR DELETE
+  USING (false);
+
+-- webhook_deliveries: 拒绝所有非 service_role 访问
+CREATE POLICY "webhook_deliveries_deny_all" ON webhook_deliveries FOR ALL
+  USING (false);
+
+-- circles: 只允许所有者查看
+CREATE POLICY "circles_select_own" ON circles FOR SELECT
+  USING (auth.uid()::text = owner_id);
+CREATE POLICY "circles_deny_insert" ON circles FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "circles_deny_update" ON circles FOR UPDATE
+  USING (false);
+CREATE POLICY "circles_deny_delete" ON circles FOR DELETE
+  USING (false);
+
+-- friend_circles: 拒绝所有非 service_role 访问
+CREATE POLICY "friend_circles_deny_all" ON friend_circles FOR ALL
+  USING (false);
+
+-- push_subscriptions: 只允许本人查看
+CREATE POLICY "push_subscriptions_select_own" ON push_subscriptions FOR SELECT
+  USING (auth.uid()::text = claw_id);
+CREATE POLICY "push_subscriptions_deny_insert" ON push_subscriptions FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "push_subscriptions_deny_delete" ON push_subscriptions FOR DELETE
+  USING (false);
+
+-- claw_stats: 只允许本人查看
+CREATE POLICY "claw_stats_select_own" ON claw_stats FOR SELECT
+  USING (auth.uid()::text = claw_id);
+CREATE POLICY "claw_stats_deny_insert" ON claw_stats FOR INSERT
+  WITH CHECK (false);
+CREATE POLICY "claw_stats_deny_update" ON claw_stats FOR UPDATE
+  USING (false);
+
+-- ========== RPC 函数 ==========
+
+-- 清理旧版 UUID 参数的函数（从 UUID→TEXT 迁移遗留）
+DROP FUNCTION IF EXISTS increment_seq_counter(UUID);
+DROP FUNCTION IF EXISTS insert_message_with_recipients(UUID, UUID, JSONB, TEXT, JSONB, TEXT, UUID, UUID, UUID[]);
+
+-- 递增序列号计数器
+CREATE OR REPLACE FUNCTION increment_seq_counter(p_claw_id TEXT)  -- 修复：UUID → TEXT
+RETURNS BIGINT AS $$
+DECLARE
+    new_seq BIGINT;
+BEGIN
+    INSERT INTO seq_counters (claw_id, seq)
+    VALUES (p_claw_id, 1)
+    ON CONFLICT (claw_id) DO UPDATE
+    SET seq = seq_counters.seq + 1
+    RETURNING seq INTO new_seq;
+
+    RETURN new_seq;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 在事务中插入消息和收件人
+CREATE OR REPLACE FUNCTION insert_message_with_recipients(
+    p_message_id UUID,
+    p_from_claw_id TEXT,  -- 修复：UUID → TEXT
+    p_blocks_json JSONB,
+    p_visibility TEXT,
+    p_circles_json JSONB DEFAULT NULL,
+    p_content_warning TEXT DEFAULT NULL,
+    p_reply_to_id UUID DEFAULT NULL,
+    p_thread_id UUID DEFAULT NULL,
+    p_recipient_ids TEXT[] DEFAULT ARRAY[]::TEXT[]  -- 修复：UUID[] → TEXT[]
+)
+RETURNS TABLE (
+    id UUID,
+    from_claw_id TEXT,  -- 修复：UUID → TEXT
+    blocks_json JSONB,
+    visibility TEXT,
+    circles_json JSONB,
+    content_warning TEXT,
+    reply_to_id UUID,
+    thread_id UUID,
+    edited BOOLEAN,
+    edited_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ
+) AS $$
+DECLARE
+    recipient_id TEXT;  -- 修复：UUID → TEXT
+BEGIN
+    -- 插入消息
+    INSERT INTO messages (
+        id,
+        from_claw_id,
+        blocks_json,
+        visibility,
+        circles_json,
+        content_warning,
+        reply_to_id,
+        thread_id
+    )
+    VALUES (
+        p_message_id,
+        p_from_claw_id,
+        p_blocks_json,
+        p_visibility,
+        p_circles_json,
+        p_content_warning,
+        p_reply_to_id,
+        p_thread_id
+    );
+
+    -- 插入收件人
+    IF p_recipient_ids IS NOT NULL AND array_length(p_recipient_ids, 1) > 0 THEN
+        FOREACH recipient_id IN ARRAY p_recipient_ids
+        LOOP
+            INSERT INTO message_recipients (message_id, recipient_id)
+            VALUES (p_message_id, recipient_id);
+        END LOOP;
+    END IF;
+
+    -- 返回插入的消息
+    RETURN QUERY
+    SELECT
+        m.id,
+        m.from_claw_id,
+        m.blocks_json,
+        m.visibility,
+        m.circles_json,
+        m.content_warning,
+        m.reply_to_id,
+        m.thread_id,
+        m.edited,
+        m.edited_at,
+        m.created_at
+    FROM messages m
+    WHERE m.id = p_message_id;
+END;
+$$ LANGUAGE plpgsql;

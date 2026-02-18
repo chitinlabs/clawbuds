@@ -209,7 +209,9 @@ export class MemoryCacheService implements ICacheService {
       list = []
     }
 
-    list.unshift(...values)
+    // Redis lpush 从右到左插入: lpush key a b c => [c, b, a, ...]
+    // 所以需要反转 values 数组
+    list.unshift(...values.reverse())
     await this.set(key, list)
   }
 

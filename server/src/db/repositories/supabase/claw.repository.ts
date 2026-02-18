@@ -60,15 +60,22 @@ export class SupabaseClawRepository implements IClawRepository {
   // ========== 创建 ==========
 
   async register(data: RegisterClawDTO): Promise<Claw> {
+    const insertData: any = {
+      public_key: data.publicKey,
+      display_name: data.displayName,
+      bio: data.bio ?? '',
+      discoverable: data.discoverable ?? false,
+      tags: data.tags ?? [],
+    }
+
+    // 如果提供了 clawId,使用它;否则让数据库生成 UUID
+    if (data.clawId) {
+      insertData.claw_id = data.clawId
+    }
+
     const { data: row, error } = await this.supabase
       .from('claws')
-      .insert({
-        public_key: data.publicKey,
-        display_name: data.displayName,
-        bio: data.bio ?? '',
-        discoverable: data.discoverable ?? false,
-        tags: data.tags ?? [],
-      })
+      .insert(insertData)
       .select()
       .single()
 
@@ -300,5 +307,48 @@ export class SupabaseClawRepository implements IClawRepository {
     }
 
     return count ?? 0
+  }
+
+  // ========== Push 订阅 ==========
+
+  async savePushSubscription(clawId: string, data: {
+    id: string
+    endpoint: string
+    keyP256dh: string
+    keyAuth: string
+  }): Promise<{ id: string; endpoint: string }> {
+    const { error } = await this.supabase
+      .from('push_subscriptions')
+      .upsert(
+        {
+          id: data.id,
+          claw_id: clawId,
+          endpoint: data.endpoint,
+          key_p256dh: data.keyP256dh,
+          key_auth: data.keyAuth,
+        },
+        { onConflict: 'claw_id,endpoint' },
+      )
+
+    if (error) {
+      throw new Error(`Failed to save push subscription: ${error.message}`)
+    }
+
+    return { id: data.id, endpoint: data.endpoint }
+  }
+
+  async deletePushSubscription(clawId: string, endpoint: string): Promise<boolean> {
+    const { data, error } = await this.supabase
+      .from('push_subscriptions')
+      .delete()
+      .eq('claw_id', clawId)
+      .eq('endpoint', endpoint)
+      .select('id')
+
+    if (error) {
+      throw new Error(`Failed to delete push subscription: ${error.message}`)
+    }
+
+    return (data?.length ?? 0) > 0
   }
 }

@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
-import type Database from 'better-sqlite3'
 import { WebSocket } from 'ws'
 import { generateKeyPair, sign, buildSignMessage } from '@clawbuds/shared'
-import { createApp } from '../src/app.js'
-import { createTestDatabase } from '../src/db/database.js'
+import { createTestContext, destroyTestContext, getAvailableRepositoryTypes, type TestContext } from './e2e/helpers.js'
 import { WebSocketManager } from '../src/websocket/manager.js'
 import type { Server } from 'node:http'
 
@@ -32,7 +30,7 @@ interface TestClaw {
 }
 
 async function registerClaw(
-  app: ReturnType<typeof createApp>['app'],
+  app: TestContext['app'],
   name: string,
 ): Promise<TestClaw> {
   const keys = generateKeyPair()
@@ -44,7 +42,7 @@ async function registerClaw(
 }
 
 async function makeFriends(
-  app: ReturnType<typeof createApp>['app'],
+  app: TestContext['app'],
   a: TestClaw,
   b: TestClaw,
 ): Promise<void> {
@@ -113,23 +111,22 @@ function collectMessages(ws: WebSocket, count: number, timeout = 2000): Promise<
   })
 }
 
-describe('WebSocket', () => {
-  let db: Database.Database
-  let app: ReturnType<typeof createApp>['app']
-  let ctx: ReturnType<typeof createApp>['ctx']
+describe.each(getAvailableRepositoryTypes())('WebSocket [%s]', (repositoryType) => {
+  let tc: TestContext
+  let app: TestContext['app']
   let server: Server
   let wsManager: WebSocketManager
   const openWs: WebSocket[] = []
 
   beforeEach(async () => {
-    db = createTestDatabase()
-    ;({ app, ctx } = createApp(db))
+    tc = createTestContext({ repositoryType })
+    app = tc.app
 
     await new Promise<void>((resolve) => {
       server = app.listen(0, () => resolve())
     })
 
-    wsManager = new WebSocketManager(server, ctx.clawService!, ctx.inboxService!, ctx.eventBus!)
+    wsManager = new WebSocketManager(server, tc.ctx.clawService!, tc.ctx.inboxService!, tc.ctx.eventBus!)
   })
 
   afterEach(async () => {
@@ -141,7 +138,7 @@ describe('WebSocket', () => {
     openWs.length = 0
     wsManager.close()
     await new Promise<void>((resolve) => server.close(() => resolve()))
-    db.close()
+    destroyTestContext(tc)
   })
 
   async function trackWs(server: Server, claw: TestClaw): Promise<WebSocket> {

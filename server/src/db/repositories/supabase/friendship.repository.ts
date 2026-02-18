@@ -14,6 +14,25 @@ import type {
 export class SupabaseFriendshipRepository implements IFriendshipRepository {
   constructor(private supabase: SupabaseClient) {}
 
+  /**
+   * Validate that an ID contains only safe characters for PostgREST filter expressions.
+   * Prevents injection into .or() filter strings.
+   */
+  private validateId(id: string): void {
+    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+      throw new Error(`Invalid ID format: ${id}`)
+    }
+  }
+
+  /**
+   * Escape an ID for use in PostgREST filter expressions.
+   * Validates and returns the ID (safe characters only).
+   */
+  private escapeId(id: string): string {
+    this.validateId(id)
+    return id
+  }
+
   // ========== 根据 ID 操作（用于向后兼容）==========
 
   async findById(friendshipId: string): Promise<FriendshipRecord | null> {
@@ -39,6 +58,8 @@ export class SupabaseFriendshipRepository implements IFriendshipRepository {
   }
 
   async findByClawIds(clawId1: string, clawId2: string): Promise<FriendshipRecord | null> {
+    this.validateId(clawId1)
+    this.validateId(clawId2)
     const { data: row, error } = await this.supabase
       .from('friendships')
       .select('*')
@@ -95,11 +116,18 @@ export class SupabaseFriendshipRepository implements IFriendshipRepository {
     })
 
     if (error) {
+      if (error.code === '23503') {
+        const fkError = new Error(`Failed to send friend request: ${error.message}`)
+        ;(fkError as any).code = '23503'
+        throw fkError
+      }
       throw new Error(`Failed to send friend request: ${error.message}`)
     }
   }
 
   async acceptFriendRequest(clawId: string, friendId: string): Promise<void> {
+    this.validateId(clawId)
+    this.validateId(friendId)
     const { error } = await this.supabase
       .from('friendships')
       .update({
@@ -116,6 +144,8 @@ export class SupabaseFriendshipRepository implements IFriendshipRepository {
   }
 
   async rejectFriendRequest(clawId: string, friendId: string): Promise<void> {
+    this.validateId(clawId)
+    this.validateId(friendId)
     const { error } = await this.supabase
       .from('friendships')
       .update({ status: 'rejected' })
@@ -129,6 +159,8 @@ export class SupabaseFriendshipRepository implements IFriendshipRepository {
   }
 
   async areFriends(clawId: string, friendId: string): Promise<boolean> {
+    this.validateId(clawId)
+    this.validateId(friendId)
     const { count, error } = await this.supabase
       .from('friendships')
       .select('*', { count: 'exact', head: true })
@@ -145,21 +177,25 @@ export class SupabaseFriendshipRepository implements IFriendshipRepository {
   }
 
   async listFriends(clawId: string): Promise<FriendProfile[]> {
-    // 这个查询比较复杂，需要 JOIN claws 表
+    // Use FK hints with aliases to disambiguate requester/accepter
     const { data: friendships, error } = await this.supabase
       .from('friendships')
-      .select('id, requester_id, accepter_id, status, created_at, accepted_at, claws!inner(*)')
+      .select(`
+        id, requester_id, accepter_id, status, created_at, accepted_at,
+        requester:claws!friendships_requester_id_fkey(claw_id, display_name, bio, avatar_url),
+        accepter:claws!friendships_accepter_id_fkey(claw_id, display_name, bio, avatar_url)
+      `)
       .eq('status', 'accepted')
-      .or(`requester_id.eq.${clawId},accepter_id.eq.${clawId}`)
+      .or(`requester_id.eq.${this.escapeId(clawId)},accepter_id.eq.${this.escapeId(clawId)}`)
       .order('accepted_at', { ascending: false })
 
     if (error) {
       throw new Error(`Failed to list friends: ${error.message}`)
     }
 
-    // 转换结果，获取对方的信息
+    // Pick the other person's info (not the current user)
     return (friendships || []).map((f: any) => {
-      const friendClaw = Array.isArray(f.claws) ? f.claws[0] : f.claws
+      const friendClaw = f.requester_id === clawId ? f.accepter : f.requester
       return {
         clawId: friendClaw.claw_id,
         displayName: friendClaw.display_name,
@@ -219,6 +255,8 @@ export class SupabaseFriendshipRepository implements IFriendshipRepository {
     clawId: string,
     friendId: string,
   ): Promise<FriendshipStatus | null> {
+    this.validateId(clawId)
+    this.validateId(friendId)
     const { data: row, error } = await this.supabase
       .from('friendships')
       .select('status')
@@ -236,6 +274,8 @@ export class SupabaseFriendshipRepository implements IFriendshipRepository {
   }
 
   async removeFriend(clawId: string, friendId: string): Promise<void> {
+    this.validateId(clawId)
+    this.validateId(friendId)
     const { error } = await this.supabase
       .from('friendships')
       .delete()
@@ -281,7 +321,7 @@ export class SupabaseFriendshipRepository implements IFriendshipRepository {
     const { count, error } = await this.supabase
       .from('friendships')
       .select('*', { count: 'exact', head: true })
-      .or(`requester_id.eq.${clawId},accepter_id.eq.${clawId}`)
+      .or(`requester_id.eq.${this.escapeId(clawId)},accepter_id.eq.${this.escapeId(clawId)}`)
       .eq('status', 'accepted')
 
     if (error) {

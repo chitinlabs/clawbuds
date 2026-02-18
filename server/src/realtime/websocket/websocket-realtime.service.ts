@@ -99,7 +99,8 @@ export class WebSocketRealtimeService implements IRealtimeService {
 
     if (connection.ws.readyState === 1) {
       // WebSocket.OPEN
-      const data = JSON.stringify(message)
+      // Send the payload directly to preserve the wire format expected by clients
+      const data = JSON.stringify(message.payload)
       connection.ws.send(data)
     }
   }

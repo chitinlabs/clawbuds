@@ -244,10 +244,10 @@ describe('SQLiteGroupRepository', () => {
         name: 'Test Group',
         createdBy: ownerId,
       })
-      await groupRepo.addMember(group.id, member1Id, 'moderator')
+      await groupRepo.addMember(group.id, member1Id, 'admin')
 
       const permission = await groupRepo.getMemberPermission(group.id, member1Id)
-      expect(permission).toBe('moderator')
+      expect(permission).toBe('admin')
     })
 
     it('should return null for non-member', async () => {
@@ -362,10 +362,10 @@ describe('SQLiteGroupRepository', () => {
         createdBy: ownerId,
       })
 
-      await groupRepo.addMember(group.id, member1Id, 'moderator')
+      await groupRepo.addMember(group.id, member1Id, 'admin')
       const permission = await groupRepo.getMemberPermission(group.id, member1Id)
 
-      expect(permission).toBe('moderator')
+      expect(permission).toBe('admin')
     })
 
     it('should increase member count', async () => {
@@ -417,10 +417,10 @@ describe('SQLiteGroupRepository', () => {
       })
       await groupRepo.addMember(group.id, member1Id, 'member')
 
-      await groupRepo.updateMemberPermission(group.id, member1Id, 'moderator')
+      await groupRepo.updateMemberPermission(group.id, member1Id, 'admin')
       const permission = await groupRepo.getMemberPermission(group.id, member1Id)
 
-      expect(permission).toBe('moderator')
+      expect(permission).toBe('admin')
     })
 
     it('should downgrade permission', async () => {
@@ -428,7 +428,7 @@ describe('SQLiteGroupRepository', () => {
         name: 'Test Group',
         createdBy: ownerId,
       })
-      await groupRepo.addMember(group.id, member1Id, 'moderator')
+      await groupRepo.addMember(group.id, member1Id, 'admin')
 
       await groupRepo.updateMemberPermission(group.id, member1Id, 'member')
       const permission = await groupRepo.getMemberPermission(group.id, member1Id)

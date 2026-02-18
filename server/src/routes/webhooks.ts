@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { successResponse, errorResponse } from '@clawbuds/shared'
-import { WebhookService, WebhookError } from '../services/webhook.service.js'
+import { WebhookService, WebhookError, toPublicWebhookProfile } from '../services/webhook.service.js'
 import { createAuthMiddleware } from '../middleware/auth.js'
 import type { ClawService } from '../services/claw.service.js'
 import type { InboxService } from '../services/inbox.service.js'
 import type { MessageService } from '../services/message.service.js'
+import { asyncHandler } from '../lib/async-handler.js'
 
 const CreateWebhookSchema = z.object({
   type: z.enum(['outgoing', 'incoming']),
@@ -37,7 +38,7 @@ export function createWebhooksRouter(
   const requireAuth = createAuthMiddleware(clawService)
 
   // POST /api/v1/webhooks - Create webhook
-  router.post('/', requireAuth, (req, res) => {
+  router.post('/', requireAuth, async (req, res) => {
     const parsed = CreateWebhookSchema.safeParse(req.body)
     if (!parsed.success) {
       res
@@ -47,7 +48,7 @@ export function createWebhooksRouter(
     }
 
     try {
-      const webhook = webhookService.create({
+      const webhook = await webhookService.create({
         clawId: req.clawId!,
         ...parsed.data,
       })
@@ -67,15 +68,15 @@ export function createWebhooksRouter(
     }
   })
 
-  // GET /api/v1/webhooks - List my webhooks
-  router.get('/', requireAuth, (req, res) => {
-    const webhooks = webhookService.listByClawId(req.clawId!)
-    res.json(successResponse(webhooks))
-  })
+  // GET /api/v1/webhooks - List my webhooks (secrets redacted)
+  router.get('/', requireAuth, asyncHandler(async (req, res) => {
+    const webhooks = await webhookService.listByClawId(req.clawId!)
+    res.json(successResponse(webhooks.map(toPublicWebhookProfile)))
+  }))
 
-  // GET /api/v1/webhooks/:id - Get webhook details
-  router.get('/:id', requireAuth, (req, res) => {
-    const webhook = webhookService.findById(req.params.id as string)
+  // GET /api/v1/webhooks/:id - Get webhook details (secret redacted)
+  router.get('/:id', requireAuth, async (req, res) => {
+    const webhook = await webhookService.findById(req.params.id as string)
     if (!webhook) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Webhook not found'))
       return
@@ -84,11 +85,11 @@ export function createWebhooksRouter(
       res.status(403).json(errorResponse('FORBIDDEN', 'Not your webhook'))
       return
     }
-    res.json(successResponse(webhook))
+    res.json(successResponse(toPublicWebhookProfile(webhook)))
   })
 
   // PATCH /api/v1/webhooks/:id - Update webhook
-  router.patch('/:id', requireAuth, (req, res) => {
+  router.patch('/:id', requireAuth, async (req, res) => {
     const parsed = UpdateWebhookSchema.safeParse(req.body)
     if (!parsed.success) {
       res
@@ -98,8 +99,8 @@ export function createWebhooksRouter(
     }
 
     try {
-      const webhook = webhookService.update(req.params.id as string, req.clawId!, parsed.data)
-      res.json(successResponse(webhook))
+      const webhook = await webhookService.update(req.params.id as string, req.clawId!, parsed.data)
+      res.json(successResponse(toPublicWebhookProfile(webhook)))
     } catch (err) {
       if (err instanceof WebhookError) {
         const statusMap: Record<string, number> = {
@@ -116,9 +117,9 @@ export function createWebhooksRouter(
   })
 
   // DELETE /api/v1/webhooks/:id - Delete webhook
-  router.delete('/:id', requireAuth, (req, res) => {
+  router.delete('/:id', requireAuth, async (req, res) => {
     try {
-      webhookService.delete(req.params.id as string, req.clawId!)
+      await webhookService.delete(req.params.id as string, req.clawId!)
       res.json(successResponse({ deleted: true }))
     } catch (err) {
       if (err instanceof WebhookError) {
@@ -136,11 +137,12 @@ export function createWebhooksRouter(
   })
 
   // GET /api/v1/webhooks/:id/deliveries - Get delivery log
-  router.get('/:id/deliveries', requireAuth, (req, res) => {
-    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100)
+  router.get('/:id/deliveries', requireAuth, async (req, res) => {
+    const rawLimit = parseInt(req.query.limit as string || '20', 10)
+    const limit = Math.min(isNaN(rawLimit) ? 20 : Math.max(1, rawLimit), 100)
 
     try {
-      const deliveries = webhookService.getDeliveries(req.params.id as string, req.clawId!, limit)
+      const deliveries = await webhookService.getDeliveries(req.params.id as string, req.clawId!, limit)
       res.json(successResponse(deliveries))
     } catch (err) {
       if (err instanceof WebhookError) {
@@ -181,7 +183,7 @@ export function createWebhooksRouter(
 
   // POST /api/v1/webhooks/incoming/:id - Incoming webhook endpoint (no auth, uses HMAC)
   router.post('/incoming/:id', async (req, res) => {
-    const webhook = webhookService.findById(req.params.id as string)
+    const webhook = await webhookService.findById(req.params.id as string)
     if (!webhook) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Webhook not found'))
       return

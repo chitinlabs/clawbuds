@@ -1,12 +1,12 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import type Database from 'better-sqlite3'
 import { successResponse, errorResponse } from '@clawbuds/shared'
 import type { ClawService } from '../services/claw.service.js'
 import { DiscoveryService } from '../services/discovery.service.js'
 import { StatsService } from '../services/stats.service.js'
 import { createAuthMiddleware } from '../middleware/auth.js'
 import { randomUUID } from 'node:crypto'
+import { asyncHandler } from '../lib/async-handler.js'
 
 const ClawIdSchema = z.string().regex(/^claw_[0-9a-f]{16}$/, 'Invalid claw ID format')
 
@@ -36,7 +36,6 @@ const PushSubscriptionSchema = z.object({
 })
 
 export function createProfileRouter(
-  db: Database.Database,
   clawService: ClawService,
   discoveryService: DiscoveryService,
   statsService: StatsService,
@@ -45,21 +44,21 @@ export function createProfileRouter(
   const requireAuth = createAuthMiddleware(clawService)
 
   // GET /api/v1/claws/:clawId/profile - public profile (no auth)
-  router.get('/claws/:clawId/profile', (req, res) => {
+  router.get('/claws/:clawId/profile', asyncHandler(async (req, res) => {
     const parsed = ClawIdSchema.safeParse(req.params.clawId)
     if (!parsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid claw ID format'))
       return
     }
 
-    const profile = discoveryService.getPublicProfile(parsed.data)
+    const profile = await discoveryService.getPublicProfile(parsed.data)
     if (!profile) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Claw not found'))
       return
     }
 
     res.json(successResponse(profile))
-  })
+  }))
 
   // PATCH /api/v1/me/profile - update extended profile (auth required)
   router.patch('/me/profile', requireAuth, async (req, res) => {
@@ -91,7 +90,7 @@ export function createProfileRouter(
   })
 
   // GET /api/v1/me/autonomy - get autonomy config (auth required)
-  router.get('/me/autonomy', requireAuth, async (req, res) => {
+  router.get('/me/autonomy', requireAuth, asyncHandler(async (req, res) => {
     const config = await clawService.getAutonomyConfig(req.clawId!)
     if (!config) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Claw not found'))
@@ -99,7 +98,7 @@ export function createProfileRouter(
     }
 
     res.json(successResponse(config))
-  })
+  }))
 
   // PATCH /api/v1/me/autonomy - update autonomy config (auth required)
   router.patch('/me/autonomy', requireAuth, async (req, res) => {
@@ -125,13 +124,13 @@ export function createProfileRouter(
   })
 
   // GET /api/v1/me/stats - get stats (auth required)
-  router.get('/me/stats', requireAuth, (req, res) => {
-    const stats = statsService.getStats(req.clawId!)
+  router.get('/me/stats', requireAuth, asyncHandler(async (req, res) => {
+    const stats = await statsService.getStats(req.clawId!)
     res.json(successResponse(stats))
-  })
+  }))
 
   // POST /api/v1/me/push-subscription - register push subscription
-  router.post('/me/push-subscription', requireAuth, (req, res) => {
+  router.post('/me/push-subscription', requireAuth, async (req, res) => {
     const parsed = PushSubscriptionSchema.safeParse(req.body)
     if (!parsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid request body', parsed.error.errors))
@@ -142,30 +141,30 @@ export function createProfileRouter(
     const id = randomUUID()
 
     try {
-      db.prepare(
-        `INSERT OR REPLACE INTO push_subscriptions (id, claw_id, endpoint, key_p256dh, key_auth)
-         VALUES (?, ?, ?, ?, ?)`,
-      ).run(id, req.clawId!, endpoint, keys.p256dh, keys.auth)
+      const result = await clawService.savePushSubscription(req.clawId!, {
+        id,
+        endpoint,
+        keyP256dh: keys.p256dh,
+        keyAuth: keys.auth,
+      })
 
-      res.status(201).json(successResponse({ id, endpoint }))
+      res.status(201).json(successResponse(result))
     } catch {
       res.status(500).json(errorResponse('INTERNAL_ERROR', 'Failed to save subscription'))
     }
   })
 
   // DELETE /api/v1/me/push-subscription - remove push subscription
-  router.delete('/me/push-subscription', requireAuth, (req, res) => {
+  router.delete('/me/push-subscription', requireAuth, async (req, res) => {
     const { endpoint } = req.body ?? {}
     if (!endpoint || typeof endpoint !== 'string') {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'endpoint is required'))
       return
     }
 
-    const result = db.prepare(
-      'DELETE FROM push_subscriptions WHERE claw_id = ? AND endpoint = ?',
-    ).run(req.clawId!, endpoint)
+    const deleted = await clawService.deletePushSubscription(req.clawId!, endpoint)
 
-    if (result.changes === 0) {
+    if (!deleted) {
       res.status(404).json(errorResponse('NOT_FOUND', 'Subscription not found'))
       return
     }

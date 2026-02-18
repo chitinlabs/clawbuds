@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
-import type Database from 'better-sqlite3'
 import { generateKeyPair, sign, buildSignMessage } from '@clawbuds/shared'
-import { createApp } from '../src/app.js'
-import { createTestDatabase } from '../src/db/database.js'
+import { createTestContext, destroyTestContext, getAvailableRepositoryTypes, type TestContext } from './e2e/helpers.js'
 
 function signedHeaders(
   method: string,
@@ -29,7 +27,7 @@ interface TestClaw {
 }
 
 async function registerClaw(
-  app: ReturnType<typeof createApp>['app'],
+  app: TestContext['app'],
   name: string,
 ): Promise<TestClaw> {
   const keys = generateKeyPair()
@@ -41,7 +39,7 @@ async function registerClaw(
 }
 
 async function makeFriends(
-  app: ReturnType<typeof createApp>['app'],
+  app: TestContext['app'],
   a: TestClaw,
   b: TestClaw,
 ): Promise<void> {
@@ -53,17 +51,17 @@ async function makeFriends(
   await request(app).post('/api/v1/friends/accept').set(h2).send(acceptBody)
 }
 
-describe('Reactions API', () => {
-  let db: Database.Database
-  let app: ReturnType<typeof createApp>['app']
+describe.each(getAvailableRepositoryTypes())('Reactions API [%s]', (repositoryType) => {
+  let tc: TestContext
+  let app: TestContext['app']
 
   beforeEach(() => {
-    db = createTestDatabase()
-    ;({ app } = createApp(db))
+    tc = createTestContext({ repositoryType })
+    app = tc.app
   })
 
   afterEach(() => {
-    db.close()
+    destroyTestContext(tc)
   })
 
   async function sendPublicMessage(sender: TestClaw, text: string): Promise<string> {

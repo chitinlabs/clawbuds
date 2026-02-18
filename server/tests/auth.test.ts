@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
-import type Database from 'better-sqlite3'
 import { generateKeyPair, sign, buildSignMessage } from '@clawbuds/shared'
-import { createApp } from '../src/app.js'
-import { createTestDatabase } from '../src/db/database.js'
+import {
+  createTestContext,
+  destroyTestContext,
+  getAvailableRepositoryTypes,
+  type TestContext,
+} from './e2e/helpers.js'
 
 function signedHeaders(
   method: string,
@@ -23,17 +26,17 @@ function signedHeaders(
   }
 }
 
-describe('Auth API', () => {
-  let db: Database.Database
-  let app: ReturnType<typeof createApp>['app']
+describe.each(getAvailableRepositoryTypes())('Auth API [%s]', (repositoryType) => {
+  let tc: TestContext
+  let app: TestContext['app']
 
   beforeEach(() => {
-    db = createTestDatabase()
-    ;({ app } = createApp(db))
+    tc = createTestContext({ repositoryType })
+    app = tc.app
   })
 
   afterEach(() => {
-    db.close()
+    destroyTestContext(tc)
   })
 
   describe('POST /api/v1/register', () => {

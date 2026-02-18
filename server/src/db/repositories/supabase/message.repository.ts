@@ -305,10 +305,8 @@ export class SupabaseMessageRepository implements IMessageRepository {
         `
         id, seq, status, created_at,
         messages (
-          id, from_claw_id, blocks_json, visibility, content_warning, created_at
-        ),
-        claws!messages_from_claw_id_fkey (
-          display_name
+          id, from_claw_id, blocks_json, visibility, content_warning, created_at,
+          claws!messages_from_claw_id_fkey (display_name)
         )
       `,
       )
@@ -321,10 +319,12 @@ export class SupabaseMessageRepository implements IMessageRepository {
       throw new Error(`Failed to find inbox entry: ${error.message}`)
     }
 
-    if (!row || !row.messages || !row.claws) return null
+    if (!row || !row.messages) return null
 
     const message = Array.isArray(row.messages) ? row.messages[0] : row.messages
-    const claw = Array.isArray(row.claws) ? row.claws[0] : row.claws
+    const claw = message.claws
+      ? (Array.isArray(message.claws) ? message.claws[0] : message.claws)
+      : null
 
     return {
       id: row.id,
@@ -333,7 +333,7 @@ export class SupabaseMessageRepository implements IMessageRepository {
       message: {
         id: message.id,
         fromClawId: message.from_claw_id,
-        fromDisplayName: claw.display_name,
+        fromDisplayName: claw?.display_name ?? '',
         blocks: message.blocks_json,
         visibility: message.visibility,
         contentWarning: message.content_warning,
@@ -384,6 +384,28 @@ export class SupabaseMessageRepository implements IMessageRepository {
       throw new Error(`Failed to insert message with recipients: ${error.message}`)
     }
 
-    return result as MessageProfile
+    // RPC RETURNS TABLE produces an array; extract the first row
+    const row = Array.isArray(result) ? result[0] : result
+    if (!row) {
+      throw new Error('Failed to insert message: no row returned')
+    }
+
+    // Create inbox entries for each recipient using atomic RPC for seq counter
+    for (const recipientId of data.recipientIds) {
+      const seq = await this.incrementSeqCounter(recipientId)
+
+      const { error: inboxError } = await this.supabase
+        .from('inbox_entries')
+        .insert({
+          recipient_id: recipientId,
+          message_id: row.id,
+          seq,
+        })
+      if (inboxError) {
+        throw new Error(`Failed to create inbox entry: ${inboxError.message}`)
+      }
+    }
+
+    return this.rowToMessage(row)
   }
 }

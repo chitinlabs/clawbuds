@@ -3,10 +3,14 @@ import request from 'supertest'
 import { join } from 'node:path'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import type Database from 'better-sqlite3'
+
+// Minimal 1x1 white PNG (valid image)
+const MINIMAL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+  'base64',
+)
 import { generateKeyPair, sign, buildSignMessage } from '@clawbuds/shared'
-import { createApp } from '../src/app.js'
-import { createTestDatabase } from '../src/db/database.js'
+import { createTestContext, destroyTestContext, getAvailableRepositoryTypes, type TestContext } from './e2e/helpers.js'
 
 function signedHeaders(
   method: string,
@@ -30,7 +34,7 @@ interface TestClaw {
 }
 
 async function registerClaw(
-  app: ReturnType<typeof createApp>['app'],
+  app: TestContext['app'],
   name: string,
 ): Promise<TestClaw> {
   const keys = generateKeyPair()
@@ -41,27 +45,27 @@ async function registerClaw(
   return { clawId: res.body.data.clawId, keys }
 }
 
-describe('Uploads API', () => {
-  let db: Database.Database
-  let app: ReturnType<typeof createApp>['app']
+describe.each(getAvailableRepositoryTypes())('Uploads API [%s]', (repositoryType) => {
+  let tc: TestContext
+  let app: TestContext['app']
   let tempDir: string
 
   beforeEach(() => {
-    db = createTestDatabase()
-    ;({ app } = createApp(db))
+    tc = createTestContext({ repositoryType })
+    app = tc.app
     tempDir = mkdtempSync(join(tmpdir(), 'clawbuds-upload-test-'))
   })
 
   afterEach(() => {
-    db.close()
+    destroyTestContext(tc)
     rmSync(tempDir, { recursive: true, force: true })
   })
 
   it('should upload a file', async () => {
     const alice = await registerClaw(app, 'Alice')
 
-    const testFilePath = join(tempDir, 'test.txt')
-    writeFileSync(testFilePath, 'hello world')
+    const testFilePath = join(tempDir, 'test.png')
+    writeFileSync(testFilePath, MINIMAL_PNG)
 
     const h = signedHeaders('POST', '/api/v1/uploads', alice.clawId, alice.keys.privateKey)
     const res = await request(app)
@@ -70,16 +74,16 @@ describe('Uploads API', () => {
       .attach('file', testFilePath)
 
     expect(res.status).toBe(201)
-    expect(res.body.data.filename).toBe('test.txt')
-    expect(res.body.data.size).toBe(11)
+    expect(res.body.data.filename).toBe('test.png')
+    expect(res.body.data.size).toBe(MINIMAL_PNG.length)
     expect(res.body.data.id).toBeTruthy()
   })
 
   it('should download an uploaded file', async () => {
     const alice = await registerClaw(app, 'Alice')
 
-    const testFilePath = join(tempDir, 'test.txt')
-    writeFileSync(testFilePath, 'hello world')
+    const testFilePath = join(tempDir, 'test.png')
+    writeFileSync(testFilePath, MINIMAL_PNG)
 
     const h1 = signedHeaders('POST', '/api/v1/uploads', alice.clawId, alice.keys.privateKey)
     const uploadRes = await request(app)
@@ -93,7 +97,7 @@ describe('Uploads API', () => {
     const res = await request(app).get(`/api/v1/uploads/${fileId}`).set(h2)
 
     expect(res.status).toBe(200)
-    expect(res.text).toBe('hello world')
+    expect(Buffer.from(res.body).length).toBe(MINIMAL_PNG.length)
   })
 
   it('should return 404 for nonexistent upload', async () => {

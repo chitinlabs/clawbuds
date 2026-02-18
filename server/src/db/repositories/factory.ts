@@ -9,6 +9,14 @@ import type { IFriendshipRepository } from './interfaces/friendship.repository.i
 import type { IGroupRepository } from './interfaces/group.repository.interface.js'
 import type { IUploadRepository } from './interfaces/upload.repository.interface.js'
 import type { IGroupDataAccess } from './interfaces/group-data-access.interface.js'
+import type { ICircleRepository } from './interfaces/circle.repository.interface.js'
+import type { IReactionRepository } from './interfaces/reaction.repository.interface.js'
+import type { IStatsRepository } from './interfaces/stats.repository.interface.js'
+import type { IPollRepository } from './interfaces/poll.repository.interface.js'
+import type { IDiscoveryRepository } from './interfaces/discovery.repository.interface.js'
+import type { IE2eeRepository } from './interfaces/e2ee.repository.interface.js'
+import type { IInboxRepository } from './interfaces/inbox.repository.interface.js'
+import type { IWebhookRepository } from './interfaces/webhook.repository.interface.js'
 import type Database from 'better-sqlite3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -19,6 +27,14 @@ import { SQLiteFriendshipRepository } from './sqlite/friendship.repository.js'
 import { SQLiteGroupRepository } from './sqlite/group.repository.js'
 import { SQLiteUploadRepository } from './sqlite/upload.repository.js'
 import { SQLiteGroupDataAccess } from './sqlite/group-data-access.js'
+import { SqliteCircleRepository } from './sqlite/circle.repository.js'
+import { SqliteReactionRepository } from './sqlite/reaction.repository.js'
+import { SqliteStatsRepository } from './sqlite/stats.repository.js'
+import { SqlitePollRepository } from './sqlite/poll.repository.js'
+import { SqliteDiscoveryRepository } from './sqlite/discovery.repository.js'
+import { SqliteE2eeRepository } from './sqlite/e2ee.repository.js'
+import { SqliteInboxRepository } from './sqlite/inbox.repository.js'
+import { SqliteWebhookRepository } from './sqlite/webhook.repository.js'
 
 // Supabase 实现
 import { SupabaseClawRepository } from './supabase/claw.repository.js'
@@ -26,6 +42,15 @@ import { SupabaseMessageRepository } from './supabase/message.repository.js'
 import { SupabaseFriendshipRepository } from './supabase/friendship.repository.js'
 import { SupabaseGroupRepository } from './supabase/group.repository.js'
 import { SupabaseUploadRepository } from './supabase/upload.repository.js'
+import { SupabaseCircleRepository } from './supabase/circle.repository.js'
+import { SupabaseReactionRepository } from './supabase/reaction.repository.js'
+import { SupabaseStatsRepository } from './supabase/stats.repository.js'
+import { SupabasePollRepository } from './supabase/poll.repository.js'
+import { SupabaseDiscoveryRepository } from './supabase/discovery.repository.js'
+import { SupabaseE2eeRepository } from './supabase/e2ee.repository.js'
+import { SupabaseInboxRepository } from './supabase/inbox.repository.js'
+import { SupabaseWebhookRepository } from './supabase/webhook.repository.js'
+import { SupabaseGroupDataAccess } from './supabase/group-data-access.js'
 
 export type DatabaseType = 'sqlite' | 'supabase'
 
@@ -140,8 +165,119 @@ export class RepositoryFactory {
       case 'sqlite':
         return new SQLiteGroupDataAccess(this.sqliteDb!)
       case 'supabase':
-        // TODO: 实现 Supabase 版本
-        throw new Error('Supabase GroupDataAccess not implemented yet')
+        return new SupabaseGroupDataAccess(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 Circle Repository
+   */
+  createCircleRepository(): ICircleRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SqliteCircleRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseCircleRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 Reaction Repository
+   */
+  createReactionRepository(): IReactionRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SqliteReactionRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseReactionRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 Stats Repository
+   */
+  createStatsRepository(): IStatsRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SqliteStatsRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseStatsRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 Poll Repository
+   */
+  createPollRepository(): IPollRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SqlitePollRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabasePollRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 Discovery Repository
+   */
+  createDiscoveryRepository(): IDiscoveryRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SqliteDiscoveryRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseDiscoveryRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 E2ee Repository
+   */
+  createE2eeRepository(): IE2eeRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SqliteE2eeRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseE2eeRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 Inbox Repository
+   */
+  createInboxRepository(): IInboxRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SqliteInboxRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseInboxRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 Webhook Repository
+   */
+  createWebhookRepository(): IWebhookRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SqliteWebhookRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseWebhookRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }

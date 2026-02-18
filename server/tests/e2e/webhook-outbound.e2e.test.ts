@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
 import { WebhookService } from '../../src/services/webhook.service.js'
+import { RepositoryFactory } from '../../src/db/repositories/factory.js'
 
 import {
   type TestContext,
@@ -61,7 +62,7 @@ describe('E2E: Webhook Outbound Events Flow', () => {
         .send(body)
 
       expect(res.status).toBe(201)
-      expect(res.body.data.id).toMatch(/^whk_/)
+      expect(res.body.data.id).toBeTruthy()
       expect(res.body.data.type).toBe('outgoing')
       expect(res.body.data.url).toBe('https://hooks.example.com/clawbuds')
       expect(res.body.data.events).toEqual(['message.new', 'friend.request'])
@@ -197,17 +198,22 @@ describe('E2E: Webhook Outbound Events Flow', () => {
 
   describe('Circuit Breaker Mechanism', () => {
     it('should auto-disable webhook after 10 consecutive failures', async () => {
-      const service = new WebhookService(tc.db)
+      const factory = new RepositoryFactory({
+        databaseType: tc.repositoryType,
+        sqliteDb: tc.db,
+      })
+      const webhookRepository = factory.createWebhookRepository()
+      const service = new WebhookService(webhookRepository)
 
-      const webhook = service.create({
+      const webhook = await service.create({
         clawId: alice.clawId,
         type: 'outgoing',
         name: 'Failing Webhook',
         url: 'http://example.com:1/nonexistent', // Port 1 -- will fail
       })
 
-      // Simulate 9 failures directly in DB
-      tc.db
+      // Simulate 9 failures directly
+      tc.db!
         .prepare('UPDATE webhooks SET failure_count = 9 WHERE id = ?')
         .run(webhook.id)
 
@@ -218,7 +224,7 @@ describe('E2E: Webhook Outbound Events Flow', () => {
         { event: 'test', timestamp: new Date().toISOString(), data: {} },
       )
 
-      const updated = service.findById(webhook.id)
+      const updated = await service.findById(webhook.id)
       expect(updated).not.toBeNull()
       expect(updated!.active).toBe(false)
       expect(updated!.failureCount).toBe(10)
@@ -245,7 +251,7 @@ describe('E2E: Webhook Outbound Events Flow', () => {
       const webhookId = createRes.body.data.id
 
       // Simulate failures and disable
-      tc.db
+      tc.db!
         .prepare(
           'UPDATE webhooks SET failure_count = 8, active = 0 WHERE id = ?',
         )
@@ -273,9 +279,14 @@ describe('E2E: Webhook Outbound Events Flow', () => {
 
   describe('Delivery Log', () => {
     it('should track delivery attempts', async () => {
-      const service = new WebhookService(tc.db)
+      const factory = new RepositoryFactory({
+        databaseType: tc.repositoryType,
+        sqliteDb: tc.db,
+      })
+      const webhookRepository = factory.createWebhookRepository()
+      const service = new WebhookService(webhookRepository)
 
-      const webhook = service.create({
+      const webhook = await service.create({
         clawId: alice.clawId,
         type: 'outgoing',
         name: 'Logged Webhook',
@@ -441,7 +452,12 @@ describe('E2E: Webhook Outbound Events Flow', () => {
 
   describe('HMAC Signature Generation', () => {
     it('should generate valid HMAC-SHA256 signatures for outgoing payloads', () => {
-      const service = new WebhookService(tc.db)
+      const factory = new RepositoryFactory({
+        databaseType: tc.repositoryType,
+        sqliteDb: tc.db,
+      })
+      const webhookRepository = factory.createWebhookRepository()
+      const service = new WebhookService(webhookRepository)
       const secret = 'test-secret-key'
       const payload = JSON.stringify({
         event: 'message.new',

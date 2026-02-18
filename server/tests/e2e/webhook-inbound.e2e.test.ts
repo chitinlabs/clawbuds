@@ -63,7 +63,7 @@ describe('E2E: Webhook Inbound Message Flow', () => {
 
       expect(createRes.status).toBe(201)
       const webhook = createRes.body.data
-      expect(webhook.id).toMatch(/^whk_/)
+      expect(webhook.id).toBeTruthy()
       expect(webhook.type).toBe('incoming')
       expect(webhook.secret).toBeTruthy()
       expect(webhook.active).toBe(true)
@@ -72,7 +72,6 @@ describe('E2E: Webhook Inbound Message Flow', () => {
       const incomingPayload = { text: 'Build #42 passed. All green!' }
       const payloadStr = JSON.stringify(incomingPayload)
       const signature = generateWebhookSignature(
-        tc.db,
         webhook.secret,
         payloadStr,
       )
@@ -132,7 +131,6 @@ describe('E2E: Webhook Inbound Message Flow', () => {
       }
       const payloadStr = JSON.stringify(incomingPayload)
       const signature = generateWebhookSignature(
-        tc.db,
         webhook.secret,
         payloadStr,
       )
@@ -258,7 +256,6 @@ describe('E2E: Webhook Inbound Message Flow', () => {
       // Sign original payload
       const originalPayload = { text: 'Original message' }
       const signature = generateWebhookSignature(
-        tc.db,
         webhook.secret,
         JSON.stringify(originalPayload),
       )
@@ -296,7 +293,6 @@ describe('E2E: Webhook Inbound Message Flow', () => {
 
       const payload = { text: 'Should not work' }
       const signature = generateWebhookSignature(
-        tc.db,
         webhook.secret,
         JSON.stringify(payload),
       )
@@ -343,7 +339,6 @@ describe('E2E: Webhook Inbound Message Flow', () => {
       // Try to use disabled webhook
       const payload = { text: 'Should be rejected' }
       const signature = generateWebhookSignature(
-        tc.db,
         webhook.secret,
         JSON.stringify(payload),
       )
@@ -391,7 +386,6 @@ describe('E2E: Webhook Inbound Message Flow', () => {
       const payload = { text: 'Lifecycle test message' }
       const payloadStr = JSON.stringify(payload)
       const signature = generateWebhookSignature(
-        tc.db,
         webhook.secret,
         payloadStr,
       )

@@ -22,7 +22,8 @@ import {
 } from '@clawbuds/shared'
 import { createApp } from '../../src/app.js'
 import { createTestDatabase } from '../../src/db/database.js'
-import { WebhookService } from '../../src/services/webhook.service.js'
+import { createHmac } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 
 // --- Types ---
 
@@ -34,22 +35,89 @@ export interface TestClaw {
   x25519Public: string
 }
 
+export type RepositoryType = 'sqlite' | 'supabase'
+
 export interface TestContext {
-  db: Database.Database
+  db?: Database.Database
   app: Express
   ctx: ReturnType<typeof createApp>['ctx']
+  repositoryType: RepositoryType
+}
+
+export interface TestContextOptions {
+  repositoryType?: RepositoryType
 }
 
 // --- Context Setup ---
 
-export function createTestContext(): TestContext {
-  const db = createTestDatabase()
-  const { app, ctx } = createApp(db)
-  return { db, app, ctx }
+/**
+ * Create test context with specified repository type
+ * Defaults to SQLite. Supabase requires SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY (or SUPABASE_ANON_KEY) env vars.
+ */
+export function createTestContext(options?: TestContextOptions): TestContext {
+  const repositoryType = options?.repositoryType ?? 'sqlite'
+
+  if (repositoryType === 'sqlite') {
+    const db = createTestDatabase()
+    const { app, ctx } = createApp(db)
+    return { db, app, ctx, repositoryType }
+  } else {
+    // Supabase implementation
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SECRET_KEY ||
+                        process.env.SUPABASE_SERVICE_ROLE_KEY ||
+                        process.env.SUPABASE_PUBLISHABLE_KEY ||
+                        process.env.SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase configuration missing. Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY')
+    }
+
+    // Create Supabase client
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // Create app with Supabase repositories
+    const { app, ctx } = createApp({
+      repositoryOptions: {
+        databaseType: 'supabase',
+        supabaseClient: supabase,
+      },
+    })
+
+    // Note: Supabase tests use the live Supabase database
+    // Make sure to clean up test data after tests
+    return { app, ctx, repositoryType }
+  }
 }
 
 export function destroyTestContext(tc: TestContext): void {
-  tc.db.close()
+  if (tc.db) {
+    tc.db.close()
+  }
+  // Supabase cleanup would go here
+}
+
+/**
+ * Get available repository types for testing
+ * Returns ['sqlite'] or ['sqlite', 'supabase'] depending on configuration
+ *
+ * Note: Supabase updated their API key format:
+ * - New format (recommended): SUPABASE_PUBLISHABLE_KEY (sb_publishable_*)
+ * - Old format (still supported): SUPABASE_ANON_KEY (JWT token)
+ */
+export function getAvailableRepositoryTypes(): RepositoryType[] {
+  const types: RepositoryType[] = ['sqlite']
+
+  // Check if Supabase is configured (support service role key and public key formats)
+  const supabaseKey = process.env.SUPABASE_SECRET_KEY ||
+                      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+                      process.env.SUPABASE_PUBLISHABLE_KEY ||
+                      process.env.SUPABASE_ANON_KEY
+  if (process.env.SUPABASE_URL && supabaseKey) {
+    types.push('supabase')
+  }
+
+  return types
 }
 
 // --- Auth Helpers ---
@@ -302,12 +370,10 @@ export async function getInbox(
 // --- Webhook Helpers ---
 
 export function generateWebhookSignature(
-  db: Database.Database,
   secret: string,
   payload: string,
 ): string {
-  const service = new WebhookService(db)
-  return service.generateSignature(secret, payload)
+  return `sha256=${createHmac('sha256', secret).update(payload).digest('hex')}`
 }
 
 // --- Direct Message Helpers ---
@@ -315,13 +381,13 @@ export function generateWebhookSignature(
 export async function sendDirectMessage(
   app: Express,
   sender: TestClaw,
-  recipientIds: string[],
+  recipient: TestClaw,
   text: string,
-): Promise<{ messageId: string; recipientCount: number }> {
+): Promise<string> {
   const msgBody = {
     blocks: [{ type: 'text', text }],
     visibility: 'direct',
-    toClawIds: recipientIds,
+    toClawIds: [recipient.clawId],
   }
   const h = signedHeaders(
     'POST',
@@ -339,8 +405,367 @@ export async function sendDirectMessage(
     throw new Error(`Send DM failed: ${JSON.stringify(res.body)}`)
   }
 
-  return {
-    messageId: res.body.data.messageId,
-    recipientCount: res.body.data.recipientCount,
+  return res.body.data.messageId
+}
+
+// --- Enhanced Friendship Helpers ---
+
+export async function sendFriendRequest(
+  app: Express,
+  requester: TestClaw,
+  accepter: TestClaw,
+): Promise<string> {
+  const body = { clawId: accepter.clawId }
+  const h = signedHeaders(
+    'POST',
+    '/api/v1/friends/request',
+    requester.clawId,
+    requester.keys.privateKey,
+    body,
+  )
+  const res = await request(app)
+    .post('/api/v1/friends/request')
+    .set(h)
+    .send(body)
+
+  if (res.status !== 201) {
+    throw new Error(`Send friend request failed: ${JSON.stringify(res.body)}`)
   }
+
+  return res.body.data.id
+}
+
+export async function getPendingRequests(
+  app: Express,
+  user: TestClaw,
+): Promise<unknown[]> {
+  const h = signedHeaders(
+    'GET',
+    '/api/v1/friends/requests',
+    user.clawId,
+    user.keys.privateKey,
+  )
+  const res = await request(app).get('/api/v1/friends/requests').set(h)
+
+  if (res.status !== 200) {
+    throw new Error(`Get pending requests failed: ${JSON.stringify(res.body)}`)
+  }
+
+  return res.body.data || []
+}
+
+export async function acceptFriendRequest(
+  app: Express,
+  accepter: TestClaw,
+  friendshipId: string,
+): Promise<void> {
+  const body = { friendshipId }
+  const h = signedHeaders(
+    'POST',
+    '/api/v1/friends/accept',
+    accepter.clawId,
+    accepter.keys.privateKey,
+    body,
+  )
+  const res = await request(app)
+    .post('/api/v1/friends/accept')
+    .set(h)
+    .send(body)
+
+  if (res.status !== 200) {
+    throw new Error(`Accept friend request failed: ${JSON.stringify(res.body)}`)
+  }
+}
+
+export async function listFriends(
+  app: Express,
+  user: TestClaw,
+): Promise<unknown[]> {
+  const h = signedHeaders(
+    'GET',
+    '/api/v1/friends',
+    user.clawId,
+    user.keys.privateKey,
+  )
+  const res = await request(app).get('/api/v1/friends').set(h)
+
+  if (res.status !== 200) {
+    throw new Error(`List friends failed: ${JSON.stringify(res.body)}`)
+  }
+
+  return res.body.data || []
+}
+
+export async function removeFriend(
+  app: Express,
+  user: TestClaw,
+  friendClawId: string,
+): Promise<void> {
+  const h = signedHeaders(
+    'DELETE',
+    `/api/v1/friends/${friendClawId}`,
+    user.clawId,
+    user.keys.privateKey,
+  )
+  const res = await request(app)
+    .delete(`/api/v1/friends/${friendClawId}`)
+    .set(h)
+
+  if (res.status !== 200) {
+    throw new Error(`Remove friend failed: ${JSON.stringify(res.body)}`)
+  }
+}
+
+// --- Message Interaction Helpers ---
+
+export async function addReaction(
+  app: Express,
+  user: TestClaw,
+  messageId: string,
+  emoji: string,
+): Promise<void> {
+  const body = { emoji }
+  const h = signedHeaders(
+    'POST',
+    `/api/v1/messages/${messageId}/reactions`,
+    user.clawId,
+    user.keys.privateKey,
+    body,
+  )
+  const res = await request(app)
+    .post(`/api/v1/messages/${messageId}/reactions`)
+    .set(h)
+    .send(body)
+
+  if (res.status !== 201) {
+    throw new Error(`Add reaction failed: ${JSON.stringify(res.body)}`)
+  }
+}
+
+export async function getReactions(
+  app: Express,
+  user: TestClaw,
+  messageId: string,
+): Promise<unknown[]> {
+  const h = signedHeaders(
+    'GET',
+    `/api/v1/messages/${messageId}/reactions`,
+    user.clawId,
+    user.keys.privateKey,
+  )
+  const res = await request(app)
+    .get(`/api/v1/messages/${messageId}/reactions`)
+    .set(h)
+
+  if (res.status !== 200) {
+    throw new Error(`Get reactions failed: ${JSON.stringify(res.body)}`)
+  }
+
+  return res.body.data || []
+}
+
+export async function getMessage(
+  app: Express,
+  user: TestClaw,
+  messageId: string,
+): Promise<unknown> {
+  const h = signedHeaders(
+    'GET',
+    `/api/v1/messages/${messageId}`,
+    user.clawId,
+    user.keys.privateKey,
+  )
+  const res = await request(app).get(`/api/v1/messages/${messageId}`).set(h)
+
+  if (res.status !== 200) {
+    throw new Error(`Get message failed: ${JSON.stringify(res.body)}`)
+  }
+
+  return res.body.data
+}
+
+// --- Circle Helpers ---
+
+export async function createCircle(
+  app: Express,
+  owner: TestClaw,
+  options: {
+    name: string
+    description?: string
+  },
+): Promise<string> {
+  const body = {
+    name: options.name,
+    description: options.description,
+  }
+  const h = signedHeaders(
+    'POST',
+    '/api/v1/circles',
+    owner.clawId,
+    owner.keys.privateKey,
+    body,
+  )
+  const res = await request(app).post('/api/v1/circles').set(h).send(body)
+
+  if (res.status !== 201) {
+    throw new Error(`Create circle failed: ${JSON.stringify(res.body)}`)
+  }
+
+  return res.body.data.id
+}
+
+export async function addFriendToCircle(
+  app: Express,
+  owner: TestClaw,
+  circleId: string,
+  friendClawId: string,
+): Promise<void> {
+  const body = { clawId: friendClawId }
+  const h = signedHeaders(
+    'POST',
+    `/api/v1/circles/${circleId}/friends`,
+    owner.clawId,
+    owner.keys.privateKey,
+    body,
+  )
+  const res = await request(app)
+    .post(`/api/v1/circles/${circleId}/friends`)
+    .set(h)
+    .send(body)
+
+  if (res.status !== 201) {
+    throw new Error(`Add friend to circle failed: ${JSON.stringify(res.body)}`)
+  }
+}
+
+export async function sendCircleMessage(
+  app: Express,
+  sender: TestClaw,
+  circleNames: string[],
+  text: string,
+): Promise<string> {
+  const msgBody = {
+    blocks: [{ type: 'text', text }],
+    visibility: 'circles',
+    circleNames,
+  }
+  const h = signedHeaders(
+    'POST',
+    '/api/v1/messages',
+    sender.clawId,
+    sender.keys.privateKey,
+    msgBody,
+  )
+  const res = await request(app)
+    .post('/api/v1/messages')
+    .set(h)
+    .send(msgBody)
+
+  if (res.status !== 201) {
+    throw new Error(`Send circle message failed: ${JSON.stringify(res.body)}`)
+  }
+
+  return res.body.data.messageId
+}
+
+// --- Upload Helpers ---
+
+export async function uploadFile(
+  app: Express,
+  owner: TestClaw,
+  options: {
+    filename: string
+    mimeType: string
+    size?: number
+  },
+): Promise<string> {
+  // Note: Real file upload requires multipart/form-data with actual file
+  // For E2E testing, we create a minimal Buffer to simulate file content
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { writeFileSync, unlinkSync, mkdtempSync, rmSync } = await import('node:fs')
+
+  const tempDir = mkdtempSync(join(tmpdir(), 'clawbuds-test-upload-'))
+  const filePath = join(tempDir, options.filename)
+
+  // Create a fake file with requested size
+  const fileSize = options.size || 1024
+  const buffer = Buffer.alloc(fileSize, 'x')
+  writeFileSync(filePath, buffer)
+
+  try {
+    const h = signedHeaders('POST', '/api/v1/uploads', owner.clawId, owner.keys.privateKey)
+    const res = await request(app)
+      .post('/api/v1/uploads')
+      .set(h)
+      .attach('file', filePath)
+
+    if (res.status !== 201) {
+      throw new Error(`Upload file failed: ${JSON.stringify(res.body)}`)
+    }
+
+    return res.body.data.id
+  } finally {
+    // Cleanup
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+}
+
+export async function getUpload(
+  app: Express,
+  user: TestClaw,
+  uploadId: string,
+): Promise<{ status: number; contentType?: string; size?: number }> {
+  const h = signedHeaders(
+    'GET',
+    `/api/v1/uploads/${uploadId}`,
+    user.clawId,
+    user.keys.privateKey,
+  )
+  const res = await request(app).get(`/api/v1/uploads/${uploadId}`).set(h)
+
+  // GET /uploads/:id returns file content, not JSON
+  return {
+    status: res.status,
+    contentType: res.headers['content-type'],
+    size: res.body?.length || res.text?.length || 0,
+  }
+}
+
+export async function sendMessageWithUpload(
+  app: Express,
+  sender: TestClaw,
+  recipient: TestClaw,
+  text: string,
+  uploadId: string,
+  baseUrl: string = 'http://localhost:3000',
+): Promise<string> {
+  // Construct image URL from uploadId
+  const imageUrl = `${baseUrl}/api/v1/uploads/${uploadId}`
+
+  const msgBody = {
+    blocks: [
+      { type: 'text', text },
+      { type: 'image', url: imageUrl },
+    ],
+    visibility: 'direct',
+    toClawIds: [recipient.clawId],
+  }
+  const h = signedHeaders(
+    'POST',
+    '/api/v1/messages',
+    sender.clawId,
+    sender.keys.privateKey,
+    msgBody,
+  )
+  const res = await request(app)
+    .post('/api/v1/messages')
+    .set(h)
+    .send(msgBody)
+
+  if (res.status !== 201) {
+    throw new Error(`Send message with upload failed: ${JSON.stringify(res.body)}`)
+  }
+
+  return res.body.data.messageId
 }

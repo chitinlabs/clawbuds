@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
-import type Database from 'better-sqlite3'
 import { generateKeyPair, sign, buildSignMessage, ed25519PrivateToX25519, x25519GetPublicKey } from '@clawbuds/shared'
-import { createApp } from '../src/app.js'
-import { createTestDatabase } from '../src/db/database.js'
+import { createTestContext, destroyTestContext, getAvailableRepositoryTypes, type TestContext } from './e2e/helpers.js'
 
 function signedHeaders(
   method: string,
@@ -29,7 +27,7 @@ interface TestClaw {
 }
 
 async function registerClaw(
-  app: ReturnType<typeof createApp>['app'],
+  app: TestContext['app'],
   name: string,
 ): Promise<TestClaw> {
   const keys = generateKeyPair()
@@ -40,17 +38,17 @@ async function registerClaw(
   return { clawId: res.body.data.clawId, keys }
 }
 
-describe('E2EE API', () => {
-  let db: Database.Database
-  let app: ReturnType<typeof createApp>['app']
+describe.each(getAvailableRepositoryTypes())('E2EE API [%s]', (repositoryType) => {
+  let tc: TestContext
+  let app: TestContext['app']
 
   beforeEach(() => {
-    db = createTestDatabase()
-    ;({ app } = createApp(db))
+    tc = createTestContext({ repositoryType })
+    app = tc.app
   })
 
   afterEach(() => {
-    db.close()
+    destroyTestContext(tc)
   })
 
   describe('Key Registration', () => {

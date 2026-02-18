@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { randomBytes } from 'node:crypto'
 import request from 'supertest'
-import type Database from 'better-sqlite3'
 import { generateKeyPair, sign, buildSignMessage } from '@clawbuds/shared'
-import { createApp } from '../src/app.js'
-import { createTestDatabase } from '../src/db/database.js'
+import { createTestContext, destroyTestContext, getAvailableRepositoryTypes, type TestContext } from './e2e/helpers.js'
 
 function signedHeaders(
   method: string,
@@ -24,7 +23,7 @@ function signedHeaders(
 }
 
 async function registerClaw(
-  app: ReturnType<typeof createApp>['app'],
+  app: TestContext['app'],
   opts?: { displayName?: string; bio?: string; tags?: string[]; discoverable?: boolean },
 ) {
   const keys = generateKeyPair()
@@ -38,17 +37,23 @@ async function registerClaw(
   return { keys, clawId: res.body.data.clawId, res }
 }
 
-describe('Discovery API', () => {
-  let db: Database.Database
-  let app: ReturnType<typeof createApp>['app']
+/** Generate a unique prefix for test isolation on shared databases */
+function uniquePrefix(): string {
+  return `t${randomBytes(4).toString('hex')}`
+}
+
+describe.each(getAvailableRepositoryTypes())('Discovery API [%s]', (repositoryType) => {
+  let tc: TestContext
+  let app: TestContext['app']
+  const isSupabase = () => repositoryType === 'supabase'
 
   beforeEach(() => {
-    db = createTestDatabase()
-    ;({ app } = createApp(db))
+    tc = createTestContext({ repositoryType })
+    app = tc.app
   })
 
   afterEach(() => {
-    db.close()
+    destroyTestContext(tc)
   })
 
   describe('GET /api/v1/discover', () => {
@@ -60,7 +65,10 @@ describe('Discovery API', () => {
     it('should return empty results when no discoverable claws', async () => {
       const { keys, clawId } = await registerClaw(app)
       const headers = signedHeaders('GET', '/api/v1/discover', clawId, keys.privateKey)
-      const res = await request(app).get('/api/v1/discover').set(headers)
+
+      // On Supabase, search with a unique term that doesn't exist to ensure empty results
+      const searchParam = isSupabase() ? `?q=${uniquePrefix()}nonexistent` : ''
+      const res = await request(app).get(`/api/v1/discover${searchParam}`).set(headers)
 
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
@@ -69,107 +77,118 @@ describe('Discovery API', () => {
     })
 
     it('should find discoverable claws', async () => {
-      // Register a discoverable claw
+      const prefix = uniquePrefix()
+      // Register a discoverable claw with unique name
       const { keys: aliceKeys, clawId: aliceId } = await registerClaw(app, {
-        displayName: 'Alice',
+        displayName: `${prefix}Alice`,
         discoverable: true,
         tags: ['ai', 'chat'],
       })
 
       // Register a non-discoverable claw (the searcher)
       const { keys: bobKeys, clawId: bobId } = await registerClaw(app, {
-        displayName: 'Bob',
+        displayName: `${prefix}Bob`,
       })
 
       const headers = signedHeaders('GET', '/api/v1/discover', bobId, bobKeys.privateKey)
-      const res = await request(app).get('/api/v1/discover').set(headers)
+      const res = await request(app).get(`/api/v1/discover?q=${prefix}`).set(headers)
 
       expect(res.status).toBe(200)
       expect(res.body.data.results).toHaveLength(1)
       expect(res.body.data.results[0].clawId).toBe(aliceId)
-      expect(res.body.data.results[0].displayName).toBe('Alice')
+      expect(res.body.data.results[0].displayName).toBe(`${prefix}Alice`)
       expect(res.body.data.results[0].tags).toEqual(['ai', 'chat'])
       expect(res.body.data.total).toBe(1)
     })
 
     it('should search by keyword in displayName', async () => {
-      await registerClaw(app, { displayName: 'Alice Bot', discoverable: true })
-      await registerClaw(app, { displayName: 'Bob Helper', discoverable: true })
+      const prefix = uniquePrefix()
+      await registerClaw(app, { displayName: `${prefix}Alice Bot`, discoverable: true })
+      await registerClaw(app, { displayName: `${prefix}Bob Helper`, discoverable: true })
       const { keys, clawId } = await registerClaw(app, { displayName: 'Searcher' })
 
       const headers = signedHeaders('GET', '/api/v1/discover', clawId, keys.privateKey)
-      const res = await request(app).get('/api/v1/discover?q=alice').set(headers)
+      const res = await request(app).get(`/api/v1/discover?q=${prefix}Alice`).set(headers)
 
       expect(res.status).toBe(200)
       expect(res.body.data.results).toHaveLength(1)
-      expect(res.body.data.results[0].displayName).toBe('Alice Bot')
+      expect(res.body.data.results[0].displayName).toBe(`${prefix}Alice Bot`)
     })
 
     it('should search by keyword in bio', async () => {
-      await registerClaw(app, { displayName: 'Helper', bio: 'I help with coding tasks', discoverable: true })
+      const prefix = uniquePrefix()
+      await registerClaw(app, {
+        displayName: `${prefix}Helper`,
+        bio: `I help with ${prefix}coding tasks`,
+        discoverable: true,
+      })
       const { keys, clawId } = await registerClaw(app, { displayName: 'Searcher' })
 
       const headers = signedHeaders('GET', '/api/v1/discover', clawId, keys.privateKey)
-      const res = await request(app).get('/api/v1/discover?q=coding').set(headers)
+      const res = await request(app).get(`/api/v1/discover?q=${prefix}coding`).set(headers)
 
       expect(res.status).toBe(200)
       expect(res.body.data.results).toHaveLength(1)
-      expect(res.body.data.results[0].displayName).toBe('Helper')
+      expect(res.body.data.results[0].displayName).toBe(`${prefix}Helper`)
     })
 
     it('should filter by tags', async () => {
-      await registerClaw(app, { displayName: 'AI Bot', tags: ['ai', 'ml'], discoverable: true })
-      await registerClaw(app, { displayName: 'Chat Bot', tags: ['chat'], discoverable: true })
+      const prefix = uniquePrefix()
+      const uniqueTag = `${prefix}ai`
+      await registerClaw(app, { displayName: `${prefix}AI Bot`, tags: [uniqueTag, 'ml'], discoverable: true })
+      await registerClaw(app, { displayName: `${prefix}Chat Bot`, tags: ['chat'], discoverable: true })
       const { keys, clawId } = await registerClaw(app, { displayName: 'Searcher' })
 
       const headers = signedHeaders('GET', '/api/v1/discover', clawId, keys.privateKey)
-      const res = await request(app).get('/api/v1/discover?tags=ai').set(headers)
+      const res = await request(app).get(`/api/v1/discover?tags=${uniqueTag}`).set(headers)
 
       expect(res.status).toBe(200)
       expect(res.body.data.results).toHaveLength(1)
-      expect(res.body.data.results[0].displayName).toBe('AI Bot')
+      expect(res.body.data.results[0].displayName).toBe(`${prefix}AI Bot`)
     })
 
     it('should not return non-discoverable claws', async () => {
-      await registerClaw(app, { displayName: 'Hidden', discoverable: false })
+      const prefix = uniquePrefix()
+      await registerClaw(app, { displayName: `${prefix}Hidden`, discoverable: false })
       const { keys, clawId } = await registerClaw(app, { displayName: 'Searcher' })
 
       const headers = signedHeaders('GET', '/api/v1/discover', clawId, keys.privateKey)
-      const res = await request(app).get('/api/v1/discover').set(headers)
+      const res = await request(app).get(`/api/v1/discover?q=${prefix}Hidden`).set(headers)
 
       expect(res.status).toBe(200)
       expect(res.body.data.results).toHaveLength(0)
     })
 
     it('should paginate results', async () => {
+      const prefix = uniquePrefix()
       for (let i = 0; i < 5; i++) {
-        await registerClaw(app, { displayName: `Bot ${i}`, discoverable: true })
+        await registerClaw(app, { displayName: `${prefix}Bot ${i}`, discoverable: true })
       }
       const { keys, clawId } = await registerClaw(app, { displayName: 'Searcher' })
 
       const headers = signedHeaders('GET', '/api/v1/discover', clawId, keys.privateKey)
-      const res = await request(app).get('/api/v1/discover?limit=2&offset=0').set(headers)
+      const res = await request(app).get(`/api/v1/discover?q=${prefix}Bot&limit=2&offset=0`).set(headers)
 
       expect(res.status).toBe(200)
       expect(res.body.data.results).toHaveLength(2)
       expect(res.body.data.total).toBe(5)
 
       const headers2 = signedHeaders('GET', '/api/v1/discover', clawId, keys.privateKey)
-      const res2 = await request(app).get('/api/v1/discover?limit=2&offset=2').set(headers2)
+      const res2 = await request(app).get(`/api/v1/discover?q=${prefix}Bot&limit=2&offset=2`).set(headers2)
 
       expect(res2.status).toBe(200)
       expect(res2.body.data.results).toHaveLength(2)
       expect(res2.body.data.total).toBe(5)
     })
 
-    it('should filter by claw type', async () => {
+    it.skipIf(repositoryType !== 'sqlite')('should filter by claw type', async () => {
       // Default type is 'personal', need to set via DB directly for service/bot
       await registerClaw(app, { displayName: 'PersonalClaw', discoverable: true })
       const { keys, clawId } = await registerClaw(app, { displayName: 'Searcher' })
 
       // Update one to be a 'service' type via DB
       const { clawId: serviceId } = await registerClaw(app, { displayName: 'ServiceBot', discoverable: true })
-      db.prepare("UPDATE claws SET claw_type = 'service' WHERE claw_id = ?").run(serviceId)
+      tc.db!.prepare("UPDATE claws SET claw_type = 'service' WHERE claw_id = ?").run(serviceId)
 
       const headers = signedHeaders('GET', '/api/v1/discover', clawId, keys.privateKey)
       const res = await request(app).get('/api/v1/discover?type=service').set(headers)
@@ -187,8 +206,9 @@ describe('Discovery API', () => {
     })
 
     it('should return recently joined discoverable claws', async () => {
-      await registerClaw(app, { displayName: 'OldClaw', discoverable: true })
-      await registerClaw(app, { displayName: 'NewClaw', discoverable: true })
+      const prefix = uniquePrefix()
+      const { clawId: oldId } = await registerClaw(app, { displayName: `${prefix}OldClaw`, discoverable: true })
+      const { clawId: newId } = await registerClaw(app, { displayName: `${prefix}NewClaw`, discoverable: true })
       const { keys, clawId } = await registerClaw(app, { displayName: 'Searcher' })
 
       const headers = signedHeaders('GET', '/api/v1/discover/recent', clawId, keys.privateKey)
@@ -197,20 +217,27 @@ describe('Discovery API', () => {
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
       expect(res.body.data).toBeInstanceOf(Array)
-      expect(res.body.data.length).toBe(2)
+      // On Supabase, there may be more results from previous runs
+      expect(res.body.data.length).toBeGreaterThanOrEqual(2)
+      // Verify our created claws are present
+      const ids = res.body.data.map((r: any) => r.clawId)
+      expect(ids).toContain(oldId)
+      expect(ids).toContain(newId)
     })
 
     it('should not include non-discoverable claws', async () => {
-      await registerClaw(app, { displayName: 'Hidden', discoverable: false })
-      await registerClaw(app, { displayName: 'Visible', discoverable: true })
+      const prefix = uniquePrefix()
+      const { clawId: hiddenId } = await registerClaw(app, { displayName: `${prefix}Hidden`, discoverable: false })
+      const { clawId: visibleId } = await registerClaw(app, { displayName: `${prefix}Visible`, discoverable: true })
       const { keys, clawId } = await registerClaw(app, { displayName: 'Searcher' })
 
       const headers = signedHeaders('GET', '/api/v1/discover/recent', clawId, keys.privateKey)
       const res = await request(app).get('/api/v1/discover/recent').set(headers)
 
       expect(res.status).toBe(200)
-      expect(res.body.data).toHaveLength(1)
-      expect(res.body.data[0].displayName).toBe('Visible')
+      const ids = res.body.data.map((r: any) => r.clawId)
+      expect(ids).toContain(visibleId)
+      expect(ids).not.toContain(hiddenId)
     })
   })
 })

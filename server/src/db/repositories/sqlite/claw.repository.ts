@@ -61,7 +61,7 @@ export class SQLiteClawRepository implements IClawRepository {
   // ========== 创建 ==========
 
   async register(data: RegisterClawDTO): Promise<Claw> {
-    const clawId = randomUUID()
+    const clawId = data.clawId ?? randomUUID()
     const tags = JSON.stringify(data.tags ?? [])
     const discoverable = data.discoverable ?? false ? 1 : 0
 
@@ -267,5 +267,31 @@ export class SQLiteClawRepository implements IClawRepository {
 
     const result = this.db.prepare(query).get(...params) as { count: number }
     return result.count
+  }
+
+  // ========== Push 订阅 ==========
+
+  async savePushSubscription(clawId: string, data: {
+    id: string
+    endpoint: string
+    keyP256dh: string
+    keyAuth: string
+  }): Promise<{ id: string; endpoint: string }> {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO push_subscriptions (id, claw_id, endpoint, key_p256dh, key_auth)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(data.id, clawId, data.endpoint, data.keyP256dh, data.keyAuth)
+
+    return { id: data.id, endpoint: data.endpoint }
+  }
+
+  async deletePushSubscription(clawId: string, endpoint: string): Promise<boolean> {
+    const result = this.db
+      .prepare('DELETE FROM push_subscriptions WHERE claw_id = ? AND endpoint = ?')
+      .run(clawId, endpoint)
+
+    return result.changes > 0
   }
 }

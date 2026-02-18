@@ -1,60 +1,17 @@
-import type Database from 'better-sqlite3'
-import { randomUUID, createHmac } from 'node:crypto'
+import { randomUUID, createHmac, timingSafeEqual } from 'node:crypto'
 import type { EventBus, EventName, EventMap } from './event-bus.js'
+import type { IWebhookRepository, WebhookProfile, WebhookDeliveryProfile } from '../db/repositories/interfaces/webhook.repository.interface.js'
+import { WebhookError } from '../db/repositories/interfaces/webhook.repository.interface.js'
 
-interface WebhookRow {
-  id: string
-  claw_id: string
-  type: 'outgoing' | 'incoming'
-  name: string
-  url: string | null
-  secret: string
-  events: string
-  active: number
-  failure_count: number
-  last_triggered_at: string | null
-  last_status_code: number | null
-  created_at: string
-}
+export type {
+  WebhookProfile,
+  WebhookProfilePublic,
+  WebhookDeliveryProfile,
+} from '../db/repositories/interfaces/webhook.repository.interface.js'
 
-interface WebhookDeliveryRow {
-  id: string
-  webhook_id: string
-  event_type: string
-  payload: string
-  status_code: number | null
-  response_body: string | null
-  duration_ms: number | null
-  success: number
-  created_at: string
-}
+export { toPublicWebhookProfile } from '../db/repositories/interfaces/webhook.repository.interface.js'
 
-export interface WebhookProfile {
-  id: string
-  clawId: string
-  type: 'outgoing' | 'incoming'
-  name: string
-  url: string | null
-  secret: string
-  events: string[]
-  active: boolean
-  failureCount: number
-  lastTriggeredAt: string | null
-  lastStatusCode: number | null
-  createdAt: string
-}
-
-export interface WebhookDeliveryProfile {
-  id: string
-  webhookId: string
-  eventType: string
-  payload: unknown
-  statusCode: number | null
-  responseBody: string | null
-  durationMs: number | null
-  success: boolean
-  createdAt: string
-}
+export { WebhookError } from '../db/repositories/interfaces/webhook.repository.interface.js'
 
 export interface CreateWebhookInput {
   clawId: string
@@ -162,7 +119,7 @@ export class WebhookService {
   private listeners: Map<EventName, (data: unknown) => void> = new Map()
 
   constructor(
-    private db: Database.Database,
+    private webhookRepository: IWebhookRepository,
     private eventBus?: EventBus,
   ) {
     if (eventBus) {
@@ -170,7 +127,7 @@ export class WebhookService {
     }
   }
 
-  create(input: CreateWebhookInput): WebhookProfile {
+  async create(input: CreateWebhookInput): Promise<WebhookProfile> {
     if (input.type === 'outgoing' && !input.url) {
       throw new WebhookError('MISSING_URL', 'Outgoing webhook requires a URL')
     }
@@ -180,44 +137,31 @@ export class WebhookService {
       validateWebhookUrl(input.url)
     }
 
-    const id = `whk_${randomUUID()}`
+    const id = randomUUID()
     const secret = randomUUID()
-    const events = JSON.stringify(input.events || ['*'])
+    const events = input.events || ['*']
 
-    let row: WebhookRow
-    try {
-      row = this.db
-        .prepare(
-          `INSERT INTO webhooks (id, claw_id, type, name, url, secret, events)
-           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-        )
-        .get(id, input.clawId, input.type, input.name, input.url || null, secret, events) as WebhookRow
-    } catch (err) {
-      if (err instanceof Error && err.message.includes('UNIQUE constraint failed')) {
-        throw new WebhookError('DUPLICATE_NAME', 'A webhook with this name already exists')
-      }
-      throw err
-    }
-
-    return rowToProfile(row)
+    return await this.webhookRepository.create({
+      id,
+      clawId: input.clawId,
+      type: input.type,
+      name: input.name,
+      url: input.url || null,
+      secret,
+      events,
+    })
   }
 
-  findById(id: string): WebhookProfile | null {
-    const row = this.db
-      .prepare('SELECT * FROM webhooks WHERE id = ?')
-      .get(id) as WebhookRow | undefined
-    return row ? rowToProfile(row) : null
+  async findById(id: string): Promise<WebhookProfile | null> {
+    return this.webhookRepository.findById(id)
   }
 
-  listByClawId(clawId: string): WebhookProfile[] {
-    const rows = this.db
-      .prepare('SELECT * FROM webhooks WHERE claw_id = ? ORDER BY created_at DESC')
-      .all(clawId) as WebhookRow[]
-    return rows.map(rowToProfile)
+  async listByClawId(clawId: string): Promise<WebhookProfile[]> {
+    return this.webhookRepository.listByClawId(clawId)
   }
 
-  update(id: string, clawId: string, input: UpdateWebhookInput): WebhookProfile {
-    const existing = this.findById(id)
+  async update(id: string, clawId: string, input: UpdateWebhookInput): Promise<WebhookProfile> {
+    const existing = await this.findById(id)
     if (!existing) {
       throw new WebhookError('NOT_FOUND', 'Webhook not found')
     }
@@ -225,48 +169,16 @@ export class WebhookService {
       throw new WebhookError('FORBIDDEN', 'Not your webhook')
     }
 
-    const updates: string[] = []
-    const values: unknown[] = []
-
-    if (input.url !== undefined) {
-      // Validate URL if it's being updated
-      if (input.url && existing.type === 'outgoing') {
-        validateWebhookUrl(input.url)
-      }
-      updates.push('url = ?')
-      values.push(input.url)
-    }
-    if (input.events !== undefined) {
-      updates.push('events = ?')
-      values.push(JSON.stringify(input.events))
-    }
-    if (input.active !== undefined) {
-      updates.push('active = ?')
-      values.push(input.active ? 1 : 0)
-      if (input.active) {
-        // Reset failure count when re-enabling
-        updates.push('failure_count = 0')
-      }
-    }
-    if (input.name !== undefined) {
-      updates.push('name = ?')
-      values.push(input.name)
+    // Validate URL if it's being updated
+    if (input.url !== undefined && input.url && existing.type === 'outgoing') {
+      validateWebhookUrl(input.url)
     }
 
-    if (updates.length === 0) {
-      return existing
-    }
-
-    values.push(id)
-    const row = this.db
-      .prepare(`UPDATE webhooks SET ${updates.join(', ')} WHERE id = ? RETURNING *`)
-      .get(...values) as WebhookRow
-
-    return rowToProfile(row)
+    return await this.webhookRepository.update(id, input)
   }
 
-  delete(id: string, clawId: string): void {
-    const existing = this.findById(id)
+  async delete(id: string, clawId: string): Promise<void> {
+    const existing = await this.findById(id)
     if (!existing) {
       throw new WebhookError('NOT_FOUND', 'Webhook not found')
     }
@@ -274,11 +186,11 @@ export class WebhookService {
       throw new WebhookError('FORBIDDEN', 'Not your webhook')
     }
 
-    this.db.prepare('DELETE FROM webhooks WHERE id = ?').run(id)
+    await this.webhookRepository.delete(id)
   }
 
-  getDeliveries(webhookId: string, clawId: string, limit = 20): WebhookDeliveryProfile[] {
-    const webhook = this.findById(webhookId)
+  async getDeliveries(webhookId: string, clawId: string, limit = 20): Promise<WebhookDeliveryProfile[]> {
+    const webhook = await this.findById(webhookId)
     if (!webhook) {
       throw new WebhookError('NOT_FOUND', 'Webhook not found')
     }
@@ -286,16 +198,7 @@ export class WebhookService {
       throw new WebhookError('FORBIDDEN', 'Not your webhook')
     }
 
-    const rows = this.db
-      .prepare(
-        `SELECT * FROM webhook_deliveries
-         WHERE webhook_id = ?
-         ORDER BY created_at DESC
-         LIMIT ?`,
-      )
-      .all(webhookId, limit) as WebhookDeliveryRow[]
-
-    return rows.map(deliveryRowToProfile)
+    return await this.webhookRepository.getDeliveries(webhookId, limit)
   }
 
   generateSignature(secret: string, payload: string): string {
@@ -304,11 +207,12 @@ export class WebhookService {
 
   verifySignature(secret: string, payload: string, signature: string): boolean {
     const expected = this.generateSignature(secret, payload)
-    return expected === signature
+    if (expected.length !== signature.length) return false
+    return timingSafeEqual(Buffer.from(expected), Buffer.from(signature))
   }
 
   async sendTestEvent(webhookId: string, clawId: string): Promise<WebhookDeliveryProfile> {
-    const webhook = this.findById(webhookId)
+    const webhook = await this.findById(webhookId)
     if (!webhook) {
       throw new WebhookError('NOT_FOUND', 'Webhook not found')
     }
@@ -340,7 +244,7 @@ export class WebhookService {
       throw new WebhookError('MISSING_URL', 'Webhook URL not configured')
     }
 
-    const deliveryId = `dlv_${randomUUID()}`
+    const deliveryId = randomUUID()
     const payloadStr = JSON.stringify(payload)
     const signature = this.generateSignature(webhook.secret, payloadStr)
     const timestamp = String(Math.floor(Date.now() / 1000))
@@ -379,34 +283,36 @@ export class WebhookService {
     const durationMs = Date.now() - start
 
     // Record delivery
-    const deliveryRow = this.db
-      .prepare(
-        `INSERT INTO webhook_deliveries (id, webhook_id, event_type, payload, status_code, response_body, duration_ms, success)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-      )
-      .get(deliveryId, webhook.id, eventType, payloadStr, statusCode, responseBody, durationMs, success ? 1 : 0) as WebhookDeliveryRow
+    const delivery = await this.webhookRepository.recordDelivery({
+      id: deliveryId,
+      webhookId: webhook.id,
+      eventType,
+      payload: payloadStr,
+      statusCode,
+      responseBody,
+      durationMs,
+      success,
+    })
 
     // Update webhook status
     if (success) {
-      this.db
-        .prepare('UPDATE webhooks SET last_triggered_at = strftime(\'%Y-%m-%dT%H:%M:%fZ\', \'now\'), last_status_code = ?, failure_count = 0 WHERE id = ?')
-        .run(statusCode, webhook.id)
+      await this.webhookRepository.updateWebhookStatus(webhook.id, {
+        lastTriggeredAt: new Date().toISOString(),
+        lastStatusCode: statusCode,
+        failureCount: 0,
+      })
     } else {
       const newFailureCount = webhook.failureCount + 1
       const shouldDisable = newFailureCount >= CIRCUIT_BREAKER_THRESHOLD
-      this.db
-        .prepare(
-          `UPDATE webhooks SET
-            last_triggered_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
-            last_status_code = ?,
-            failure_count = ?,
-            active = ?
-           WHERE id = ?`,
-        )
-        .run(statusCode, newFailureCount, shouldDisable ? 0 : 1, webhook.id)
+      await this.webhookRepository.updateWebhookStatus(webhook.id, {
+        lastTriggeredAt: new Date().toISOString(),
+        lastStatusCode: statusCode,
+        failureCount: newFailureCount,
+        active: !shouldDisable,
+      })
     }
 
-    return deliveryRowToProfile(deliveryRow)
+    return delivery
   }
 
   async deliverWithRetry(
@@ -419,7 +325,7 @@ export class WebhookService {
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       // Refresh webhook to check if it was disabled by circuit breaker
-      const current = this.findById(webhook.id)
+      const current = await this.findById(webhook.id)
       if (!current || !current.active) return
 
       await sleep(RETRY_DELAYS[attempt])
@@ -433,15 +339,9 @@ export class WebhookService {
     if (recipientIds.length === 0) return
 
     for (const recipientId of recipientIds) {
-      const webhooks = this.db
-        .prepare(
-          `SELECT * FROM webhooks
-           WHERE claw_id = ? AND type = 'outgoing' AND active = 1`,
-        )
-        .all(recipientId) as WebhookRow[]
+      const webhooks = await this.webhookRepository.getActiveWebhooksForRecipient(recipientId)
 
-      for (const row of webhooks) {
-        const webhook = rowToProfile(row)
+      for (const webhook of webhooks) {
         const events = webhook.events
 
         // Check if webhook subscribes to this event type
@@ -515,47 +415,6 @@ function getRecipientIds(data: unknown): string[] {
   return []
 }
 
-function rowToProfile(row: WebhookRow): WebhookProfile {
-  return {
-    id: row.id,
-    clawId: row.claw_id,
-    type: row.type,
-    name: row.name,
-    url: row.url,
-    secret: row.secret,
-    events: JSON.parse(row.events) as string[],
-    active: Boolean(row.active),
-    failureCount: row.failure_count,
-    lastTriggeredAt: row.last_triggered_at,
-    lastStatusCode: row.last_status_code,
-    createdAt: row.created_at,
-  }
-}
-
-function deliveryRowToProfile(row: WebhookDeliveryRow): WebhookDeliveryProfile {
-  return {
-    id: row.id,
-    webhookId: row.webhook_id,
-    eventType: row.event_type,
-    payload: JSON.parse(row.payload) as unknown,
-    statusCode: row.status_code,
-    responseBody: row.response_body,
-    durationMs: row.duration_ms,
-    success: Boolean(row.success),
-    createdAt: row.created_at,
-  }
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-export class WebhookError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-  ) {
-    super(message)
-    this.name = 'WebhookError'
-  }
 }

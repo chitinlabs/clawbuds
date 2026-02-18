@@ -3,6 +3,8 @@ import type {
   IFriendshipRepository,
   FriendshipRecord,
 } from '../db/repositories/interfaces/friendship.repository.interface.js'
+import type { ICacheService } from '../cache/interfaces/cache.interface.js'
+import { config } from '../config/env.js'
 
 export type FriendshipStatus = 'pending' | 'accepted' | 'rejected' | 'blocked'
 
@@ -27,6 +29,7 @@ export class FriendshipService {
   constructor(
     private friendshipRepository: IFriendshipRepository,
     private eventBus?: EventBus,
+    private cache?: ICacheService,
   ) {}
 
   async sendRequest(requesterId: string, accepterId: string): Promise<FriendshipProfile> {
@@ -44,22 +47,54 @@ export class FriendshipService {
       throw new FriendshipError('ALREADY_FRIENDS', 'Already friends')
     }
 
-    if (existingStatus === 'pending') {
-      throw new FriendshipError('DUPLICATE_REQUEST', 'Friend request already sent')
-    }
-
     if (existingStatus === 'blocked') {
       throw new FriendshipError('BLOCKED', 'Cannot send friend request')
     }
 
+    // If pending, check if it's a reverse request (auto-accept scenario)
+    if (existingStatus === 'pending') {
+      const existingFriendship = await this._findByClawIds(requesterId, accepterId)
+      if (existingFriendship) {
+        // Check if the existing request is in the reverse direction (accepter -> requester)
+        // If Bob already sent to Alice, and now Alice sends to Bob, auto-accept
+        if (existingFriendship.accepterId === requesterId) {
+          // This is a reverse request - auto accept
+          await this.friendshipRepository.acceptFriendRequestById(existingFriendship.id)
+          const accepted = await this._findByClawIds(requesterId, accepterId)
+          if (!accepted) {
+            throw new Error('Failed to auto-accept friendship')
+          }
+          return this._toProfile(accepted)
+        } else {
+          // Same direction request - duplicate
+          throw new FriendshipError('DUPLICATE_REQUEST', 'Friend request already sent')
+        }
+      }
+    }
+
+    // If previously rejected, remove the old record to allow re-request
+    if (existingStatus === 'rejected') {
+      await this.friendshipRepository.removeFriend(requesterId, accepterId)
+    }
+
     // Send friend request
-    await this.friendshipRepository.sendFriendRequest(requesterId, accepterId)
+    try {
+      await this.friendshipRepository.sendFriendRequest(requesterId, accepterId)
+    } catch (err: any) {
+      // Handle foreign key constraint (claw doesn't exist)
+      if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' || err.code === '23503') {
+        throw new FriendshipError('CLAW_NOT_FOUND', 'User not found')
+      }
+      throw err
+    }
 
     // Get the created friendship record
     const friendship = await this._findByClawIds(requesterId, accepterId)
     if (!friendship) {
       throw new Error('Failed to create friendship request')
     }
+
+    await this.invalidateFriendCache(requesterId, accepterId)
 
     // Emit event
     this.eventBus?.emit('friend.request', {
@@ -107,6 +142,8 @@ export class FriendshipService {
 
     const profile = this._toProfile(updated)
 
+    await this.invalidateFriendCache(profile.requesterId, profile.accepterId)
+
     this.eventBus?.emit('friend.accepted', {
       recipientIds: [profile.requesterId, profile.accepterId],
       friendship: profile,
@@ -136,6 +173,8 @@ export class FriendshipService {
       throw new Error('Failed to reject friendship request')
     }
 
+    await this.invalidateFriendCache(updated.requesterId, updated.accepterId)
+
     return this._toProfile(updated)
   }
 
@@ -146,18 +185,30 @@ export class FriendshipService {
     }
 
     await this.friendshipRepository.removeFriend(clawId, friendClawId)
+    await this.invalidateFriendCache(clawId, friendClawId)
   }
 
   async listFriends(clawId: string): Promise<FriendInfo[]> {
+    const cacheKey = `friends:${clawId}`
+    if (this.cache) {
+      const cached = await this.cache.get<FriendInfo[]>(cacheKey)
+      if (cached) return cached
+    }
+
     const friends = await this.friendshipRepository.listFriends(clawId)
 
-    return friends.map((friend) => ({
+    const result = friends.map((friend) => ({
       clawId: friend.clawId,
       displayName: friend.displayName,
       bio: friend.bio,
       friendshipId: friend.friendshipId || '',
       friendsSince: friend.friendsSince || friend.createdAt,
     }))
+
+    if (this.cache) {
+      await this.cache.set(cacheKey, result, config.cacheTtlFriend)
+    }
+    return result
   }
 
   async findById(id: string): Promise<FriendshipProfile | null> {
@@ -166,7 +217,29 @@ export class FriendshipService {
   }
 
   async areFriends(clawId1: string, clawId2: string): Promise<boolean> {
-    return await this.friendshipRepository.areFriends(clawId1, clawId2)
+    const sorted = [clawId1, clawId2].sort()
+    const cacheKey = `areFriends:${sorted[0]}:${sorted[1]}`
+    if (this.cache) {
+      const cached = await this.cache.get<boolean>(cacheKey)
+      if (cached !== null && cached !== undefined) return cached
+    }
+
+    const result = await this.friendshipRepository.areFriends(clawId1, clawId2)
+
+    if (this.cache) {
+      await this.cache.set(cacheKey, result, config.cacheTtlFriend)
+    }
+    return result
+  }
+
+  private async invalidateFriendCache(clawId1: string, clawId2: string): Promise<void> {
+    if (!this.cache) return
+    const sorted = [clawId1, clawId2].sort()
+    await Promise.all([
+      this.cache.del(`friends:${clawId1}`),
+      this.cache.del(`friends:${clawId2}`),
+      this.cache.del(`areFriends:${sorted[0]}:${sorted[1]}`),
+    ])
   }
 
   // ========== 私有辅助方法 ==========

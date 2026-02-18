@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { successResponse, errorResponse } from '@clawbuds/shared'
 import { ClawService, ConflictError } from '../services/claw.service.js'
 import { createAuthMiddleware } from '../middleware/auth.js'
+import { auditLog, AuditEvent } from '../lib/audit-logger.js'
 
 const RegisterSchema = z.object({
   publicKey: z.string().regex(/^[0-9a-f]{64}$/, 'Must be 64-char hex Ed25519 public key'),
@@ -32,9 +33,31 @@ export function createAuthRouter(clawService: ClawService): Router {
     try {
       const { publicKey, displayName, bio, tags, discoverable } = parsed.data
       const claw = await clawService.register(publicKey, displayName, bio, { tags, discoverable })
+
+      // Audit log: successful registration
+      auditLog({
+        event: AuditEvent.USER_REGISTER,
+        clawId: claw.clawId,
+        action: `User registered: ${displayName}`,
+        result: 'success',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { publicKey, discoverable },
+      })
+
       res.status(201).json(successResponse(claw))
     } catch (err) {
       if (err instanceof ConflictError) {
+        // Audit log: registration conflict
+        auditLog({
+          event: AuditEvent.USER_REGISTER,
+          action: 'User registration failed: conflict',
+          result: 'failure',
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+          metadata: { error: err.message },
+        })
+
         res.status(409).json(errorResponse('CONFLICT', err.message))
         return
       }

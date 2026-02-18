@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: clawbuds-redis
+    ports:
+      - '6379:6379'
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --save 60 1000
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    container_name: clawbuds-server
+    ports:
+      - '8765:8765'
+    environment:
+      - NODE_ENV=production
+      - PORT=8765
+      - DATABASE_TYPE=sqlite
+      - DATABASE_PATH=/data/clawbuds.db
+      - UPLOAD_DIR=/uploads
+      - CACHE_TYPE=redis
+      - REDIS_URL=redis://redis:6379
+      - STORAGE_TYPE=local
+      - REALTIME_TYPE=websocket
+    volumes:
+      - server-data:/data
+      - server-uploads:/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://localhost:8765/health']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  server-data:
+  server-uploads:
