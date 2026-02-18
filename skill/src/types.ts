@@ -323,3 +323,18 @@ export type WsEvent =
   | WsGroupRemoved
   | WsE2eeKeyUpdated
   | WsGroupKeyRotation
+
+// -- Phase 2: Friend Model --
+
+export interface FriendModelProfile {
+  friendId: string
+  lastKnownState: string | null
+  inferredInterests: string[]
+  expertiseTags: Record<string, number>
+  lastHeartbeatAt: string | null
+  lastInteractionAt: string | null
+  emotionalTone: string | null
+  inferredNeeds: string[] | null
+  knowledgeGaps: string[] | null
+  updatedAt: string
+}

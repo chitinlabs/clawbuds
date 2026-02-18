@@ -24,6 +24,7 @@ import { HeartbeatService } from './services/heartbeat.service.js'
 import { HeartbeatDataCollector } from './services/heartbeat-data-collector.js'
 import { RelationshipService } from './services/relationship.service.js'
 import { SchedulerService } from './services/scheduler.service.js'
+import { ProxyToMService } from './services/proxy-tom.service.js'
 import { createAuthRouter } from './routes/auth.js'
 import { createFriendsRouter } from './routes/friends.js'
 import { createMessagesRouter } from './routes/messages.js'
@@ -38,6 +39,7 @@ import { createDiscoverRouter } from './routes/discover.js'
 import { createProfileRouter } from './routes/profile.js'
 import { createHeartbeatRouter } from './routes/heartbeat.js'
 import { createRelationshipsRouter } from './routes/relationships.js'
+import { createFriendModelsRouter } from './routes/friend-models.js'
 import { config } from './config/env.js'
 import { RepositoryFactory, type RepositoryFactoryOptions } from './db/repositories/factory.js'
 import { CacheFactory, type CacheType } from './cache/factory.js'
@@ -221,6 +223,7 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     const statsRepository = repositoryFactory.createStatsRepository()
     const heartbeatRepository = repositoryFactory.createHeartbeatRepository()
     const relationshipStrengthRepository = repositoryFactory.createRelationshipStrengthRepository()
+    const friendModelRepository = repositoryFactory.createFriendModelRepository()
 
     // Create cache service
     const appOptions = (options && 'repositoryOptions' in options) ? options as CreateAppOptions : {}
@@ -265,6 +268,7 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     const heartbeatCollector = new HeartbeatDataCollector(clawRepository, circleRepository)
     const heartbeatService = new HeartbeatService(heartbeatRepository, friendshipRepository, heartbeatCollector, eventBus)
     const relationshipService = new RelationshipService(relationshipStrengthRepository, eventBus)
+    const proxyToMService = new ProxyToMService(friendModelRepository, eventBus)
 
     ctx.clawService = clawService
     ctx.inboxService = inboxService
@@ -293,6 +297,7 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1', createProfileRouter(clawService, discoveryService, statsService))
     app.use('/api/v1/heartbeat', createHeartbeatRouter(heartbeatService, friendshipService, clawService))
     app.use('/api/v1/relationships', createRelationshipsRouter(relationshipService, clawService))
+    app.use('/api/v1/friend-models', createFriendModelsRouter(proxyToMService, friendshipService, clawService))
 
     // ─── EventBus 监听：Phase 1 联动 ───
     // friend.accepted → 双向初始化关系强度
@@ -334,6 +339,32 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     // poll.voted → 投票者→投票创建者关系提振
     eventBus.on('poll.voted', ({ clawId, recipientId }) => {
       relationshipService.boostStrength(clawId, recipientId, 'poll_vote').catch(() => {})
+    })
+
+    // ─── EventBus 监听：Phase 2 ProxyToM 联动 ───
+    // heartbeat.received → 更新好友心智模型
+    eventBus.on('heartbeat.received', async ({ fromClawId, toClawId, payload }) => {
+      const existing = await proxyToMService.getModel(toClawId, fromClawId)
+      proxyToMService.updateFromHeartbeat(toClawId, fromClawId, payload, existing).catch(() => {})
+    })
+
+    // message.new → 更新 lastInteractionAt（好友给我发消息时）
+    eventBus.on('message.new', async ({ recipientId, entry }) => {
+      proxyToMService.touchInteraction(recipientId, entry.message.fromClawId).catch(() => {})
+    })
+
+    // friend.accepted → 双向初始化心智模型
+    eventBus.on('friend.accepted', ({ recipientIds }) => {
+      const [clawA, clawB] = recipientIds
+      Promise.all([
+        proxyToMService.initializeFriendModel(clawA, clawB),
+        proxyToMService.initializeFriendModel(clawB, clawA),
+      ]).catch(() => {})
+    })
+
+    // friend.removed → 清理心智模型
+    eventBus.on('friend.removed', ({ clawId, friendId }) => {
+      proxyToMService.removeFriendModel(clawId, friendId).catch(() => {})
     })
 
     ctx.heartbeatService = heartbeatService
