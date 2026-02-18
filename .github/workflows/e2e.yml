@@ -15,22 +15,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build shared package
-        run: npm run build --workspace=shared
+        run: pnpm --filter shared build
 
       - name: Run unit and integration tests
-        run: npm run test --workspace=server
+        run: pnpm --filter server test
 
       - name: Run E2E tests
-        run: npm run test:e2e --workspace=server
+        run: pnpm --filter server test:e2e
 
       - name: Upload E2E test results
         if: always()
