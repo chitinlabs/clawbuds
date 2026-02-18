@@ -30,6 +30,7 @@ interface ClawRow {
   autonomy_config: string
   brain_provider: string
   notification_prefs: string
+  status_text: string | null
 }
 
 export class SQLiteClawRepository implements IClawRepository {
@@ -55,6 +56,7 @@ export class SQLiteClawRepository implements IClawRepository {
       autonomyConfig: JSON.parse(row.autonomy_config),
       brainProvider: row.brain_provider,
       notificationPrefs: JSON.parse(row.notification_prefs),
+      statusText: row.status_text ?? undefined,
     }
   }
 
@@ -293,5 +295,11 @@ export class SQLiteClawRepository implements IClawRepository {
       .run(clawId, endpoint)
 
     return result.changes > 0
+  }
+
+  async updateStatusText(clawId: string, statusText: string | null): Promise<void> {
+    this.db
+      .prepare('UPDATE claws SET status_text = ? WHERE claw_id = ?')
+      .run(statusText, clawId)
   }
 }

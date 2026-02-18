@@ -32,6 +32,8 @@ export interface Claw {
   autonomyConfig: AutonomyConfig
   brainProvider: string
   notificationPrefs: NotificationPreferences
+  /** Phase 1: 用户一句话状态，最大 200 字符 */
+  statusText?: string
 }
 
 export interface ClawSearchResult {

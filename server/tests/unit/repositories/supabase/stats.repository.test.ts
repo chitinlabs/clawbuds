@@ -73,6 +73,70 @@ describe('SupabaseStatsRepository', () => {
     })
   })
 
+  describe('getStats - null counts', () => {
+    it('should return 0 for all stats when counts are null', async () => {
+      const nullCountBuilder = createQueryBuilder({ data: null, error: null, count: null })
+      const nullMsgBuilder = createQueryBuilder({ data: null, error: null })
+
+      client.from
+        .mockReturnValueOnce(nullCountBuilder)
+        .mockReturnValueOnce(nullCountBuilder)
+        .mockReturnValueOnce(nullCountBuilder)
+        .mockReturnValueOnce(nullMsgBuilder)
+
+      const result = await repo.getStats('claw_abc')
+      expect(result.messagesSent).toBe(0)
+      expect(result.messagesReceived).toBe(0)
+      expect(result.friendsCount).toBe(0)
+      expect(result.lastMessageAt).toBeUndefined()
+    })
+  })
+
+  describe('getStats - error paths', () => {
+    it('should throw when messages sent query fails', async () => {
+      const errorBuilder = createQueryBuilder({ data: null, error: { message: 'sent error' } })
+      client.from.mockReturnValue(errorBuilder)
+
+      await expect(repo.getStats('claw_abc')).rejects.toMatchObject({ message: 'sent error' })
+    })
+
+    it('should throw when inbox_entries query fails', async () => {
+      const okBuilder = createQueryBuilder({ data: null, error: null, count: 0 })
+      const errorBuilder = createQueryBuilder({ data: null, error: { message: 'received error' } })
+
+      client.from
+        .mockReturnValueOnce(okBuilder)
+        .mockReturnValueOnce(errorBuilder)
+
+      await expect(repo.getStats('claw_abc')).rejects.toMatchObject({ message: 'received error' })
+    })
+
+    it('should throw when friendships query fails', async () => {
+      const okBuilder = createQueryBuilder({ data: null, error: null, count: 0 })
+      const errorBuilder = createQueryBuilder({ data: null, error: { message: 'friends error' } })
+
+      client.from
+        .mockReturnValueOnce(okBuilder)
+        .mockReturnValueOnce(okBuilder)
+        .mockReturnValueOnce(errorBuilder)
+
+      await expect(repo.getStats('claw_abc')).rejects.toMatchObject({ message: 'friends error' })
+    })
+
+    it('should throw when last message query fails', async () => {
+      const okBuilder = createQueryBuilder({ data: null, error: null, count: 0 })
+      const errorBuilder = createQueryBuilder({ data: null, error: { message: 'last msg error' } })
+
+      client.from
+        .mockReturnValueOnce(okBuilder)
+        .mockReturnValueOnce(okBuilder)
+        .mockReturnValueOnce(okBuilder)
+        .mockReturnValueOnce(errorBuilder)
+
+      await expect(repo.getStats('claw_abc')).rejects.toMatchObject({ message: 'last msg error' })
+    })
+  })
+
   describe('initStats', () => {
     it('should upsert into claw_stats', async () => {
       const builder = createQueryBuilder({ data: null, error: null })
@@ -86,6 +150,13 @@ describe('SupabaseStatsRepository', () => {
         { onConflict: 'claw_id', ignoreDuplicates: true },
       )
       expect(builder.throwOnError).toHaveBeenCalled()
+    })
+
+    it('should throw on error', async () => {
+      const errorBuilder = createQueryBuilder({ data: null, error: { message: 'upsert failed' } })
+      client.from.mockReturnValue(errorBuilder)
+
+      await expect(repo.initStats('claw_abc')).rejects.toMatchObject({ message: 'upsert failed' })
     })
   })
 })

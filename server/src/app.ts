@@ -20,6 +20,10 @@ import { E2eeService } from './services/e2ee.service.js'
 import { DiscoveryService } from './services/discovery.service.js'
 import { StatsService } from './services/stats.service.js'
 import { EventBus } from './services/event-bus.js'
+import { HeartbeatService } from './services/heartbeat.service.js'
+import { HeartbeatDataCollector } from './services/heartbeat-data-collector.js'
+import { RelationshipService } from './services/relationship.service.js'
+import { SchedulerService } from './services/scheduler.service.js'
 import { createAuthRouter } from './routes/auth.js'
 import { createFriendsRouter } from './routes/friends.js'
 import { createMessagesRouter } from './routes/messages.js'
@@ -32,6 +36,8 @@ import { createGroupsRouter } from './routes/groups.js'
 import { createE2eeRouter } from './routes/e2ee.js'
 import { createDiscoverRouter } from './routes/discover.js'
 import { createProfileRouter } from './routes/profile.js'
+import { createHeartbeatRouter } from './routes/heartbeat.js'
+import { createRelationshipsRouter } from './routes/relationships.js'
 import { config } from './config/env.js'
 import { RepositoryFactory, type RepositoryFactoryOptions } from './db/repositories/factory.js'
 import { CacheFactory, type CacheType } from './cache/factory.js'
@@ -61,6 +67,8 @@ export interface AppContext {
   cacheService?: ICacheService
   storageService?: IStorageService
   realtimeService?: IRealtimeService
+  heartbeatService?: HeartbeatService
+  relationshipService?: RelationshipService
 }
 
 export interface CreateAppOptions {
@@ -211,6 +219,8 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     const e2eeRepository = repositoryFactory.createE2eeRepository()
     const discoveryRepository = repositoryFactory.createDiscoveryRepository()
     const statsRepository = repositoryFactory.createStatsRepository()
+    const heartbeatRepository = repositoryFactory.createHeartbeatRepository()
+    const relationshipStrengthRepository = repositoryFactory.createRelationshipStrengthRepository()
 
     // Create cache service
     const appOptions = (options && 'repositoryOptions' in options) ? options as CreateAppOptions : {}
@@ -252,6 +262,9 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     const e2eeService = new E2eeService(e2eeRepository, eventBus)
     const discoveryService = new DiscoveryService(discoveryRepository, cacheService)
     const statsService = new StatsService(statsRepository)
+    const heartbeatCollector = new HeartbeatDataCollector(clawRepository, circleRepository)
+    const heartbeatService = new HeartbeatService(heartbeatRepository, friendshipRepository, heartbeatCollector, eventBus)
+    const relationshipService = new RelationshipService(relationshipStrengthRepository, eventBus)
 
     ctx.clawService = clawService
     ctx.inboxService = inboxService
@@ -278,6 +291,53 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1/e2ee', createE2eeRouter(e2eeService, clawService, groupService))
     app.use('/api/v1/discover', createDiscoverRouter(discoveryService, clawService))
     app.use('/api/v1', createProfileRouter(clawService, discoveryService, statsService))
+    app.use('/api/v1/heartbeat', createHeartbeatRouter(heartbeatService, friendshipService, clawService))
+    app.use('/api/v1/relationships', createRelationshipsRouter(relationshipService, clawService))
+
+    // ─── EventBus 监听：Phase 1 联动 ───
+    // friend.accepted → 双向初始化关系强度
+    eventBus.on('friend.accepted', ({ friendship }) => {
+      const { requesterId, accepterId } = friendship
+      Promise.all([
+        relationshipService.initializeRelationship(requesterId, accepterId),
+        relationshipService.initializeRelationship(accepterId, requesterId),
+      ]).catch(() => {
+        // Ignore errors to avoid crashing the event loop
+      })
+    })
+
+    // friend.removed → 双向删除关系强度
+    eventBus.on('friend.removed', ({ clawId, friendId }) => {
+      Promise.all([
+        relationshipService.removeRelationship(clawId, friendId),
+        relationshipService.removeRelationship(friendId, clawId),
+      ]).catch(() => {
+        // Ignore errors to avoid crashing the event loop
+      })
+    })
+
+    // message.new → 发送方→接收方关系提振
+    eventBus.on('message.new', ({ recipientId, entry }) => {
+      relationshipService.boostStrength(entry.message.fromClawId, recipientId, 'message').catch(() => {})
+    })
+
+    // reaction.added → 反应者→消息主人关系提振
+    eventBus.on('reaction.added', ({ recipientId, clawId }) => {
+      relationshipService.boostStrength(clawId, recipientId, 'reaction').catch(() => {})
+    })
+
+    // heartbeat.received → 心跳发送方→接收方关系提振
+    eventBus.on('heartbeat.received', ({ fromClawId, toClawId }) => {
+      relationshipService.boostStrength(fromClawId, toClawId, 'heartbeat').catch(() => {})
+    })
+
+    // poll.voted → 投票者→投票创建者关系提振
+    eventBus.on('poll.voted', ({ clawId, recipientId }) => {
+      relationshipService.boostStrength(clawId, recipientId, 'poll_vote').catch(() => {})
+    })
+
+    ctx.heartbeatService = heartbeatService
+    ctx.relationshipService = relationshipService
   }
 
   // Error handler

@@ -186,6 +186,8 @@ export class FriendshipService {
 
     await this.friendshipRepository.removeFriend(clawId, friendClawId)
     await this.invalidateFriendCache(clawId, friendClawId)
+
+    this.eventBus?.emit('friend.removed', { clawId, friendId: friendClawId })
   }
 
   async listFriends(clawId: string): Promise<FriendInfo[]> {

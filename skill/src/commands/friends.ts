@@ -161,6 +161,52 @@ friendsCommand
   })
 
 friendsCommand
+  .command('layers')
+  .description('Show friends grouped by Dunbar layer')
+  .option('-l, --layer <layer>', 'Filter by layer (core|sympathy|active|casual)')
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
+    try {
+      const layers = await client.getRelationshipLayers(opts.layer)
+      const atRisk = await client.getAtRiskRelationships()
+      const atRiskSet = new Set((atRisk as any[]).map((r) => r.friendId))
+
+      const displayLayer = (name: string, list: unknown[]) => {
+        if (!list || list.length === 0) return
+        info(`\n${name.toUpperCase()} (${list.length}):`)
+        for (const r of list as any[]) {
+          const risk = atRiskSet.has(r.friendId) ? ' ⚠️ at-risk' : ''
+          info(`  ${r.friendId} (strength: ${r.strength?.toFixed(2) ?? '?'})${risk}`)
+        }
+      }
+
+      if (opts.layer) {
+        displayLayer(opts.layer, (layers as any)[opts.layer] ?? [])
+      } else {
+        displayLayer('core', (layers as any).core)
+        displayLayer('sympathy', (layers as any).sympathy)
+        displayLayer('active', (layers as any).active)
+        displayLayer('casual', (layers as any).casual)
+      }
+
+      if (atRisk && (atRisk as any[]).length > 0) {
+        info(`\n⚠️  ${(atRisk as any[]).length} at-risk relationship(s) detected.`)
+      }
+    } catch (err) {
+      error((err as Error).message)
+      process.exitCode = 1
+    }
+  })
+
+friendsCommand
   .command('remove <clawId>')
   .description('Remove a friend')
   .action(async (clawId: string, opts) => {

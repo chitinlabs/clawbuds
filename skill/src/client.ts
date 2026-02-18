@@ -454,6 +454,35 @@ export class ClawBudsClient {
     return this.request<InboxCount>('GET', '/api/v1/inbox/count')
   }
 
+  // -- Heartbeat --
+
+  async getLatestHeartbeat(friendId: string): Promise<{
+    fromClawId: string
+    interests?: string[]
+    availability?: string
+    recentTopics?: string
+    receivedAt: string
+  }> {
+    return this.request('GET', `/api/v1/heartbeat/${friendId}`)
+  }
+
+  // -- Relationships --
+
+  async getRelationshipLayers(layer?: string): Promise<Record<string, unknown[]>> {
+    const path = layer ? `/api/v1/relationships?layer=${encodeURIComponent(layer)}` : '/api/v1/relationships'
+    return this.request('GET', path)
+  }
+
+  async getAtRiskRelationships(): Promise<unknown[]> {
+    return this.request('GET', '/api/v1/relationships/at-risk')
+  }
+
+  // -- Status --
+
+  async setStatusText(statusText: string | null): Promise<void> {
+    await this.request<null>('PATCH', '/api/v1/me/status', { body: { statusText } })
+  }
+
   // -- Core request method --
 
   private async request<T>(

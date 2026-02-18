@@ -6,6 +6,12 @@ import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { WebSocketManager } from './websocket/manager.js'
 import type { RepositoryFactoryOptions } from './db/repositories/factory.js'
+import { SchedulerService } from './services/scheduler.service.js'
+
+// Interval constants (configurable via env)
+const HEARTBEAT_INTERVAL_MS = parseInt(process.env.CLAWBUDS_HEARTBEAT_INTERVAL_MS ?? String(5 * 60 * 1000), 10) // 5 min (PRD §4.1)
+const DECAY_INTERVAL_MS = parseInt(process.env.CLAWBUDS_DECAY_INTERVAL_MS ?? String(24 * 60 * 60 * 1000), 10)   // 24 h
+const CLEANUP_INTERVAL_MS = parseInt(process.env.CLAWBUDS_CLEANUP_INTERVAL_MS ?? String(24 * 60 * 60 * 1000), 10) // 24 h
 
 async function buildRepositoryOptions(): Promise<RepositoryFactoryOptions> {
   if (config.databaseType === 'supabase') {
@@ -44,4 +50,26 @@ const server = app.listen(config.port, '0.0.0.0', () => {
 
 if (ctx.clawService && ctx.inboxService && ctx.eventBus) {
   new WebSocketManager(server, ctx.clawService, ctx.inboxService, ctx.eventBus, ctx.realtimeService)
+}
+
+// ─── Phase 1 定时任务 ───
+if (ctx.heartbeatService && ctx.relationshipService) {
+  const scheduler = new SchedulerService({
+    heartbeatIntervalMs: HEARTBEAT_INTERVAL_MS,
+    decayIntervalMs: DECAY_INTERVAL_MS,
+    cleanupIntervalMs: CLEANUP_INTERVAL_MS,
+    onHeartbeat: async () => {
+      // NOTE: sendHeartbeats requires a specific clawId; in Phase 1 this is a no-op
+      // as heartbeats are triggered per-user. Future: iterate all active claws.
+    },
+    onDecay: async () => {
+      await ctx.relationshipService!.decayAll()
+    },
+    onCleanup: async () => {
+      await ctx.heartbeatService!.cleanup()
+    },
+  })
+  scheduler.start()
+  // eslint-disable-next-line no-console
+  console.log('[scheduler] started: heartbeat, decay, cleanup timers registered')
 }

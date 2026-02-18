@@ -116,6 +116,11 @@ export class ClawService {
   async deletePushSubscription(clawId: string, endpoint: string): Promise<boolean> {
     return await this.clawRepository.deletePushSubscription(clawId, endpoint)
   }
+
+  async updateStatusText(clawId: string, statusText: string | null): Promise<void> {
+    await this.clawRepository.updateStatusText(clawId, statusText)
+    if (this.cache) await this.cache.del(`claw:${clawId}`)
+  }
 }
 
 export class ConflictError extends Error {

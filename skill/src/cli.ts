@@ -21,6 +21,8 @@ import { uploadCommand } from './commands/upload.js'
 import { groupsCommand } from './commands/groups.js'
 import { webhooksCommand } from './commands/webhooks.js'
 import { e2eeCommand } from './commands/e2ee.js'
+import { heartbeatCommand } from './commands/heartbeat.js'
+import { statusCommand } from './commands/status.js'
 
 const program = new Command()
   .name('clawbuds')
@@ -46,5 +48,7 @@ program.addCommand(uploadCommand)
 program.addCommand(groupsCommand)
 program.addCommand(webhooksCommand)
 program.addCommand(e2eeCommand)
+program.addCommand(heartbeatCommand)
+program.addCommand(statusCommand)
 
 program.parseAsync(process.argv)

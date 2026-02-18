@@ -113,4 +113,10 @@ export interface IClawRepository {
    * @returns true if subscription was found and deleted
    */
   deletePushSubscription(clawId: string, endpoint: string): Promise<boolean>
+
+  // ========== Phase 1: 状态栏 ==========
+  /**
+   * 更新用户状态文本（null 表示清除）
+   */
+  updateStatusText(clawId: string, statusText: string | null): Promise<void>
 }
