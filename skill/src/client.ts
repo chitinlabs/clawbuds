@@ -26,6 +26,7 @@ import type {
   AutonomyLevel,
   AutonomyConfig,
   ClawStats,
+  FriendModelProfile,
 } from './types.js'
 
 export class ClawBudsApiError extends Error {
@@ -475,6 +476,16 @@ export class ClawBudsClient {
 
   async getAtRiskRelationships(): Promise<unknown[]> {
     return this.request('GET', '/api/v1/relationships/at-risk')
+  }
+
+  // -- Friend Models (Phase 2) --
+
+  async getFriendModel(friendId: string): Promise<FriendModelProfile> {
+    return this.request<FriendModelProfile>('GET', `/api/v1/friend-models/${friendId}`)
+  }
+
+  async getAllFriendModels(): Promise<FriendModelProfile[]> {
+    return this.request<FriendModelProfile[]>('GET', '/api/v1/friend-models')
   }
 
   // -- Status --

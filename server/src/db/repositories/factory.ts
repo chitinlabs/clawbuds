@@ -19,6 +19,7 @@ import type { IInboxRepository } from './interfaces/inbox.repository.interface.j
 import type { IWebhookRepository } from './interfaces/webhook.repository.interface.js'
 import type { IHeartbeatRepository } from './interfaces/heartbeat.repository.interface.js'
 import type { IRelationshipStrengthRepository } from './interfaces/relationship-strength.repository.interface.js'
+import type { IFriendModelRepository } from './interfaces/friend-model.repository.interface.js'
 import type Database from 'better-sqlite3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -39,6 +40,7 @@ import { SqliteInboxRepository } from './sqlite/inbox.repository.js'
 import { SqliteWebhookRepository } from './sqlite/webhook.repository.js'
 import { SQLiteHeartbeatRepository } from './sqlite/heartbeat.repository.js'
 import { SQLiteRelationshipStrengthRepository } from './sqlite/relationship-strength.repository.js'
+import { SQLiteFriendModelRepository } from './sqlite/friend-model.repository.js'
 
 // Supabase 实现
 import { SupabaseClawRepository } from './supabase/claw.repository.js'
@@ -57,6 +59,7 @@ import { SupabaseWebhookRepository } from './supabase/webhook.repository.js'
 import { SupabaseGroupDataAccess } from './supabase/group-data-access.js'
 import { SupabaseHeartbeatRepository } from './supabase/heartbeat.repository.js'
 import { SupabaseRelationshipStrengthRepository } from './supabase/relationship-strength.repository.js'
+import { SupabaseFriendModelRepository } from './supabase/friend-model.repository.js'
 
 export type DatabaseType = 'sqlite' | 'supabase'
 
@@ -312,6 +315,20 @@ export class RepositoryFactory {
         return new SQLiteRelationshipStrengthRepository(this.sqliteDb!)
       case 'supabase':
         return new SupabaseRelationshipStrengthRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 FriendModel Repository（Phase 2）
+   */
+  createFriendModelRepository(): IFriendModelRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteFriendModelRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseFriendModelRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }
