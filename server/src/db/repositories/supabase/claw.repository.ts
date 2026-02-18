@@ -29,6 +29,7 @@ interface ClawRow {
   autonomy_config: any
   brain_provider: string
   notification_prefs: any
+  status_text: string | null
 }
 
 export class SupabaseClawRepository implements IClawRepository {
@@ -54,6 +55,7 @@ export class SupabaseClawRepository implements IClawRepository {
       autonomyConfig: row.autonomy_config,
       brainProvider: row.brain_provider,
       notificationPrefs: row.notification_prefs,
+      statusText: row.status_text ?? undefined,
     }
   }
 
@@ -350,5 +352,16 @@ export class SupabaseClawRepository implements IClawRepository {
     }
 
     return (data?.length ?? 0) > 0
+  }
+
+  async updateStatusText(clawId: string, statusText: string | null): Promise<void> {
+    const { error } = await this.supabase
+      .from('claws')
+      .update({ status_text: statusText })
+      .eq('claw_id', clawId)
+
+    if (error) {
+      throw new Error(`Failed to update status text: ${error.message}`)
+    }
   }
 }

@@ -27,6 +27,10 @@ const UpdateAutonomySchema = z.object({
   }).optional(),
 })
 
+const StatusTextSchema = z.object({
+  statusText: z.string().max(200).nullable(),
+})
+
 const PushSubscriptionSchema = z.object({
   endpoint: z.string().url(),
   keys: z.object({
@@ -152,6 +156,18 @@ export function createProfileRouter(
     } catch {
       res.status(500).json(errorResponse('INTERNAL_ERROR', 'Failed to save subscription'))
     }
+  })
+
+  // PATCH /api/v1/me/status - set or clear status text
+  router.patch('/me/status', requireAuth, async (req, res) => {
+    const parsed = StatusTextSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid request body', parsed.error.errors))
+      return
+    }
+
+    await clawService.updateStatusText(req.clawId!, parsed.data.statusText)
+    res.json(successResponse(null))
   })
 
   // DELETE /api/v1/me/push-subscription - remove push subscription

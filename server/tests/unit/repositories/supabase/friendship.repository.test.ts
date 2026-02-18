@@ -54,6 +54,16 @@ describe('SupabaseFriendshipRepository', () => {
 
       expect(result).toBeNull()
     })
+
+    it('should throw on non-PGRST116 error', async () => {
+      const builder = createQueryBuilder({
+        data: null,
+        error: { code: 'DB_FAIL', message: 'DB error' },
+      })
+      client.from.mockReturnValue(builder)
+
+      await expect(repo.findById('fr_001')).rejects.toThrow()
+    })
   })
 
   describe('findByClawIds', () => {
@@ -72,7 +82,7 @@ describe('SupabaseFriendshipRepository', () => {
       expect(result!.requesterId).toBe('alice')
     })
 
-    it('should return null when no friendship exists', async () => {
+    it('should return null when no friendship exists (PGRST116)', async () => {
       const builder = createQueryBuilder({
         data: null,
         error: { code: 'PGRST116', message: 'not found' },
@@ -82,6 +92,16 @@ describe('SupabaseFriendshipRepository', () => {
       const result = await repo.findByClawIds('alice', 'charlie')
 
       expect(result).toBeNull()
+    })
+
+    it('should throw on non-PGRST116 error', async () => {
+      const builder = createQueryBuilder({
+        data: null,
+        error: { code: 'DB_FAIL', message: 'DB error' },
+      })
+      client.from.mockReturnValue(builder)
+
+      await expect(repo.findByClawIds('alice', 'bob')).rejects.toThrow()
     })
   })
 
@@ -125,6 +145,13 @@ describe('SupabaseFriendshipRepository', () => {
       expect(updateArg.accepted_at).toBeDefined()
       expect(builder.eq).toHaveBeenCalledWith('id', 'fr_001')
     })
+
+    it('should throw on error', async () => {
+      const builder = createQueryBuilder({ data: null, error: { message: 'update failed' } })
+      client.from.mockReturnValue(builder)
+
+      await expect(repo.acceptFriendRequestById('fr_001')).rejects.toThrow()
+    })
   })
 
   describe('rejectFriendRequestById', () => {
@@ -136,6 +163,13 @@ describe('SupabaseFriendshipRepository', () => {
 
       expect(builder.update).toHaveBeenCalledWith({ status: 'rejected' })
       expect(builder.eq).toHaveBeenCalledWith('id', 'fr_001')
+    })
+
+    it('should throw on error', async () => {
+      const builder = createQueryBuilder({ data: null, error: { message: 'reject failed' } })
+      client.from.mockReturnValue(builder)
+
+      await expect(repo.rejectFriendRequestById('fr_001')).rejects.toThrow()
     })
   })
 
@@ -159,6 +193,22 @@ describe('SupabaseFriendshipRepository', () => {
       const result = await repo.areFriends('alice', 'charlie')
 
       expect(result).toBe(false)
+    })
+
+    it('should return false when count is null', async () => {
+      const builder = createQueryBuilder({ data: null, error: null, count: null })
+      client.from.mockReturnValue(builder)
+
+      const result = await repo.areFriends('alice', 'charlie')
+
+      expect(result).toBe(false)
+    })
+
+    it('should throw on error', async () => {
+      const builder = createQueryBuilder({ data: null, error: { message: 'DB error' } })
+      client.from.mockReturnValue(builder)
+
+      await expect(repo.areFriends('alice', 'bob')).rejects.toThrow()
     })
   })
 
@@ -269,6 +319,21 @@ describe('SupabaseFriendshipRepository', () => {
       expect(builder.eq).toHaveBeenCalledWith('status', 'accepted')
       expect(result).toBe(5)
     })
+
+    it('should return 0 when count is null', async () => {
+      const builder = createQueryBuilder({ data: null, error: null, count: null })
+      client.from.mockReturnValue(builder)
+
+      const result = await repo.countFriends('alice')
+      expect(result).toBe(0)
+    })
+
+    it('should throw on error', async () => {
+      const builder = createQueryBuilder({ data: null, error: { message: 'count failed' } })
+      client.from.mockReturnValue(builder)
+
+      await expect(repo.countFriends('alice')).rejects.toThrow()
+    })
   })
 
   describe('countPendingRequests', () => {
@@ -281,6 +346,21 @@ describe('SupabaseFriendshipRepository', () => {
       expect(builder.eq).toHaveBeenCalledWith('accepter_id', 'bob')
       expect(builder.eq).toHaveBeenCalledWith('status', 'pending')
       expect(result).toBe(3)
+    })
+
+    it('should return 0 when count is null', async () => {
+      const builder = createQueryBuilder({ data: null, error: null, count: null })
+      client.from.mockReturnValue(builder)
+
+      const result = await repo.countPendingRequests('bob')
+      expect(result).toBe(0)
+    })
+
+    it('should throw on error', async () => {
+      const builder = createQueryBuilder({ data: null, error: { message: 'count failed' } })
+      client.from.mockReturnValue(builder)
+
+      await expect(repo.countPendingRequests('bob')).rejects.toThrow()
     })
   })
 })

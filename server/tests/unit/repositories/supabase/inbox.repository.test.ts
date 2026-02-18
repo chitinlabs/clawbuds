@@ -114,6 +114,15 @@ describe('SupabaseInboxRepository', () => {
     })
   })
 
+  describe('getInbox - error path', () => {
+    it('should throw on query error', async () => {
+      const builder = createQueryBuilder({ data: null, error: { message: 'DB error' } })
+      client.from.mockReturnValue(builder)
+
+      await expect(repo.getInbox('bob')).rejects.toMatchObject({ message: 'DB error' })
+    })
+  })
+
   describe('ack', () => {
     it('should update entries to acked status', async () => {
       const builder = createQueryBuilder({ data: null, error: null, count: 3 })
@@ -131,11 +140,26 @@ describe('SupabaseInboxRepository', () => {
       expect(result).toBe(3)
     })
 
-    it('should return 0 for empty array', async () => {
+    it('should return 0 for empty array without calling DB', async () => {
       const result = await repo.ack('bob', [])
 
       expect(client.from).not.toHaveBeenCalled()
       expect(result).toBe(0)
+    })
+
+    it('should return 0 when count is null', async () => {
+      const builder = createQueryBuilder({ data: null, error: null, count: null })
+      client.from.mockReturnValue(builder)
+
+      const result = await repo.ack('bob', ['ie_001'])
+      expect(result).toBe(0)
+    })
+
+    it('should throw on error', async () => {
+      const builder = createQueryBuilder({ data: null, error: { message: 'update failed' } })
+      client.from.mockReturnValue(builder)
+
+      await expect(repo.ack('bob', ['ie_001'])).rejects.toMatchObject({ message: 'update failed' })
     })
   })
 
@@ -159,6 +183,21 @@ describe('SupabaseInboxRepository', () => {
       const result = await repo.getUnreadCount('bob')
 
       expect(result).toBe(0)
+    })
+
+    it('should return 0 when count is null', async () => {
+      const builder = createQueryBuilder({ data: null, error: null, count: null })
+      client.from.mockReturnValue(builder)
+
+      const result = await repo.getUnreadCount('bob')
+      expect(result).toBe(0)
+    })
+
+    it('should throw on error', async () => {
+      const builder = createQueryBuilder({ data: null, error: { message: 'count failed' } })
+      client.from.mockReturnValue(builder)
+
+      await expect(repo.getUnreadCount('bob')).rejects.toMatchObject({ message: 'count failed' })
     })
   })
 })
