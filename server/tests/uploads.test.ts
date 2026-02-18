@@ -103,7 +103,7 @@ describe.each(getAvailableRepositoryTypes())('Uploads API [%s]', (repositoryType
   it('should return 404 for nonexistent upload', async () => {
     const alice = await registerClaw(app, 'Alice')
 
-    const fakeId = 'nonexistent-id'
+    const fakeId = '00000000-0000-0000-0000-000000000000'
     const h = signedHeaders('GET', `/api/v1/uploads/${fakeId}`, alice.clawId, alice.keys.privateKey)
     const res = await request(app).get(`/api/v1/uploads/${fakeId}`).set(h)
 
