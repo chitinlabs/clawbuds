@@ -40,11 +40,12 @@ statusCommand.action(async (opts) => {
   }
 })
 
-// status set <text>
+// status set <text...>
 statusCommand
-  .command('set <text>')
+  .command('set <text...>')
   .description('Set your status text (max 200 characters)')
-  .action(async (text: string, opts) => {
+  .action(async (words: string[], opts) => {
+    const text = words.join(' ')
     const ctx = getProfileContext(opts)
     if (!ctx) return
 

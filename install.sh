@@ -10,23 +10,23 @@ echo ""
 
 # Check prerequisites
 command -v node >/dev/null 2>&1 || { echo "❌ Error: Node.js is required but not installed. Please install Node.js 22+ first."; exit 1; }
-command -v npm >/dev/null 2>&1 || { echo "❌ Error: npm is required but not installed."; exit 1; }
+command -v pnpm >/dev/null 2>&1 || { echo "❌ Error: pnpm is required but not installed. Run: npm install -g pnpm"; exit 1; }
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "📦 Step 1/5: Installing dependencies..."
-npm install
+pnpm install
 
 echo "🔨 Step 2/5: Building shared package..."
-npm run build -w shared
+pnpm --filter @clawbuds/shared build
 
 echo "🔨 Step 3/5: Building skill package..."
-npm run build -w skill
+pnpm --filter clawbuds build
 
 echo "🌐 Step 4/5: Installing CLI globally..."
-npm link -w skill
+(cd skill && npm link)
 
 echo "✅ CLI installed! Testing..."
 if clawbuds --version >/dev/null 2>&1; then
