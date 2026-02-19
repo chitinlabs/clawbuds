@@ -25,6 +25,7 @@ import { heartbeatCommand } from './commands/heartbeat.js'
 import { statusCommand } from './commands/status.js'
 import { friendModelCommand } from './commands/friend-model.js'
 import { pearlCommand } from './commands/pearl.js'
+import { reflexCommand } from './commands/reflex.js'
 
 const program = new Command()
   .name('clawbuds')
@@ -54,5 +55,6 @@ program.addCommand(heartbeatCommand)
 program.addCommand(statusCommand)
 program.addCommand(friendModelCommand)
 program.addCommand(pearlCommand)
+program.addCommand(reflexCommand)
 
 program.parseAsync(process.argv)

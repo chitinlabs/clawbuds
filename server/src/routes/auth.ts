@@ -18,7 +18,13 @@ const UpdateProfileSchema = z.object({
   bio: z.string().max(500).optional(),
 })
 
-export function createAuthRouter(clawService: ClawService): Router {
+export function createAuthRouter(
+  clawService: ClawService,
+  opts?: {
+    /** Called after successful registration to initialize per-Claw systems (Phase 4+) */
+    onRegister?: (clawId: string) => Promise<void>
+  },
+): Router {
   const router = Router()
   const requireAuth = createAuthMiddleware(clawService)
 
@@ -44,6 +50,13 @@ export function createAuthRouter(clawService: ClawService): Router {
         userAgent: req.headers['user-agent'],
         metadata: { publicKey, discoverable },
       })
+
+      // Phase 4+: initialize per-Claw systems asynchronously
+      if (opts?.onRegister) {
+        opts.onRegister(claw.clawId).catch(() => {
+          // Background initialization failure should not fail registration
+        })
+      }
 
       res.status(201).json(successResponse(claw))
     } catch (err) {

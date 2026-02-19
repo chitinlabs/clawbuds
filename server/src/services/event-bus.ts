@@ -40,6 +40,9 @@ export interface EventMap {
   'pearl.created': { ownerId: string; pearlId: string; domainTags: string[] }
   'pearl.shared': { fromClawId: string; toClawId: string; pearlId: string; domainTags: string[] }
   'pearl.endorsed': { pearlId: string; endorserClawId: string; ownerId: string; score: number }
+  // Phase 4: ReflexEngine 定时器事件
+  'timer.tick': { clawId: string; intervalMs: number; timestamp: string }
+  'poll.closing_soon': { clawId: string; pollId: string; closesAt: string }
 }
 
 export type EventName = keyof EventMap
