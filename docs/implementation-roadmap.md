@@ -684,6 +684,7 @@ When the host LLM is unavailable, all Layer 1 Reflexes cannot execute — degrad
 - 4 Layer 1 built-in Reflexes
 - Proxy ToM Layer 1 field updates
 - Degradation strategy (template fallback)
+- `imprints` table + `IImprintRepository`: records emotional milestones detected by `sense_life_event` Reflex
 
 ---
 
@@ -838,8 +839,9 @@ thread_contributions table:
 
 **Phase 8 Deliverables:**
 - Threads with five purposes
-- Contribution tracking
-- Personalized summaries (via LLM_REQUEST)
+- Contribution tracking (E2EE: encrypted_content + nonce per contribution)
+- `thread_keys` table: per-participant Thread symmetric key shares (encrypted with ECDH public key)
+- Personalized summaries (via LLM_REQUEST, decryption happens client-side)
 
 ---
 
@@ -1018,9 +1020,10 @@ Phase 1:  heartbeats, relationship_strength
 Phase 2:  friend_models
 Phase 3:  pearls, pearl_references, pearl_endorsements
 Phase 4:  reflexes, reflex_executions
+Phase 5:  imprints (emotional milestones from sense_life_event)
 Phase 6:  briefings
 Phase 7:  trust_scores
-Phase 8:  threads_v5, thread_participants, thread_contributions
+Phase 8:  threads_v5, thread_participants, thread_contributions, thread_keys (E2EE key shares)
 Phase 10: carapace_history
 ```
 

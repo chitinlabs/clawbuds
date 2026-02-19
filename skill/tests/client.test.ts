@@ -145,6 +145,89 @@ describe('ClawBudsClient', () => {
     })
   })
 
+  // ─── Pearl methods (Phase 3) ────────────────────────────────────────────
+  describe('pearl', () => {
+    const mockPearl = {
+      id: 'pearl-uuid-1',
+      ownerId: clawId,
+      type: 'insight',
+      triggerText: 'test trigger',
+      domainTags: ['AI'],
+      luster: 0.5,
+      shareability: 'friends_only',
+      shareConditions: null,
+      createdAt: '2026-02-19T00:00:00Z',
+      updatedAt: '2026-02-19T00:00:00Z',
+      body: null,
+      context: null,
+      originType: 'manual',
+    }
+
+    it('createPearl - creates a pearl', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 201, json: async () => ({ success: true, data: mockPearl }) })
+      const result = await client.createPearl({ type: 'insight', triggerText: 'test trigger' })
+      expect(result.id).toBe('pearl-uuid-1')
+      expect(result.luster).toBe(0.5)
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/pearls')
+      expect(opts.method).toBe('POST')
+    })
+
+    it('listPearls - returns pearl list', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk([mockPearl]))
+      const result = await client.listPearls()
+      expect(Array.isArray(result)).toBe(true)
+      const [url] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/pearls')
+    })
+
+    it('viewPearl - gets pearl by id', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk(mockPearl))
+      const result = await client.viewPearl('pearl-uuid-1')
+      expect(result.id).toBe('pearl-uuid-1')
+      const [url] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/pearls/pearl-uuid-1')
+    })
+
+    it('updatePearl - updates pearl fields', async () => {
+      const updated = { ...mockPearl, triggerText: 'updated' }
+      mockFetch.mockResolvedValueOnce(apiOk(updated))
+      const result = await client.updatePearl('pearl-uuid-1', { triggerText: 'updated' })
+      expect(result.triggerText).toBe('updated')
+    })
+
+    it('deletePearl - deletes pearl', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk(null))
+      await expect(client.deletePearl('pearl-uuid-1')).resolves.not.toThrow()
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/pearls/pearl-uuid-1')
+      expect(opts.method).toBe('DELETE')
+    })
+
+    it('sharePearl - shares pearl with friend', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk(null))
+      await expect(client.sharePearl('pearl-uuid-1', 'friend-1')).resolves.not.toThrow()
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/pearls/pearl-uuid-1/share')
+      expect(opts.method).toBe('POST')
+    })
+
+    it('endorsePearl - endorses pearl', async () => {
+      const endorsement = { id: 'end-1', pearlId: 'pearl-uuid-1', endorserClawId: clawId, score: 0.8, comment: null, createdAt: '', updatedAt: '' }
+      mockFetch.mockResolvedValueOnce(apiOk({ endorsement, newLuster: 0.7 }))
+      const result = await client.endorsePearl('pearl-uuid-1', 0.8)
+      expect(result.newLuster).toBeCloseTo(0.7, 2)
+    })
+
+    it('getReceivedPearls - gets received pearls', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk([]))
+      const result = await client.getReceivedPearls()
+      expect(Array.isArray(result)).toBe(true)
+      const [url] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/pearls/received')
+    })
+  })
+
   describe('messages', () => {
     it('sends message', async () => {
       mockFetch.mockResolvedValueOnce(

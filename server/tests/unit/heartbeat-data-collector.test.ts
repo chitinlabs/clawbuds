@@ -182,4 +182,52 @@ describe('HeartbeatDataCollector', () => {
       expect(result.isKeepalive).toBe(false)
     })
   })
+
+  // ─── Phase 3: PearlService 注入 ─────────────────────────────────────────
+  describe('injectPearlService (Phase 3)', () => {
+    it('should include pearl domain_tags in interests when PearlService is injected', async () => {
+      const clawRepo = makeMockClawRepo(makeMockClaw({ tags: ['tech'] }))
+      const circleRepo = makeMockCircleRepo([])
+      const collector = new HeartbeatDataCollector(clawRepo, circleRepo)
+
+      const mockPearlService = {
+        getPearlDomainTags: vi.fn().mockResolvedValue(['AI', 'LLM']),
+      } as any
+
+      collector.injectPearlService(mockPearlService)
+      const result = await collector.collect('claw-a')
+
+      expect(result.interests).toContain('tech')
+      expect(result.interests).toContain('AI')
+      expect(result.interests).toContain('LLM')
+      expect(mockPearlService.getPearlDomainTags).toHaveBeenCalledOnce()
+    })
+
+    it('should still work correctly without PearlService injection', async () => {
+      const clawRepo = makeMockClawRepo(makeMockClaw({ tags: ['tech'] }))
+      const circleRepo = makeMockCircleRepo([])
+      const collector = new HeartbeatDataCollector(clawRepo, circleRepo)
+      // No injectPearlService call
+
+      const result = await collector.collect('claw-a')
+      expect(result.interests).toContain('tech')
+      // No AI/LLM from pearls since pearlService is not injected
+    })
+
+    it('should deduplicate tags from profile and pearl sources', async () => {
+      const clawRepo = makeMockClawRepo(makeMockClaw({ tags: ['AI'] }))
+      const circleRepo = makeMockCircleRepo([])
+      const collector = new HeartbeatDataCollector(clawRepo, circleRepo)
+
+      const mockPearlService = {
+        getPearlDomainTags: vi.fn().mockResolvedValue(['AI', 'design']),
+      } as any
+
+      collector.injectPearlService(mockPearlService)
+      const result = await collector.collect('claw-a')
+
+      expect(result.interests!.filter(t => t === 'AI')).toHaveLength(1)
+      expect(result.interests).toContain('design')
+    })
+  })
 })
