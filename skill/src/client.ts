@@ -488,6 +488,83 @@ export class ClawBudsClient {
     return this.request<FriendModelProfile[]>('GET', '/api/v1/friend-models')
   }
 
+  // -- Pearl (Phase 3) --
+
+  async createPearl(data: {
+    type: 'insight' | 'framework' | 'experience'
+    triggerText: string
+    body?: string
+    context?: string
+    domainTags?: string[]
+    shareability?: 'private' | 'friends_only' | 'public'
+    shareConditions?: Record<string, unknown>
+  }): Promise<Record<string, unknown>> {
+    return this.request('POST', '/api/v1/pearls', { body: data })
+  }
+
+  async listPearls(filters?: {
+    type?: string
+    domain?: string
+    shareability?: string
+    limit?: number
+    offset?: number
+  }): Promise<Record<string, unknown>[]> {
+    const params = new URLSearchParams()
+    if (filters?.type) params.set('type', filters.type)
+    if (filters?.domain) params.set('domain', filters.domain)
+    if (filters?.shareability) params.set('shareability', filters.shareability)
+    if (filters?.limit !== undefined) params.set('limit', String(filters.limit))
+    if (filters?.offset !== undefined) params.set('offset', String(filters.offset))
+    const qs = params.toString()
+    return this.request('GET', `/api/v1/pearls${qs ? `?${qs}` : ''}`)
+  }
+
+  async viewPearl(id: string, level?: 0 | 1 | 2): Promise<Record<string, unknown>> {
+    const qs = level !== undefined ? `?level=${level}` : ''
+    return this.request('GET', `/api/v1/pearls/${id}${qs}`)
+  }
+
+  async updatePearl(
+    id: string,
+    data: {
+      triggerText?: string
+      body?: string | null
+      context?: string | null
+      domainTags?: string[]
+      shareability?: 'private' | 'friends_only' | 'public'
+      shareConditions?: Record<string, unknown> | null
+    },
+  ): Promise<Record<string, unknown>> {
+    return this.request('PATCH', `/api/v1/pearls/${id}`, { body: data })
+  }
+
+  async deletePearl(id: string): Promise<void> {
+    await this.request('DELETE', `/api/v1/pearls/${id}`)
+  }
+
+  async sharePearl(id: string, toClawId: string): Promise<void> {
+    await this.request('POST', `/api/v1/pearls/${id}/share`, { body: { toClawId } })
+  }
+
+  async endorsePearl(
+    id: string,
+    score: number,
+    comment?: string,
+  ): Promise<{ endorsement: Record<string, unknown>; newLuster: number }> {
+    return this.request('POST', `/api/v1/pearls/${id}/endorse`, { body: { score, comment } })
+  }
+
+  async getReceivedPearls(filters?: {
+    limit?: number
+    offset?: number
+  }): Promise<Array<{ share: Record<string, unknown>; pearl: Record<string, unknown> }>> {
+    const params = new URLSearchParams()
+    if (filters?.limit !== undefined) params.set('limit', String(filters.limit))
+    if (filters?.offset !== undefined) params.set('offset', String(filters.offset))
+    const qs = params.toString()
+    return this.request('GET', `/api/v1/pearls/received${qs ? `?${qs}` : ''}`)
+  }
+
   // -- Status --
 
   async setStatusText(statusText: string | null): Promise<void> {

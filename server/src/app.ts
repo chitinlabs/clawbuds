@@ -25,6 +25,7 @@ import { HeartbeatDataCollector } from './services/heartbeat-data-collector.js'
 import { RelationshipService } from './services/relationship.service.js'
 import { SchedulerService } from './services/scheduler.service.js'
 import { ProxyToMService } from './services/proxy-tom.service.js'
+import { PearlService } from './services/pearl.service.js'
 import { createAuthRouter } from './routes/auth.js'
 import { createFriendsRouter } from './routes/friends.js'
 import { createMessagesRouter } from './routes/messages.js'
@@ -40,6 +41,7 @@ import { createProfileRouter } from './routes/profile.js'
 import { createHeartbeatRouter } from './routes/heartbeat.js'
 import { createRelationshipsRouter } from './routes/relationships.js'
 import { createFriendModelsRouter } from './routes/friend-models.js'
+import { createPearlsRouter } from './routes/pearls.js'
 import { config } from './config/env.js'
 import { RepositoryFactory, type RepositoryFactoryOptions } from './db/repositories/factory.js'
 import { CacheFactory, type CacheType } from './cache/factory.js'
@@ -270,6 +272,14 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     const relationshipService = new RelationshipService(relationshipStrengthRepository, eventBus)
     const proxyToMService = new ProxyToMService(friendModelRepository, eventBus)
 
+    // ─── Phase 3: Pearl 认知资产 ───
+    const pearlRepository = repositoryFactory.createPearlRepository()
+    const endorsementRepository = repositoryFactory.createPearlEndorsementRepository()
+    const pearlService = new PearlService(pearlRepository, endorsementRepository, friendshipService, eventBus)
+
+    // 注入 PearlService 到 HeartbeatDataCollector（最近 30 天 domain_tags 聚合）
+    heartbeatCollector.injectPearlService(pearlService)
+
     ctx.clawService = clawService
     ctx.inboxService = inboxService
     ctx.eventBus = eventBus
@@ -298,6 +308,7 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1/heartbeat', createHeartbeatRouter(heartbeatService, friendshipService, clawService))
     app.use('/api/v1/relationships', createRelationshipsRouter(relationshipService, clawService))
     app.use('/api/v1/friend-models', createFriendModelsRouter(proxyToMService, friendshipService, clawService))
+    app.use('/api/v1/pearls', createPearlsRouter(pearlService, clawService))
 
     // ─── EventBus 监听：Phase 1 联动 ───
     // friend.accepted → 双向初始化关系强度
@@ -339,6 +350,12 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     // poll.voted → 投票者→投票创建者关系提振
     eventBus.on('poll.voted', ({ clawId, recipientId }) => {
       relationshipService.boostStrength(clawId, recipientId, 'poll_vote').catch(() => {})
+    })
+
+    // ─── EventBus 监听：Phase 3 Pearl 联动 ───
+    // pearl.shared → 关系强度提振
+    eventBus.on('pearl.shared', ({ fromClawId, toClawId }) => {
+      relationshipService.boostStrength(fromClawId, toClawId, 'pearl_share').catch(() => {})
     })
 
     // ─── EventBus 监听：Phase 2 ProxyToM 联动 ───

@@ -36,6 +36,10 @@ export interface EventMap {
     newLayer: DunbarLayer
     strength: number
   }
+  // Phase 3: Pearl 认知资产
+  'pearl.created': { ownerId: string; pearlId: string; domainTags: string[] }
+  'pearl.shared': { fromClawId: string; toClawId: string; pearlId: string; domainTags: string[] }
+  'pearl.endorsed': { pearlId: string; endorserClawId: string; ownerId: string; score: number }
 }
 
 export type EventName = keyof EventMap

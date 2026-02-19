@@ -246,6 +246,33 @@ describe('RelationshipService', () => {
   })
 
   // ─────────────────────────────────────────────
+  // pearl_share boost weight (Phase 3)
+  // ─────────────────────────────────────────────
+  describe('boostStrength with pearl_share', () => {
+    it('should boost relationship strength by ~0.08 for pearl_share interaction', async () => {
+      await service.initializeRelationship(clawAId, clawBId)
+      const before = await repo.get(clawAId, clawBId)
+      const strengthBefore = before!.strength
+
+      await service.boostStrength(clawAId, clawBId, 'pearl_share')
+
+      const after = await repo.get(clawAId, clawBId)
+      // Boost applied, constrained by daily cap
+      expect(after!.strength).toBeGreaterThan(strengthBefore)
+    })
+
+    it('pearl_share weight should be 0.08 in boost table', async () => {
+      // Start from a known strength via create
+      await repo.create({ clawId: clawAId, friendId: clawBId, strength: 0.5, dunbarLayer: 'casual' })
+
+      await service.boostStrength(clawAId, clawBId, 'pearl_share')
+      const record = await repo.get(clawAId, clawBId)
+      // 0.5 + 0.08 = 0.58 (assuming no daily cap hit)
+      expect(record!.strength).toBeCloseTo(0.58, 1)
+    })
+  })
+
+  // ─────────────────────────────────────────────
   // getFriendsByLayer
   // ─────────────────────────────────────────────
   describe('getFriendsByLayer', () => {
