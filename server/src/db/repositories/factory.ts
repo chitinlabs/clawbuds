@@ -21,6 +21,7 @@ import type { IHeartbeatRepository } from './interfaces/heartbeat.repository.int
 import type { IRelationshipStrengthRepository } from './interfaces/relationship-strength.repository.interface.js'
 import type { IFriendModelRepository } from './interfaces/friend-model.repository.interface.js'
 import type { IPearlRepository, IPearlEndorsementRepository } from './interfaces/pearl.repository.interface.js'
+import type { IReflexRepository, IReflexExecutionRepository } from './interfaces/reflex.repository.interface.js'
 import type Database from 'better-sqlite3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -44,6 +45,8 @@ import { SQLiteRelationshipStrengthRepository } from './sqlite/relationship-stre
 import { SQLiteFriendModelRepository } from './sqlite/friend-model.repository.js'
 import { SQLitePearlRepository } from './sqlite/pearl.repository.js'
 import { SQLitePearlEndorsementRepository } from './sqlite/pearl-endorsement.repository.js'
+import { SQLiteReflexRepository } from './sqlite/reflex.repository.js'
+import { SQLiteReflexExecutionRepository } from './sqlite/reflex-execution.repository.js'
 
 // Supabase 实现
 import { SupabaseClawRepository } from './supabase/claw.repository.js'
@@ -65,6 +68,8 @@ import { SupabaseRelationshipStrengthRepository } from './supabase/relationship-
 import { SupabaseFriendModelRepository } from './supabase/friend-model.repository.js'
 import { SupabasePearlRepository } from './supabase/pearl.repository.js'
 import { SupabasePearlEndorsementRepository } from './supabase/pearl-endorsement.repository.js'
+import { SupabaseReflexRepository } from './supabase/reflex.repository.js'
+import { SupabaseReflexExecutionRepository } from './supabase/reflex-execution.repository.js'
 
 export type DatabaseType = 'sqlite' | 'supabase'
 
@@ -334,6 +339,34 @@ export class RepositoryFactory {
         return new SQLiteFriendModelRepository(this.sqliteDb!)
       case 'supabase':
         return new SupabaseFriendModelRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 ReflexRepository（Phase 4）
+   */
+  createReflexRepository(): IReflexRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteReflexRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseReflexRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 ReflexExecutionRepository（Phase 4）
+   */
+  createReflexExecutionRepository(): IReflexExecutionRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteReflexExecutionRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseReflexExecutionRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }

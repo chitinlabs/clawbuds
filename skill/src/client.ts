@@ -565,6 +565,37 @@ export class ClawBudsClient {
     return this.request('GET', `/api/v1/pearls/received${qs ? `?${qs}` : ''}`)
   }
 
+  // -- Reflex (Phase 4) --
+
+  async listReflexes(filters?: { layer?: 0 | 1; enabled?: boolean }): Promise<Record<string, unknown>[]> {
+    const params = new URLSearchParams()
+    if (filters?.layer !== undefined) params.set('layer', String(filters.layer))
+    if (filters?.enabled !== undefined) params.set('enabled', String(filters.enabled))
+    const qs = params.toString()
+    return this.request('GET', `/api/v1/reflexes${qs ? `?${qs}` : ''}`)
+  }
+
+  async enableReflex(name: string): Promise<void> {
+    await this.request('PATCH', `/api/v1/reflexes/${name}/enable`)
+  }
+
+  async disableReflex(name: string): Promise<void> {
+    await this.request('PATCH', `/api/v1/reflexes/${name}/disable`)
+  }
+
+  async getReflexExecutions(filters?: {
+    limit?: number
+    result?: 'executed' | 'recommended' | 'blocked' | 'queued_for_l1'
+    since?: string
+  }): Promise<{ data: Record<string, unknown>[]; meta: { total: number; limit: number } }> {
+    const params = new URLSearchParams()
+    if (filters?.limit !== undefined) params.set('limit', String(filters.limit))
+    if (filters?.result !== undefined) params.set('result', filters.result)
+    if (filters?.since !== undefined) params.set('since', filters.since)
+    const qs = params.toString()
+    return this.request('GET', `/api/v1/reflexes/executions${qs ? `?${qs}` : ''}`)
+  }
+
   // -- Status --
 
   async setStatusText(statusText: string | null): Promise<void> {

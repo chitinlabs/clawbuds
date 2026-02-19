@@ -26,6 +26,8 @@ import { RelationshipService } from './services/relationship.service.js'
 import { SchedulerService } from './services/scheduler.service.js'
 import { ProxyToMService } from './services/proxy-tom.service.js'
 import { PearlService } from './services/pearl.service.js'
+import { ReflexEngine } from './services/reflex-engine.js'
+import { createReflexesRouter } from './routes/reflexes.js'
 import { createAuthRouter } from './routes/auth.js'
 import { createFriendsRouter } from './routes/friends.js'
 import { createMessagesRouter } from './routes/messages.js'
@@ -168,6 +170,15 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     message: { success: false, error: 'TOO_MANY_WEBHOOK_REQUESTS', message: 'Too many webhook requests' },
   })
 
+  // Moderate rate limiting for reflex operations (enable/disable toggle + execution log queries)
+  const reflexLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 15, // 15 requests per minute
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: 'TOO_MANY_REFLEX_REQUESTS', message: 'Too many reflex requests' },
+  })
+
   app.use('/api/v1', globalLimiter)
 
   // Health check
@@ -280,6 +291,20 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     // 注入 PearlService 到 HeartbeatDataCollector（最近 30 天 domain_tags 聚合）
     heartbeatCollector.injectPearlService(pearlService)
 
+    // ─── Phase 4: ReflexEngine Layer 0 ───
+    const reflexRepository = repositoryFactory.createReflexRepository()
+    const reflexExecutionRepository = repositoryFactory.createReflexExecutionRepository()
+    const reflexEngine = new ReflexEngine(
+      reflexRepository,
+      reflexExecutionRepository,
+      heartbeatService,
+      reactionService,
+      clawService,
+      eventBus,
+    )
+    // 注册全局 EventBus 订阅（同步）
+    reflexEngine.initialize()
+
     ctx.clawService = clawService
     ctx.inboxService = inboxService
     ctx.eventBus = eventBus
@@ -293,7 +318,9 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1/uploads', uploadLimiter) // Strict: file uploads
     app.use('/api/v1/webhooks', webhookLimiter) // Strict: webhook operations
 
-    app.use('/api/v1', createAuthRouter(clawService))
+    app.use('/api/v1', createAuthRouter(clawService, {
+      onRegister: (clawId: string) => reflexEngine.initializeBuiltins(clawId),
+    }))
     app.use('/api/v1/friends', createFriendsRouter(friendshipService, clawService))
     app.use('/api/v1/messages', createMessagesRouter(messageService, clawService, reactionService))
     app.use('/api/v1/inbox', createInboxRouter(inboxService, clawService))
@@ -309,6 +336,8 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1/relationships', createRelationshipsRouter(relationshipService, clawService))
     app.use('/api/v1/friend-models', createFriendModelsRouter(proxyToMService, friendshipService, clawService))
     app.use('/api/v1/pearls', createPearlsRouter(pearlService, clawService))
+    app.use('/api/v1/reflexes', reflexLimiter)
+    app.use('/api/v1/reflexes', createReflexesRouter(reflexEngine, clawService))
 
     // ─── EventBus 监听：Phase 1 联动 ───
     // friend.accepted → 双向初始化关系强度

@@ -1,0 +1,505 @@
+/**
+ * ReflexEngine (Phase 4)
+ * EventBus 的全局智能订阅者，实现 Layer 0 纯算法 Reflex
+ */
+
+import { randomUUID } from 'node:crypto'
+import type {
+  IReflexRepository,
+  IReflexExecutionRepository,
+  ReflexRecord,
+  ExecutionResult,
+} from '../db/repositories/interfaces/reflex.repository.interface.js'
+import type { HeartbeatService } from './heartbeat.service.js'
+import type { ReactionService } from './reaction.service.js'
+import type { ClawService } from './claw.service.js'
+import type { EventBus } from './event-bus.js'
+
+// ─── BusEvent: 统一的事件数据结构 ────────────────────────────────────────────
+export interface BusEvent {
+  type: string
+  clawId: string
+  [key: string]: unknown
+}
+
+// ─── Dunbar 层级顺序（用于判断升级/降级） ─────────────────────────────────────
+const LAYER_ORDER: Record<string, number> = {
+  casual: 0,
+  active: 1,
+  sympathy: 2,
+  core: 3,
+}
+
+// ─── HardConstraints（Phase 4 硬编码默认值） ──────────────────────────────────
+const HARD_CONSTRAINTS = {
+  maxMessagesPerHour: 20,
+}
+
+// ─── Layer 0 匹配逻辑（纯函数，无副作用） ─────────────────────────────────────
+
+/**
+ * Layer 0 条件匹配（纯函数）
+ * @returns true 表示该 Reflex 应当被触发
+ */
+export function matchLayer0(reflex: ReflexRecord, event: BusEvent): boolean {
+  const cfg = reflex.triggerConfig
+  const condType = cfg['type'] as string | undefined
+
+  switch (condType) {
+    case 'event_type': {
+      if (event.type !== cfg['eventType']) return false
+      // 可选 condition：'downgrade' 用于 relationship.layer_changed
+      if (cfg['condition'] === 'downgrade') {
+        const oldLayer = event['oldLayer'] as string | undefined
+        const newLayer = event['newLayer'] as string | undefined
+        if (!oldLayer || !newLayer) return false
+        return (LAYER_ORDER[oldLayer] ?? -1) > (LAYER_ORDER[newLayer] ?? -1)
+      }
+      return true
+    }
+
+    case 'timer': {
+      if (event.type !== 'timer.tick') return false
+      const configInterval = cfg['intervalMs'] as number | undefined
+      const eventInterval = event['intervalMs'] as number | undefined
+      if (configInterval === undefined) return true  // 无约束，直接匹配
+      return eventInterval === configInterval
+    }
+
+    case 'event_type_with_tag_intersection': {
+      if (event.type !== cfg['eventType']) return false
+      const minCommon = (cfg['minCommonTags'] as number) ?? 1
+      const domainTags = (event['domainTags'] as string[]) ?? []
+      const senderInterests = (event['senderInterests'] as string[]) ?? []
+      const common = domainTags.filter((t) => senderInterests.includes(t))
+      return common.length >= minCommon
+    }
+
+    case 'threshold': {
+      const field = cfg['field'] as string
+      const value = event[field] as number | undefined
+      if (value === undefined) return false
+      if ('lt' in cfg) return value < (cfg['lt'] as number)
+      if ('lte' in cfg) return value <= (cfg['lte'] as number)
+      if ('gt' in cfg) return value > (cfg['gt'] as number)
+      if ('gte' in cfg) return value >= (cfg['gte'] as number)
+      return false
+    }
+
+    case 'counter': {
+      const field = cfg['field'] as string
+      const count = event[field] as number | undefined
+      if (count === undefined) return false
+      if ('gte' in cfg) return count >= (cfg['gte'] as number)
+      if ('gt' in cfg) return count > (cfg['gt'] as number)
+      return false
+    }
+
+    case 'deadline': {
+      if (event.type !== cfg['eventType']) return false
+      const closesAt = event['closesAt'] as string | undefined
+      if (!closesAt) return true  // event matched, no deadline field
+      const withinMs = (cfg['withinMs'] as number) ?? 3600000
+      const timeUntilClose = new Date(closesAt).getTime() - Date.now()
+      return timeUntilClose > 0 && timeUntilClose <= withinMs
+    }
+
+    case 'any_reflex_execution': {
+      // audit_behavior_log: matches any internal execution event
+      return event.type === '__reflex_execution__'
+    }
+
+    default:
+      return false
+  }
+}
+
+// ─── 6 个内置 Reflex 定义 ─────────────────────────────────────────────────────
+export const BUILTIN_REFLEXES: Array<Omit<ReflexRecord, 'id' | 'clawId' | 'createdAt' | 'updatedAt'>> = [
+  {
+    name: 'keepalive_heartbeat',
+    valueLayer: 'infrastructure',
+    behavior: 'keepalive',
+    triggerLayer: 0,
+    triggerConfig: { type: 'timer', intervalMs: 300000 },
+    enabled: true,
+    confidence: 1.0,
+    source: 'builtin',
+  },
+  {
+    name: 'phatic_micro_reaction',
+    valueLayer: 'emotional',
+    behavior: 'audit',
+    triggerLayer: 0,
+    triggerConfig: {
+      type: 'event_type_with_tag_intersection',
+      eventType: 'message.new',
+      minCommonTags: 1,
+    },
+    enabled: true,
+    confidence: 0.7,
+    source: 'builtin',
+  },
+  {
+    name: 'track_thread_progress',
+    valueLayer: 'collaboration',
+    behavior: 'track',
+    triggerLayer: 0,
+    triggerConfig: {
+      type: 'counter',
+      eventType: 'thread.contribution_added',
+      field: 'contributionCount',
+      gte: 5,
+    },
+    enabled: true,
+    confidence: 1.0,
+    source: 'builtin',
+  },
+  {
+    name: 'collect_poll_responses',
+    valueLayer: 'collaboration',
+    behavior: 'collect',
+    triggerLayer: 0,
+    triggerConfig: {
+      type: 'deadline',
+      eventType: 'poll.closing_soon',
+      withinMs: 3600000,
+    },
+    enabled: true,
+    confidence: 1.0,
+    source: 'builtin',
+  },
+  {
+    name: 'relationship_decay_alert',
+    valueLayer: 'infrastructure',
+    behavior: 'alert',
+    triggerLayer: 0,
+    triggerConfig: {
+      type: 'event_type',
+      eventType: 'relationship.layer_changed',
+      condition: 'downgrade',
+    },
+    enabled: true,
+    confidence: 1.0,
+    source: 'builtin',
+  },
+  {
+    name: 'audit_behavior_log',
+    valueLayer: 'infrastructure',
+    behavior: 'audit',
+    triggerLayer: 0,
+    triggerConfig: { type: 'any_reflex_execution' },
+    enabled: true,
+    confidence: 1.0,
+    source: 'builtin',
+  },
+]
+
+// ─── ReflexEngine 主类 ────────────────────────────────────────────────────────
+
+// 硬约束：每小时消息计数器（内存，重启后重置）
+// key: `${clawId}:${hourBucket}` where hourBucket = Math.floor(now/3600000)
+const messageCounters = new Map<string, number>()
+
+function getHourBucket(): number {
+  return Math.floor(Date.now() / 3_600_000)
+}
+
+function incrementMessageCount(clawId: string): void {
+  const key = `${clawId}:${getHourBucket()}`
+  messageCounters.set(key, (messageCounters.get(key) ?? 0) + 1)
+}
+
+function getMessageCount(clawId: string): number {
+  const key = `${clawId}:${getHourBucket()}`
+  return messageCounters.get(key) ?? 0
+}
+
+// Events to subscribe to
+const SUBSCRIBED_EVENTS = [
+  'message.new',
+  'reaction.added',
+  'heartbeat.received',
+  'relationship.layer_changed',
+  'friend.accepted',
+  'pearl.created',
+  'pearl.shared',
+  'pearl.endorsed',
+  'timer.tick',
+  'poll.closing_soon',
+] as const
+
+export class ReflexEngine {
+  constructor(
+    private reflexRepo: IReflexRepository,
+    private executionRepo: IReflexExecutionRepository,
+    private heartbeatService: HeartbeatService,
+    private reactionService: ReactionService,
+    private clawService: ClawService,
+    private eventBus: EventBus,
+  ) {}
+
+  /**
+   * 初始化：注册全局 EventBus 订阅（同步调用，eventBus.on 是同步的）
+   */
+  initialize(): void {
+    for (const eventType of SUBSCRIBED_EVENTS) {
+      this.eventBus.on(eventType, async (payload: Record<string, unknown>) => {
+        try {
+          await this.onEvent({ type: eventType, clawId: this.extractClawId(eventType, payload), ...payload })
+        } catch {
+          // ReflexEngine 异常不影响其他订阅者
+        }
+      })
+    }
+  }
+
+  /** 从事件 payload 提取 clawId */
+  private extractClawId(eventType: string, payload: Record<string, unknown>): string {
+    // 优先使用直接字段
+    if (typeof payload['clawId'] === 'string') return payload['clawId']
+    if (typeof payload['recipientId'] === 'string') return payload['recipientId']
+    if (typeof payload['ownerId'] === 'string') return payload['ownerId']
+    if (typeof payload['toClawId'] === 'string') return payload['toClawId']
+    return ''
+  }
+
+  /**
+   * 为指定 Claw 初始化内置 Reflex
+   */
+  async initializeBuiltins(clawId: string): Promise<void> {
+    const builtins = BUILTIN_REFLEXES.map((b) => ({ ...b, clawId }))
+    await this.reflexRepo.upsertBuiltins(clawId, builtins)
+  }
+
+  /**
+   * EventBus 事件处理入口
+   */
+  async onEvent(event: BusEvent): Promise<void> {
+    if (!event.clawId) return
+
+    const reflexes = await this.reflexRepo.findEnabled(event.clawId, 0)  // Layer 0 only
+
+    for (const reflex of reflexes) {
+      if (reflex.triggerLayer === 0) {
+        const matched = matchLayer0(reflex, event)
+        if (matched) {
+          const allowed = this.checkHardConstraints(reflex, event)
+          if (allowed) {
+            await this.execute(reflex, event)
+          } else {
+            await this.logExecution(reflex, event, 'blocked', { reason: 'hard_constraint' })
+          }
+        }
+      } else {
+        // Layer 1: 加入挂起队列（Phase 5 激活）
+        await this.queueForLayer1(reflex, event)
+      }
+    }
+  }
+
+  /** 硬约束检查 */
+  private checkHardConstraints(reflex: ReflexRecord, event: BusEvent): boolean {
+    // audit 和 keepalive 不受限制
+    if (reflex.behavior === 'audit' || reflex.behavior === 'keepalive') return true
+
+    // 检查每小时消息上限
+    return getMessageCount(event.clawId) < HARD_CONSTRAINTS.maxMessagesPerHour
+  }
+
+  /** 执行 Layer 0 Reflex */
+  private async execute(reflex: ReflexRecord, event: BusEvent): Promise<void> {
+    switch (reflex.name) {
+      case 'keepalive_heartbeat':
+        await this.executeKeepaliveHeartbeat(reflex, event)
+        break
+      case 'phatic_micro_reaction':
+        await this.executePhaticMicroReaction(reflex, event)
+        break
+      case 'relationship_decay_alert':
+        await this.executeRelationshipDecayAlert(reflex, event)
+        break
+      case 'collect_poll_responses':
+        await this.executeCollectPollResponses(reflex, event)
+        break
+      case 'track_thread_progress':
+        // Phase 4 占位：Phase 8 后完整激活
+        await this.logExecution(reflex, event, 'queued_for_l1', {
+          note: 'track_thread_progress awaiting Phase 8 thread events',
+        })
+        break
+      case 'audit_behavior_log':
+        // 元 Reflex，在 logExecution 中处理，这里不再调用
+        break
+      default:
+        await this.logExecution(reflex, event, 'executed', { note: 'custom reflex' })
+    }
+  }
+
+  /** keepalive_heartbeat 执行 */
+  private async executeKeepaliveHeartbeat(reflex: ReflexRecord, event: BusEvent): Promise<void> {
+    try {
+      await this.heartbeatService.sendHeartbeats(event.clawId)
+      await this.logExecution(reflex, event, 'executed', {
+        action: 'heartbeat_sent',
+        timestamp: new Date().toISOString(),
+      })
+    } catch (err: unknown) {
+      await this.logExecution(reflex, event, 'blocked', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  /** phatic_micro_reaction 执行 */
+  private async executePhaticMicroReaction(reflex: ReflexRecord, event: BusEvent): Promise<void> {
+    const messageId = event['messageId'] as string | undefined
+    const domainTags = (event['domainTags'] as string[]) ?? []
+    const senderInterests = (event['senderInterests'] as string[]) ?? []
+    const minCommonTags = (reflex.triggerConfig['minCommonTags'] as number) ?? 1
+
+    const commonTags = domainTags.filter((t) => senderInterests.includes(t))
+    if (commonTags.length < minCommonTags) return
+
+    if (!this.checkHardConstraints(reflex, event)) {
+      await this.logExecution(reflex, event, 'blocked', { reason: 'hard_constraint' })
+      return
+    }
+
+    try {
+      if (messageId) {
+        await this.reactionService.addReaction(messageId, event.clawId, '👍')
+        incrementMessageCount(event.clawId)
+        await this.logExecution(reflex, event, 'executed', {
+          action: 'emoji_reaction',
+          emoji: '👍',
+          commonTags,
+          messageId,
+        })
+      }
+    } catch (err: unknown) {
+      await this.logExecution(reflex, event, 'blocked', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  /** relationship_decay_alert 执行 */
+  private async executeRelationshipDecayAlert(
+    reflex: ReflexRecord,
+    event: BusEvent,
+  ): Promise<void> {
+    const friendId = event['friendId'] as string | undefined
+    const oldLayer = event['oldLayer'] as string | undefined
+    const newLayer = event['newLayer'] as string | undefined
+    const strength = event['strength'] as number | undefined
+
+    await this.logExecution(reflex, event, 'executed', {
+      alertType: 'relationship_downgrade',
+      friendId,
+      oldLayer,
+      newLayer,
+      strength,
+      suggestion: `与 ${friendId} 关系降级：${oldLayer}→${newLayer}（强度 ${strength?.toFixed(2) ?? 'unknown'}）`,
+    })
+  }
+
+  /** collect_poll_responses 执行 */
+  private async executeCollectPollResponses(
+    reflex: ReflexRecord,
+    event: BusEvent,
+  ): Promise<void> {
+    const pollId = event['pollId'] as string | undefined
+    const closesAt = event['closesAt'] as string | undefined
+
+    await this.logExecution(reflex, event, 'executed', {
+      action: 'poll_response_collected',
+      pollId,
+      closesAt,
+      collectedAt: new Date().toISOString(),
+    })
+  }
+
+  /** Layer 1 挂起队列（Phase 4 版本：只记录） */
+  private async queueForLayer1(reflex: ReflexRecord, event: BusEvent): Promise<void> {
+    await this.logExecution(reflex, event, 'queued_for_l1', {
+      note: 'Awaiting Phase 5 agent execution model',
+    })
+  }
+
+  /** 写入执行审计日志 */
+  private async logExecution(
+    reflex: ReflexRecord,
+    event: BusEvent,
+    result: ExecutionResult,
+    details: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await this.executionRepo.create({
+        id: randomUUID(),
+        reflexId: reflex.id,
+        clawId: event.clawId,
+        eventType: event.type,
+        triggerData: { ...event },
+        executionResult: result,
+        details,
+      })
+    } catch {
+      // 审计日志写入失败不应影响主流程
+    }
+  }
+
+  /** 获取某 Claw 的最近执行记录（CLI 使用） */
+  async getRecentExecutions(clawId: string, limit = 50): Promise<ReturnType<typeof this.executionRepo.findRecent>> {
+    return this.executionRepo.findRecent(clawId, limit)
+  }
+
+  /** 按结果类型过滤执行记录（推入数据库层，避免内存后过滤） */
+  async getFilteredExecutions(
+    clawId: string,
+    result: ExecutionResult,
+    since?: string,
+    limit = 50,
+  ): Promise<ReturnType<typeof this.executionRepo.findByResult>> {
+    return this.executionRepo.findByResult(clawId, result, since, limit)
+  }
+
+  /** 获取某 Claw 的 at-risk 警报（简报引擎使用） */
+  async getPendingAlerts(
+    clawId: string,
+    since?: string,
+  ): Promise<ReturnType<typeof this.executionRepo.findAlerts>> {
+    return this.executionRepo.findAlerts(clawId, since)
+  }
+
+  /** 获取 Reflex 列表 */
+  async listReflexes(
+    clawId: string,
+    opts?: { layer?: 0 | 1; enabledOnly?: boolean },
+  ): Promise<ReflexRecord[]> {
+    if (opts?.enabledOnly !== false) {
+      return this.reflexRepo.findEnabled(clawId, opts?.layer)
+    }
+    return this.reflexRepo.findAll(clawId)
+  }
+
+  /** 启用 Reflex */
+  async enableReflex(clawId: string, name: string): Promise<void> {
+    const reflex = await this.reflexRepo.findByName(clawId, name)
+    if (!reflex) throw Object.assign(new Error('Reflex not found'), { code: 'NOT_FOUND' })
+    await this.reflexRepo.setEnabled(clawId, name, true)
+  }
+
+  /** 禁用 Reflex（audit_behavior_log 不可禁用） */
+  async disableReflex(clawId: string, name: string): Promise<void> {
+    if (name === 'audit_behavior_log') {
+      throw Object.assign(
+        new Error('Cannot disable audit_behavior_log'),
+        { code: 'FORBIDDEN' },
+      )
+    }
+    const reflex = await this.reflexRepo.findByName(clawId, name)
+    if (!reflex) throw Object.assign(new Error('Reflex not found'), { code: 'NOT_FOUND' })
+    await this.reflexRepo.setEnabled(clawId, name, false)
+  }
+}

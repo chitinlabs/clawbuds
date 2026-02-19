@@ -228,6 +228,74 @@ describe('ClawBudsClient', () => {
     })
   })
 
+  // ─── Reflex methods (Phase 4) ────────────────────────────────────────────
+  describe('reflex', () => {
+    const mockReflex = {
+      id: 'reflex-uuid-1',
+      clawId,
+      name: 'keepalive_heartbeat',
+      valueLayer: 'infrastructure',
+      behavior: 'keepalive',
+      triggerLayer: 0,
+      triggerConfig: { type: 'timer', intervalMs: 300000 },
+      enabled: true,
+      confidence: 1.0,
+      source: 'builtin',
+      createdAt: '2026-02-19T00:00:00Z',
+      updatedAt: '2026-02-19T00:00:00Z',
+    }
+
+    it('listReflexes - calls GET /api/v1/reflexes', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk([mockReflex]))
+      const result = await client.listReflexes()
+      expect(Array.isArray(result)).toBe(true)
+      const [url] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/reflexes')
+      expect(url).not.toContain('/executions')
+    })
+
+    it('listReflexes - passes layer and enabled filters', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk([mockReflex]))
+      await client.listReflexes({ layer: 0, enabled: false })
+      const [url] = mockFetch.mock.calls[0]
+      expect(url).toContain('layer=0')
+      expect(url).toContain('enabled=false')
+    })
+
+    it('enableReflex - calls PATCH /:name/enable', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk(null))
+      await expect(client.enableReflex('phatic_micro_reaction')).resolves.not.toThrow()
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/reflexes/phatic_micro_reaction/enable')
+      expect(opts.method).toBe('PATCH')
+    })
+
+    it('disableReflex - calls PATCH /:name/disable', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk(null))
+      await expect(client.disableReflex('phatic_micro_reaction')).resolves.not.toThrow()
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/reflexes/phatic_micro_reaction/disable')
+      expect(opts.method).toBe('PATCH')
+    })
+
+    it('getReflexExecutions - calls GET /api/v1/reflexes/executions', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk({ data: [], meta: { total: 0, limit: 50 } }))
+      const result = await client.getReflexExecutions()
+      expect(result).toBeDefined()
+      const [url] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/reflexes/executions')
+    })
+
+    it('getReflexExecutions - passes filters as query params', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk({ data: [], meta: { total: 0, limit: 10 } }))
+      await client.getReflexExecutions({ limit: 10, result: 'blocked', since: '2026-02-01T00:00:00Z' })
+      const [url] = mockFetch.mock.calls[0]
+      expect(url).toContain('limit=10')
+      expect(url).toContain('result=blocked')
+      expect(url).toContain('since=')
+    })
+  })
+
   describe('messages', () => {
     it('sends message', async () => {
       mockFetch.mockResolvedValueOnce(
