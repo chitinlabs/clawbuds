@@ -14,6 +14,7 @@ import type { HeartbeatService } from './heartbeat.service.js'
 import type { ReactionService } from './reaction.service.js'
 import type { ClawService } from './claw.service.js'
 import type { EventBus } from './event-bus.js'
+import type { ReflexBatchProcessor, BatchQueueItem } from './reflex-batch-processor.js'
 
 // ─── BusEvent: 统一的事件数据结构 ────────────────────────────────────────────
 export interface BusEvent {
@@ -229,7 +230,53 @@ const SUBSCRIBED_EVENTS = [
   'poll.closing_soon',
 ] as const
 
+// ─── 4 个 Layer 1 内置 Reflex 定义 ──────────────────────────────────────────
+const LAYER1_BUILTIN_REFLEXES: Array<Omit<ReflexRecord, 'id' | 'clawId' | 'createdAt' | 'updatedAt'>> = [
+  {
+    name: 'sense_life_event',
+    valueLayer: 'cognitive',
+    behavior: 'sense',
+    triggerLayer: 1,
+    triggerConfig: { type: 'event_type', eventType: 'heartbeat.received' },
+    enabled: true,
+    confidence: 0.8,
+    source: 'builtin',
+  },
+  {
+    name: 'route_pearl_by_interest',
+    valueLayer: 'cognitive',
+    behavior: 'route',
+    triggerLayer: 1,
+    triggerConfig: { type: 'event_type', eventType: 'heartbeat.received', condition: 'has_routing_candidates' },
+    enabled: true,
+    confidence: 0.8,
+    source: 'builtin',
+  },
+  {
+    name: 'crystallize_from_conversation',
+    valueLayer: 'cognitive',
+    behavior: 'crystallize',
+    triggerLayer: 1,
+    triggerConfig: { type: 'event_type', eventType: 'message.new', condition: 'is_sender' },
+    enabled: true,
+    confidence: 0.7,
+    source: 'builtin',
+  },
+  {
+    name: 'bridge_shared_experience',
+    valueLayer: 'collaboration',
+    behavior: 'sense',
+    triggerLayer: 1,
+    triggerConfig: { type: 'multi_heartbeat', minCommonTopics: 1 },
+    enabled: true,
+    confidence: 0.7,
+    source: 'builtin',
+  },
+]
+
 export class ReflexEngine {
+  private batchProcessor: ReflexBatchProcessor | null = null
+
   constructor(
     private reflexRepo: IReflexRepository,
     private executionRepo: IReflexExecutionRepository,
@@ -238,6 +285,28 @@ export class ReflexEngine {
     private clawService: ClawService,
     private eventBus: EventBus,
   ) {}
+
+  /**
+   * Phase 5: 注入 Layer 1 批处理器，激活真实积累
+   */
+  activateLayer1(batchProcessor: ReflexBatchProcessor): void {
+    this.batchProcessor = batchProcessor
+  }
+
+  /**
+   * 检查 Layer 1 是否已激活
+   */
+  isLayer1Active(): boolean {
+    return this.batchProcessor !== null
+  }
+
+  /**
+   * Phase 5: 为指定 Claw 注册 4 个 Layer 1 内置 Reflex
+   */
+  async initializeLayer1Builtins(clawId: string): Promise<void> {
+    const builtins = LAYER1_BUILTIN_REFLEXES.map((b) => ({ ...b, clawId }))
+    await this.reflexRepo.upsertBuiltins(clawId, builtins)
+  }
 
   /**
    * 初始化：注册全局 EventBus 订阅（同步调用，eventBus.on 是同步的）
@@ -420,11 +489,24 @@ export class ReflexEngine {
     })
   }
 
-  /** Layer 1 挂起队列（Phase 4 版本：只记录） */
+  /** Layer 1 挂起队列（Phase 5：真实积累，Phase 4 兼容） */
   private async queueForLayer1(reflex: ReflexRecord, event: BusEvent): Promise<void> {
+    // Phase 4 兼容：始终写入审计日志
     await this.logExecution(reflex, event, 'queued_for_l1', {
-      note: 'Awaiting Phase 5 agent execution model',
+      note: this.batchProcessor ? 'Queued for L1 batch processing' : 'Awaiting Phase 5 agent execution model',
     })
+
+    // Phase 5：若 batchProcessor 已激活，加入批处理队列
+    if (this.batchProcessor) {
+      const item: BatchQueueItem = {
+        reflexId: reflex.id,
+        reflexName: reflex.name,
+        clawId: event.clawId,
+        eventType: event.type,
+        triggerData: { ...event },
+      }
+      this.batchProcessor.enqueue(item)
+    }
   }
 
   /** 写入执行审计日志 */
@@ -446,6 +528,34 @@ export class ReflexEngine {
       })
     } catch {
       // 审计日志写入失败不应影响主流程
+    }
+  }
+
+  /**
+   * Phase 5: Agent 确认批次处理完成
+   * 返回已确认的记录数（0 = batchId 不存在）
+   */
+  async acknowledgeBatch(clawId: string, batchId: string): Promise<number> {
+    if (this.batchProcessor) {
+      await this.batchProcessor.acknowledgeBatch(batchId)
+    }
+    // 查找此 batchId 对应的执行记录（检查是否存在）
+    const records = await this.executionRepo.findByResult(clawId, 'dispatched_to_l1' as any, undefined, 200)
+    const matched = records.filter(
+      (r) => (r.details as Record<string, unknown>)?.['batchId'] === batchId
+    )
+    return matched.length
+  }
+
+  /**
+   * Phase 5: 获取 Layer 1 待处理队列状态
+   */
+  getPendingL1Status(_clawId: string): { queueSize: number; oldestEntry: string | null; hostAvailable: boolean } {
+    const size = this.batchProcessor?.queueSize() ?? 0
+    return {
+      queueSize: size,
+      oldestEntry: null,  // Phase 5 简化：不追踪最早时间
+      hostAvailable: this.batchProcessor !== null,
     }
   }
 

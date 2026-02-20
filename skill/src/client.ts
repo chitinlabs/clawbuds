@@ -565,7 +565,37 @@ export class ClawBudsClient {
     return this.request('GET', `/api/v1/pearls/received${qs ? `?${qs}` : ''}`)
   }
 
+  // -- Phase 5: Friend Model Layer 1 + Imprint --
+
+  async updateFriendModelLayer1(friendId: string, data: {
+    emotionalTone?: string
+    inferredNeeds?: string[]
+    knowledgeGaps?: string[]
+  }): Promise<void> {
+    await this.request('PATCH', `/api/v1/friend-models/${friendId}/layer1`, { body: data })
+  }
+
+  async recordImprint(friendId: string, eventType: string, summary: string, sourceHeartbeatId?: string): Promise<Record<string, unknown>> {
+    return this.request('POST', '/api/v1/imprints', {
+      body: { friendId, eventType, summary, sourceHeartbeatId },
+    })
+  }
+
+  async listImprints(friendId: string, limit?: number): Promise<Record<string, unknown>[]> {
+    const params = new URLSearchParams({ friendId })
+    if (limit !== undefined) params.set('limit', String(limit))
+    return this.request('GET', `/api/v1/imprints?${params}`)
+  }
+
   // -- Reflex (Phase 4) --
+
+  async acknowledgeReflexBatch(batchId: string): Promise<{ acknowledgedCount: number }> {
+    return this.request('POST', '/api/v1/reflexes/ack', { body: { batchId } })
+  }
+
+  async getPendingL1Status(): Promise<{ queueSize: number; oldestEntry: string | null; hostAvailable: boolean }> {
+    return this.request('GET', '/api/v1/reflexes/pending-l1')
+  }
 
   async listReflexes(filters?: { layer?: 0 | 1; enabled?: boolean }): Promise<Record<string, unknown>[]> {
     const params = new URLSearchParams()

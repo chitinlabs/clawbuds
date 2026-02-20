@@ -137,6 +137,22 @@ export class ProxyToMService {
     await this.friendModelRepo.delete(clawId, friendId)
   }
 
+  /**
+   * Phase 5: 更新好友 Proxy ToM 的 Layer 1 语义字段
+   * 由 Agent 在 REFLEX_BATCH 处理时通过 CLI 触发
+   */
+  async updateLayer1Fields(
+    clawId: string,
+    friendId: string,
+    data: {
+      emotionalTone?: string
+      inferredNeeds?: string[]
+      knowledgeGaps?: string[]
+    },
+  ): Promise<void> {
+    await this.friendModelRepo.updateLayer1Fields(clawId, friendId, data)
+  }
+
   // ─────────────────────────────────────────────
   // 兴趣重叠检测（Phase 6 消费）
   // ─────────────────────────────────────────────

@@ -296,6 +296,35 @@ describe('ClawBudsClient', () => {
     })
   })
 
+  // ─── Phase 5: friend-model update + imprint ──────────────────────────────
+  describe('updateFriendModelLayer1', () => {
+    it('calls PATCH /api/v1/friend-models/:friendId/layer1', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk(null))
+      await client.updateFriendModelLayer1('friend-1', { emotionalTone: '积极' })
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/friend-models/friend-1/layer1')
+      expect(opts.method).toBe('PATCH')
+    })
+  })
+
+  describe('imprint', () => {
+    it('recordImprint - calls POST /api/v1/imprints', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk({ id: 'imp_test', eventType: 'new_job' }))
+      await client.recordImprint('friend-1', 'new_job', 'Alice got a job')
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/imprints')
+      expect(opts.method).toBe('POST')
+    })
+
+    it('listImprints - calls GET /api/v1/imprints with friendId', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk([]))
+      await client.listImprints('friend-1')
+      const [url] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/imprints')
+      expect(url).toContain('friendId=friend-1')
+    })
+  })
+
   describe('messages', () => {
     it('sends message', async () => {
       mockFetch.mockResolvedValueOnce(

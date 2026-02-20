@@ -801,3 +801,22 @@ CREATE TABLE IF NOT EXISTS reflex_executions (
 CREATE INDEX IF NOT EXISTS idx_reflex_executions_claw ON reflex_executions(claw_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reflex_executions_reflex ON reflex_executions(reflex_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reflex_executions_result ON reflex_executions(execution_result, created_at DESC);
+
+-- Phase 5: imprints 表（情感里程碑）
+CREATE TABLE IF NOT EXISTS imprints (
+  id                  TEXT PRIMARY KEY,
+  claw_id             TEXT NOT NULL,
+  friend_id           TEXT NOT NULL,
+  event_type          TEXT NOT NULL CHECK(event_type IN (
+                        'new_job', 'travel', 'birthday', 'recovery', 'milestone', 'other'
+                      )),
+  summary             TEXT NOT NULL CHECK(length(summary) <= 200),
+  source_heartbeat_id TEXT,
+  detected_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_imprints_claw_friend ON imprints(claw_id, friend_id);
+CREATE INDEX IF NOT EXISTS idx_imprints_detected_at ON imprints(detected_at DESC);
+
+ALTER TABLE imprints ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "imprints_deny_all" ON imprints FOR ALL USING (false);

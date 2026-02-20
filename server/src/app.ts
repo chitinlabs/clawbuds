@@ -27,7 +27,12 @@ import { SchedulerService } from './services/scheduler.service.js'
 import { ProxyToMService } from './services/proxy-tom.service.js'
 import { PearlService } from './services/pearl.service.js'
 import { ReflexEngine } from './services/reflex-engine.js'
+import { ImprintService } from './services/imprint.service.js'
+import { NoopNotifier } from './services/host-notifier.js'
+import { OpenClawNotifier } from './services/openclaw-notifier.js'
+import { ReflexBatchProcessor } from './services/reflex-batch-processor.js'
 import { createReflexesRouter } from './routes/reflexes.js'
+import { createImprintsRouter } from './routes/imprints.js'
 import { createAuthRouter } from './routes/auth.js'
 import { createFriendsRouter } from './routes/friends.js'
 import { createMessagesRouter } from './routes/messages.js'
@@ -291,6 +296,10 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     // 注入 PearlService 到 HeartbeatDataCollector（最近 30 天 domain_tags 聚合）
     heartbeatCollector.injectPearlService(pearlService)
 
+    // ─── Phase 5: Imprint Service ───
+    const imprintRepository = repositoryFactory.createImprintRepository()
+    const imprintService = new ImprintService(imprintRepository)
+
     // ─── Phase 4: ReflexEngine Layer 0 ───
     const reflexRepository = repositoryFactory.createReflexRepository()
     const reflexExecutionRepository = repositoryFactory.createReflexExecutionRepository()
@@ -304,6 +313,25 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     )
     // 注册全局 EventBus 订阅（同步）
     reflexEngine.initialize()
+
+    // ─── Phase 5: HostNotifier + Layer 1 批处理器 ───
+    const hostType = process.env['CLAWBUDS_HOST_TYPE'] ?? 'noop'
+    const hostNotifier = hostType === 'openclaw' && process.env['CLAWBUDS_HOOKS_URL']
+      ? new OpenClawNotifier(
+          process.env['CLAWBUDS_HOOKS_URL'],
+          process.env['CLAWBUDS_API_KEY'] ?? '',
+        )
+      : new NoopNotifier()
+
+    const batchProcessor = new ReflexBatchProcessor(
+      reflexExecutionRepository,
+      hostNotifier,
+      {
+        batchSize: parseInt(process.env['CLAWBUDS_L1_BATCH_SIZE'] ?? '10', 10),
+        maxWaitMs: parseInt(process.env['CLAWBUDS_L1_MAX_WAIT_MS'] ?? '600000', 10),
+      },
+    )
+    reflexEngine.activateLayer1(batchProcessor)
 
     ctx.clawService = clawService
     ctx.inboxService = inboxService
@@ -338,6 +366,7 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1/pearls', createPearlsRouter(pearlService, clawService))
     app.use('/api/v1/reflexes', reflexLimiter)
     app.use('/api/v1/reflexes', createReflexesRouter(reflexEngine, clawService))
+    app.use('/api/v1/imprints', createImprintsRouter(imprintService, clawService))
 
     // ─── EventBus 监听：Phase 1 联动 ───
     // friend.accepted → 双向初始化关系强度
