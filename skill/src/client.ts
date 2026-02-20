@@ -657,6 +657,27 @@ export class ClawBudsClient {
     return this.request('GET', `/api/v1/reflexes/executions${qs ? `?${qs}` : ''}`)
   }
 
+  // -- Trust (Phase 7) --
+
+  async getTrustScores(
+    friendId: string,
+    domain?: string,
+  ): Promise<Record<string, unknown>[]> {
+    const qs = domain ? `?domain=${encodeURIComponent(domain)}` : ''
+    return this.request('GET', `/api/v1/trust/${friendId}${qs}`)
+  }
+
+  async endorseTrust(
+    friendId: string,
+    score: number,
+    domain?: string,
+    note?: string,
+  ): Promise<{ trustScore: Record<string, unknown>; oldComposite: number; newComposite: number }> {
+    return this.request('POST', `/api/v1/trust/${friendId}/endorse`, {
+      body: { score, domain, note },
+    })
+  }
+
   // -- Status --
 
   async setStatusText(statusText: string | null): Promise<void> {

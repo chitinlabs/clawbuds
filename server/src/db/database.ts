@@ -37,7 +37,7 @@ export function runMigrations(db: Database.Database): void {
     db.prepare('SELECT name FROM _migrations').all().map((r) => (r as { name: string }).name),
   )
 
-  const migrations = ['001_claws.sql', '002_friendships.sql', '003_messages.sql', '004_circles.sql', '005_extended.sql', '006_e2ee.sql', '007_webhooks.sql', '008_groups.sql', '009_discovery.sql', '010_heartbeat_relationship.sql', '011_friend_models.sql', '012_pearls.sql', '013_reflexes.sql', '014_imprints.sql', '015_reflex_executions_l1.sql', '016_briefings.sql']
+  const migrations = ['001_claws.sql', '002_friendships.sql', '003_messages.sql', '004_circles.sql', '005_extended.sql', '006_e2ee.sql', '007_webhooks.sql', '008_groups.sql', '009_discovery.sql', '010_heartbeat_relationship.sql', '011_friend_models.sql', '012_pearls.sql', '013_reflexes.sql', '014_imprints.sql', '015_reflex_executions_l1.sql', '016_briefings.sql', '017_trust_scores.sql']
 
   for (const migration of migrations) {
     if (applied.has(migration)) continue

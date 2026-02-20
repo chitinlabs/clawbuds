@@ -39,7 +39,7 @@ export interface EventMap {
   // Phase 3: Pearl 认知资产
   'pearl.created': { ownerId: string; pearlId: string; domainTags: string[] }
   'pearl.shared': { fromClawId: string; toClawId: string; pearlId: string; domainTags: string[] }
-  'pearl.endorsed': { pearlId: string; endorserClawId: string; ownerId: string; score: number }
+  'pearl.endorsed': { pearlId: string; endorserClawId: string; ownerId: string; score: number; pearlDomainTags?: string[] }  // Phase 7: pearlDomainTags for trust Q update
   // Phase 4: ReflexEngine 定时器事件
   'timer.tick': { clawId: string; intervalMs: number; timestamp: string }
   'poll.closing_soon': { clawId: string; pollId: string; closesAt: string }

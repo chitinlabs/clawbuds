@@ -7,6 +7,16 @@ import { randomUUID } from 'node:crypto'
 import type { IPearlRepository, IPearlEndorsementRepository, PearlMetadataRecord, PearlContentRecord, PearlFullRecord, PearlReferenceRecord, PearlEndorsementRecord, PearlFilters, UpdatePearlData } from '../db/repositories/interfaces/pearl.repository.interface.js'
 import type { FriendshipService } from './friendship.service.js'
 import type { EventBus } from './event-bus.js'
+import type { TrustService } from './trust.service.js'
+
+/** Phase 7: 信任阈值未满足时抛出 */
+export class TrustThresholdError extends Error {
+  readonly code = 'TRUST_THRESHOLD'
+  constructor(message: string) {
+    super(message)
+    this.name = 'TrustThresholdError'
+  }
+}
 
 /**
  * 基于背书分数计算 Pearl 质量评分（Phase 3 简化版）
@@ -34,6 +44,7 @@ export class PearlService {
     private endorsementRepo: IPearlEndorsementRepository,
     private friendshipService: FriendshipService,
     private eventBus: EventBus,
+    private trustService?: TrustService,  // Phase 7: 可选，信任阈值过滤
   ) {}
 
   /** 创建 Pearl（手动沉淀） */
@@ -134,6 +145,17 @@ export class PearlService {
       throw Object.assign(new Error('Not friends'), { code: 'NOT_FRIENDS' })
     }
 
+    // Phase 7: 信任阈值过滤（share_conditions.trustThreshold）
+    if (this.trustService && pearl.shareConditions?.trustThreshold != null) {
+      const domain = pearl.domainTags[0] ?? '_overall'
+      const trustScore = await this.trustService.getComposite(fromClawId, toClawId, domain)
+      if (trustScore < (pearl.shareConditions.trustThreshold as number)) {
+        throw new TrustThresholdError(
+          `Trust score ${trustScore.toFixed(2)} < required ${pearl.shareConditions.trustThreshold}`,
+        )
+      }
+    }
+
     // Idempotent: createShare uses INSERT OR IGNORE (SQLite) / upsert ignoreDuplicates (Supabase)
     const alreadyShared = await this.pearlRepo.hasBeenSharedWith(pearlId, toClawId)
     if (alreadyShared) {
@@ -203,6 +225,7 @@ export class PearlService {
       endorserClawId,
       ownerId: pearl.ownerId,
       score,
+      pearlDomainTags: pearl.domainTags,  // Phase 7: trust Q 维度更新需要领域信息
     })
 
     return endorsement
