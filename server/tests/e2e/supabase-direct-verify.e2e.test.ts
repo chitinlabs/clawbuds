@@ -69,11 +69,12 @@ describe('E2E: Supabase API + 直连 PostgreSQL 双重验证', () => {
       return
     }
 
-    // 初始化直连 pg 连接池
+    // 初始化直连 pg 连接池（需 SSL，Supabase 要求）
     pool = new Pool({
       connectionString: DATABASE_URL,
       max: 2,
       connectionTimeoutMillis: 10000,
+      ssl: { rejectUnauthorized: false },
     })
 
     try {
@@ -202,17 +203,17 @@ describe('E2E: Supabase API + 直连 PostgreSQL 双重验证', () => {
       const { rows } = await pool.query<{
         id: string
         requester_id: string
-        addressee_id: string
+        accepter_id: string
         status: string
       }>(
-        'SELECT id, requester_id, addressee_id, status FROM friendships WHERE id = $1',
+        'SELECT id, requester_id, accepter_id, status FROM friendships WHERE id = $1',
         [friendshipId],
       )
 
       expect(rows).toHaveLength(1)
       expect(rows[0].status).toBe('accepted')
-      expect([rows[0].requester_id, rows[0].addressee_id]).toContain(alice.clawId)
-      expect([rows[0].requester_id, rows[0].addressee_id]).toContain(bob.clawId)
+      expect([rows[0].requester_id, rows[0].accepter_id]).toContain(alice.clawId)
+      expect([rows[0].requester_id, rows[0].accepter_id]).toContain(bob.clawId)
     })
 
     it('直连双向查询：Alice 和 Bob 互为好友', async () => {
@@ -222,9 +223,9 @@ describe('E2E: Supabase API + 直连 PostgreSQL 双重验证', () => {
         `SELECT COUNT(*) AS count FROM friendships
          WHERE status = 'accepted'
            AND (
-             (requester_id = $1 AND addressee_id = $2)
+             (requester_id = $1 AND accepter_id = $2)
              OR
-             (requester_id = $2 AND addressee_id = $1)
+             (requester_id = $2 AND accepter_id = $1)
            )`,
         [alice.clawId, bob.clawId],
       )
@@ -242,42 +243,47 @@ describe('E2E: Supabase API + 直连 PostgreSQL 双重验证', () => {
       const uniqueText = `直连验证消息_${Date.now()}`
       await sendDirectMessage(app, alice, bob, uniqueText)
 
+      // Supabase schema: messages.from_claw_id（非 sender_id）
+      // 接收者在 message_recipients 表
       const { rows } = await pool.query<{
-        sender_id: string
-        recipient_id: string
+        from_claw_id: string
         visibility: string
       }>(
-        `SELECT sender_id, recipient_id, visibility
-         FROM messages
-         WHERE sender_id = $1 AND recipient_id = $2
-         ORDER BY created_at DESC
+        `SELECT m.from_claw_id, m.visibility
+         FROM messages m
+         JOIN message_recipients mr ON mr.message_id = m.id
+         WHERE m.from_claw_id = $1 AND mr.recipient_id = $2
+         ORDER BY m.created_at DESC
          LIMIT 1`,
         [alice.clawId, bob.clawId],
       )
 
       expect(rows).toHaveLength(1)
-      expect(rows[0].sender_id).toBe(alice.clawId)
-      expect(rows[0].recipient_id).toBe(bob.clawId)
+      expect(rows[0].from_claw_id).toBe(alice.clawId)
       expect(rows[0].visibility).toBe('direct')
     })
 
-    it('消息内容（blocks）应正确存储', async () => {
+    it('消息内容（blocks_json）应正确存储', async () => {
       if (!isReady) return
 
       const markerText = `marker_${Date.now()}`
       await sendDirectMessage(app, alice, bob, markerText)
 
-      const { rows } = await pool.query<{ blocks: unknown }>(
-        `SELECT blocks FROM messages
-         WHERE sender_id = $1 AND recipient_id = $2
-         ORDER BY created_at DESC
+      // Supabase schema: messages.blocks_json（非 blocks）
+      const { rows } = await pool.query<{ blocks_json: unknown }>(
+        `SELECT m.blocks_json FROM messages m
+         JOIN message_recipients mr ON mr.message_id = m.id
+         WHERE m.from_claw_id = $1 AND mr.recipient_id = $2
+         ORDER BY m.created_at DESC
          LIMIT 1`,
         [alice.clawId, bob.clawId],
       )
 
       expect(rows).toHaveLength(1)
       const blocks =
-        typeof rows[0].blocks === 'string' ? JSON.parse(rows[0].blocks) : rows[0].blocks
+        typeof rows[0].blocks_json === 'string'
+          ? JSON.parse(rows[0].blocks_json)
+          : rows[0].blocks_json
       expect(JSON.stringify(blocks)).toContain(markerText)
     })
   })
@@ -299,8 +305,9 @@ describe('E2E: Supabase API + 直连 PostgreSQL 双重验证', () => {
     it('通过直连统计 Alice 发出的消息数应大于 0', async () => {
       if (!isReady) return
 
+      // Supabase schema: messages.from_claw_id（非 sender_id）
       const { rows } = await pool.query<{ count: string }>(
-        'SELECT COUNT(*) AS count FROM messages WHERE sender_id = $1',
+        'SELECT COUNT(*) AS count FROM messages WHERE from_claw_id = $1',
         [alice.clawId],
       )
 

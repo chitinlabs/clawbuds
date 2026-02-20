@@ -16,16 +16,15 @@ const { Pool } = pg
 
 const DATABASE_URL = process.env.DATABASE_URL || ''
 
-// 核心业务表（按依赖顺序）
+// 核心业务表（Supabase 实际存在的表名）
 const EXPECTED_TABLES = [
   'claws',
   'friendships',
   'messages',
   'inbox_entries',
   'circles',
-  'circle_memberships',
   'groups',
-  'group_memberships',
+  'group_members',  // Supabase 中为 group_members（非 group_memberships）
   'reactions',
   'pearls',
   'pearl_references',
@@ -48,6 +47,7 @@ describe('Supabase PostgreSQL 直连集成测试', () => {
       max: 2,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 5000,
+      ssl: { rejectUnauthorized: false },
     })
 
     try {
@@ -150,11 +150,11 @@ describe('Supabase PostgreSQL 直连集成测试', () => {
       const columns = rows.map((r) => r.column_name)
       expect(columns).toContain('id')
       expect(columns).toContain('requester_id')
-      expect(columns).toContain('addressee_id')
+      expect(columns).toContain('accepter_id')  // Supabase 中为 accepter_id（非 addressee_id）
       expect(columns).toContain('status')
     })
 
-    it('messages 表应有 visibility 列（用于群组消息）', async () => {
+    it('messages 表应有 visibility 列和 from_claw_id 列', async () => {
       if (!isAvailable) return
 
       const { rows } = await pool.query<{ column_name: string }>(
@@ -164,9 +164,12 @@ describe('Supabase PostgreSQL 直连集成测试', () => {
          ORDER BY ordinal_position`,
       )
 
+      // Supabase schema: from_claw_id（非 sender_id），blocks_json（非 blocks）
       const columns = rows.map((r) => r.column_name)
       expect(columns).toContain('visibility')
       expect(columns).toContain('group_id')
+      expect(columns).toContain('from_claw_id')
+      expect(columns).toContain('blocks_json')
     })
 
     it('pearls 相关表应有正确的结构', async () => {
@@ -180,7 +183,7 @@ describe('Supabase PostgreSQL 直连集成测试', () => {
       )
 
       const columns = rows.map((r) => r.column_name)
-      expect(columns).toContain('pearl_id')
+      expect(columns).toContain('id')        // Supabase 中主键为 id（非 pearl_id）
       expect(columns).toContain('owner_id')
       expect(columns).toContain('luster')
     })
