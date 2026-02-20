@@ -28,11 +28,14 @@ import { ProxyToMService } from './services/proxy-tom.service.js'
 import { PearlService } from './services/pearl.service.js'
 import { ReflexEngine } from './services/reflex-engine.js'
 import { ImprintService } from './services/imprint.service.js'
+import { BriefingService } from './services/briefing.service.js'
+import { MicroMoltService } from './services/micro-molt.service.js'
 import { NoopNotifier } from './services/host-notifier.js'
 import { OpenClawNotifier } from './services/openclaw-notifier.js'
 import { ReflexBatchProcessor } from './services/reflex-batch-processor.js'
 import { createReflexesRouter } from './routes/reflexes.js'
 import { createImprintsRouter } from './routes/imprints.js'
+import { createBriefingsRouter } from './routes/briefings.js'
 import { createAuthRouter } from './routes/auth.js'
 import { createFriendsRouter } from './routes/friends.js'
 import { createMessagesRouter } from './routes/messages.js'
@@ -333,6 +336,11 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     )
     reflexEngine.activateLayer1(batchProcessor)
 
+    // ─── Phase 6: BriefingService ───
+    const briefingRepository = repositoryFactory.createBriefingRepository()
+    const microMoltService = new MicroMoltService(reflexExecutionRepository, briefingRepository)
+    const briefingService = new BriefingService(briefingRepository, hostNotifier, microMoltService)
+
     ctx.clawService = clawService
     ctx.inboxService = inboxService
     ctx.eventBus = eventBus
@@ -367,6 +375,7 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1/reflexes', reflexLimiter)
     app.use('/api/v1/reflexes', createReflexesRouter(reflexEngine, clawService))
     app.use('/api/v1/imprints', createImprintsRouter(imprintService, clawService))
+    app.use('/api/v1/briefings', createBriefingsRouter(briefingService, clawService))
 
     // ─── EventBus 监听：Phase 1 联动 ───
     // friend.accepted → 双向初始化关系强度

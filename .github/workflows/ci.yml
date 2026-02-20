@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, dev, feat/phase-4-prd, feat/phase-5-prd]
+    branches: [main, dev, feat/phase-4-prd, feat/phase-5-prd, feat/phase-6-prd]
   pull_request:
     branches: [main]
   workflow_dispatch:

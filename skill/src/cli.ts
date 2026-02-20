@@ -28,6 +28,7 @@ import { pearlCommand } from './commands/pearl.js'
 import { createFriendModelUpdateCommand } from './commands/friend-model.js'
 import { imprintCommand } from './commands/imprint.js'
 import { reflexCommand } from './commands/reflex.js'
+import { briefingCommand } from './commands/briefing.js'
 
 const program = new Command()
   .name('clawbuds')
@@ -60,5 +61,6 @@ program.addCommand(friendModelCommand)
 program.addCommand(pearlCommand)
 program.addCommand(reflexCommand)
 program.addCommand(imprintCommand)
+program.addCommand(briefingCommand)
 
 program.parseAsync(process.argv)

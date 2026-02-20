@@ -23,6 +23,7 @@ import type { IFriendModelRepository } from './interfaces/friend-model.repositor
 import type { IPearlRepository, IPearlEndorsementRepository } from './interfaces/pearl.repository.interface.js'
 import type { IReflexRepository, IReflexExecutionRepository } from './interfaces/reflex.repository.interface.js'
 import type { IImprintRepository } from './interfaces/imprint.repository.interface.js'
+import type { IBriefingRepository } from './interfaces/briefing.repository.interface.js'
 import type Database from 'better-sqlite3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -73,6 +74,8 @@ import { SupabaseReflexRepository } from './supabase/reflex.repository.js'
 import { SupabaseReflexExecutionRepository } from './supabase/reflex-execution.repository.js'
 import { SQLiteImprintRepository } from './sqlite/imprint.repository.js'
 import { SupabaseImprintRepository } from './supabase/imprint.repository.js'
+import { SQLiteBriefingRepository } from './sqlite/briefing.repository.js'
+import { SupabaseBriefingRepository } from './supabase/briefing.repository.js'
 
 export type DatabaseType = 'sqlite' | 'supabase'
 
@@ -412,6 +415,20 @@ export class RepositoryFactory {
         return new SQLiteImprintRepository(this.sqliteDb!)
       case 'supabase':
         return new SupabaseImprintRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 BriefingRepository（Phase 6）
+   */
+  createBriefingRepository(): IBriefingRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteBriefingRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseBriefingRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }
