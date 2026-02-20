@@ -21,6 +21,35 @@ export function createReflexesRouter(reflexEngine: ReflexEngine, clawService: Cl
   const router = Router()
   const requireAuth = createAuthMiddleware(clawService)
 
+  // POST /api/v1/reflexes/ack — Agent 确认批次处理完成（⚠️ 必须在 /:name 之前）
+  router.post('/ack', requireAuth, async (req, res) => {
+    const { batchId } = req.body
+    if (!batchId || typeof batchId !== 'string') {
+      res.status(400).json(errorResponse('VALIDATION_ERROR', 'batchId is required'))
+      return
+    }
+    try {
+      const count = await reflexEngine.acknowledgeBatch(req.clawId as string, batchId)
+      if (count === 0) {
+        res.status(404).json(errorResponse('NOT_FOUND', 'Batch not found'))
+        return
+      }
+      res.json({ success: true, acknowledgedCount: count })
+    } catch {
+      res.status(500).json(errorResponse('INTERNAL_ERROR', 'An unexpected error occurred'))
+    }
+  })
+
+  // GET /api/v1/reflexes/pending-l1 — 查看 Layer 1 待处理队列（调试用）
+  router.get('/pending-l1', requireAuth, async (req, res) => {
+    try {
+      const status = reflexEngine.getPendingL1Status(req.clawId as string)
+      res.json(successResponse(status))
+    } catch {
+      res.status(500).json(errorResponse('INTERNAL_ERROR', 'An unexpected error occurred'))
+    }
+  })
+
   // GET /api/v1/reflexes/executions — 获取最近执行记录（⚠️ 必须在 /:name 之前）
   router.get('/executions', requireAuth, async (req, res) => {
     const qLimit = (Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit) as string | undefined

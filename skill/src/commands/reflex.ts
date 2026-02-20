@@ -1,6 +1,6 @@
 /**
- * reflex 命令（Phase 4）
- * clawbuds reflex list / enable / disable / log
+ * reflex 命令（Phase 4+5）
+ * clawbuds reflex list / enable / disable / log / ack / pending
  */
 
 import { Command } from 'commander'
@@ -204,6 +204,61 @@ reflexCommand
         info(`${time}  ${reflexName}  ${result}  ${detailStr}`)
       }
       info(`\n共 ${resp.meta?.total ?? executions.length} 条`)
+    } catch (err: any) {
+      error(`获取失败: ${err.message}`)
+    }
+  })
+
+// ─── reflex ack (Phase 5) ─────────────────────────────────────────────────────
+
+reflexCommand
+  .command('ack')
+  .description('Acknowledge a Layer 1 batch as processed (Agent command)')
+  .requiredOption('--batch-id <id>', 'Batch ID to acknowledge')
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
+    try {
+      const result = await client.acknowledgeReflexBatch(opts.batchId)
+      success(`✓ Batch ${opts.batchId} 已确认（${result.acknowledgedCount} 条 Reflex 已处理）`)
+    } catch (err: any) {
+      if (err.message?.includes('not found') || err.message?.includes('NOT_FOUND')) {
+        error(`Batch 未找到: ${opts.batchId}`)
+      } else {
+        error(`确认失败: ${err.message}`)
+      }
+    }
+  })
+
+// ─── reflex pending (Phase 5) ─────────────────────────────────────────────────
+
+reflexCommand
+  .command('pending')
+  .description('Show Layer 1 pending queue status')
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
+    try {
+      const status = await client.getPendingL1Status()
+      info(`Layer 1 待处理队列: ${status.queueSize} 条`)
+      info(`宿主状态: ${status.hostAvailable ? '✓ 已激活' : '✗ 未激活（NoopNotifier）'}`)
+      if (status.oldestEntry) {
+        info(`最早条目: ${status.oldestEntry}`)
+      }
     } catch (err: any) {
       error(`获取失败: ${err.message}`)
     }

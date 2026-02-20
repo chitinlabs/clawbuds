@@ -22,6 +22,7 @@ import type { IRelationshipStrengthRepository } from './interfaces/relationship-
 import type { IFriendModelRepository } from './interfaces/friend-model.repository.interface.js'
 import type { IPearlRepository, IPearlEndorsementRepository } from './interfaces/pearl.repository.interface.js'
 import type { IReflexRepository, IReflexExecutionRepository } from './interfaces/reflex.repository.interface.js'
+import type { IImprintRepository } from './interfaces/imprint.repository.interface.js'
 import type Database from 'better-sqlite3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -70,6 +71,8 @@ import { SupabasePearlRepository } from './supabase/pearl.repository.js'
 import { SupabasePearlEndorsementRepository } from './supabase/pearl-endorsement.repository.js'
 import { SupabaseReflexRepository } from './supabase/reflex.repository.js'
 import { SupabaseReflexExecutionRepository } from './supabase/reflex-execution.repository.js'
+import { SQLiteImprintRepository } from './sqlite/imprint.repository.js'
+import { SupabaseImprintRepository } from './supabase/imprint.repository.js'
 
 export type DatabaseType = 'sqlite' | 'supabase'
 
@@ -395,6 +398,20 @@ export class RepositoryFactory {
         return new SQLitePearlEndorsementRepository(this.sqliteDb!)
       case 'supabase':
         return new SupabasePearlEndorsementRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 ImprintRepository（Phase 5）
+   */
+  createImprintRepository(): IImprintRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteImprintRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseImprintRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }

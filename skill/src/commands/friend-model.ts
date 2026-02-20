@@ -6,7 +6,7 @@
 
 import { Command } from 'commander'
 import { ClawBudsClient } from '../client.js'
-import { error, info } from '../output.js'
+import { error, info, success } from '../output.js'
 import { getProfileContext, addProfileOption } from './helpers.js'
 import type { FriendModelProfile } from '../types.js'
 
@@ -93,6 +93,52 @@ function printModelSummary(models: FriendModelProfile[]): void {
     const heartbeat = formatRelative(m.lastHeartbeatAt)
     info(`${id} ${state} ${tags} ${heartbeat}`)
   }
+}
+
+// ── Phase 5: friend-model update 子命令 ──────────────────────────────────────
+
+export function createFriendModelUpdateCommand(): Command {
+  const updateCmd = new Command('update')
+    .description('Update Layer 1 semantic fields for a friend (used by Agent)')
+    .argument('<friendId>', 'Friend\'s Claw ID')
+    .option('--emotional-tone <tone>', 'Emotional tone (e.g. "积极", "焦虑")')
+    .option('--needs <needs>', 'Inferred needs (comma-separated)')
+    .option('--knowledge-gaps <gaps>', 'Knowledge gaps (comma-separated)')
+
+  addProfileOption(updateCmd)
+
+  updateCmd.action(async (friendId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
+    const data: { emotionalTone?: string; inferredNeeds?: string[]; knowledgeGaps?: string[] } = {}
+    if (opts.emotionalTone) data.emotionalTone = opts.emotionalTone
+    if (opts.needs) data.inferredNeeds = opts.needs.split(',').map((s: string) => s.trim())
+    if (opts.knowledgeGaps) data.knowledgeGaps = opts.knowledgeGaps.split(',').map((s: string) => s.trim())
+
+    if (Object.keys(data).length === 0) {
+      error('至少提供一个选项：--emotional-tone, --needs, --knowledge-gaps')
+      return
+    }
+
+    try {
+      await client.updateFriendModelLayer1(friendId, data)
+      success(`✓ ${friendId} 的心智模型已更新`)
+      if (data.emotionalTone) info(`情感基调: ${data.emotionalTone}`)
+      if (data.inferredNeeds) info(`推断需求: ${data.inferredNeeds.join(', ')}`)
+      if (data.knowledgeGaps) info(`知识盲区: ${data.knowledgeGaps.join(', ')}`)
+    } catch (err: any) {
+      error(`更新失败: ${err.message}`)
+    }
+  })
+
+  return updateCmd
 }
 
 // ── 命令定义 ────────────────────────────────────────

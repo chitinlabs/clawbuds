@@ -25,6 +25,8 @@ import { heartbeatCommand } from './commands/heartbeat.js'
 import { statusCommand } from './commands/status.js'
 import { friendModelCommand } from './commands/friend-model.js'
 import { pearlCommand } from './commands/pearl.js'
+import { createFriendModelUpdateCommand } from './commands/friend-model.js'
+import { imprintCommand } from './commands/imprint.js'
 import { reflexCommand } from './commands/reflex.js'
 
 const program = new Command()
@@ -53,8 +55,10 @@ program.addCommand(webhooksCommand)
 program.addCommand(e2eeCommand)
 program.addCommand(heartbeatCommand)
 program.addCommand(statusCommand)
+friendModelCommand.addCommand(createFriendModelUpdateCommand())
 program.addCommand(friendModelCommand)
 program.addCommand(pearlCommand)
 program.addCommand(reflexCommand)
+program.addCommand(imprintCommand)
 
 program.parseAsync(process.argv)
