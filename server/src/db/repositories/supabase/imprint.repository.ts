@@ -3,10 +3,12 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { customAlphabet } from 'nanoid'
+import { randomUUID } from 'node:crypto'
 import type { Imprint, IImprintRepository } from '../interfaces/imprint.repository.interface.js'
 
-const nanoid = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 10)
+function nanoid(): string {
+  return randomUUID().replace(/-/g, '').slice(0, 10)
+}
 
 interface ImprintRow {
   id: string

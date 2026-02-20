@@ -3,11 +3,13 @@
  * 积累 queued_for_l1 事件，达到阈值或超时后触发批处理
  */
 
-import { customAlphabet } from 'nanoid'
+import { randomUUID } from 'node:crypto'
 import type { IReflexExecutionRepository } from '../db/repositories/interfaces/reflex.repository.interface.js'
 import type { HostNotifier } from './host-notifier.js'
 
-const nanoid = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 10)
+function nanoid(): string {
+  return randomUUID().replace(/-/g, '').slice(0, 10)
+}
 
 export interface BatchQueueItem {
   reflexId: string
