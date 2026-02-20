@@ -1,7 +1,12 @@
 import { defineConfig } from 'vitest/config'
 import { config } from 'dotenv'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 
-config({ path: '.env.test' })
+// Use absolute paths so env files are found regardless of CWD (root vs server/)
+const __dirname = dirname(fileURLToPath(import.meta.url))
+config({ path: join(__dirname, '.env.test') })
+config({ path: join(__dirname, '.env.test.local'), override: true })
 
 export default defineConfig({
   test: {
