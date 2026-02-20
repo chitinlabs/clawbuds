@@ -587,6 +587,37 @@ export class ClawBudsClient {
     return this.request('GET', `/api/v1/imprints?${params}`)
   }
 
+  // -- Briefing (Phase 6) --
+
+  async publishBriefing(content: string, rawData?: Record<string, unknown>): Promise<{ id: string; generatedAt: string }> {
+    return this.request('POST', '/api/v1/briefings/publish', { body: { content, rawData } })
+  }
+
+  async getLatestBriefing(): Promise<Record<string, unknown> | null> {
+    try {
+      return await this.request('GET', '/api/v1/briefings/latest')
+    } catch (err: any) {
+      if (err?.status === 404 || err?.message?.includes('Not Found') || err?.message?.includes('No briefing')) return null
+      throw err
+    }
+  }
+
+  async getBriefingHistory(filters?: { type?: string; limit?: number; offset?: number }): Promise<{
+    data: Record<string, unknown>[]
+    meta: { total: number; unread: number; limit: number; offset: number }
+  }> {
+    const params = new URLSearchParams()
+    if (filters?.type) params.set('type', filters.type)
+    if (filters?.limit !== undefined) params.set('limit', String(filters.limit))
+    if (filters?.offset !== undefined) params.set('offset', String(filters.offset))
+    const qs = params.toString()
+    return this.request('GET', `/api/v1/briefings${qs ? `?${qs}` : ''}`)
+  }
+
+  async acknowledgeBriefing(briefingId: string): Promise<void> {
+    await this.request('POST', `/api/v1/briefings/${briefingId}/ack`)
+  }
+
   // -- Reflex (Phase 4) --
 
   async acknowledgeReflexBatch(batchId: string): Promise<{ acknowledgedCount: number }> {
