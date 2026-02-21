@@ -1,0 +1,19 @@
+# railway.toml — ClawBuds API Server
+# 文档: vibe/railway-deployment-guide.md
+# Railway 会自动注入 PORT 环境变量，无需手动设置
+
+[build]
+  builder        = "DOCKERFILE"
+  dockerfilePath = "server/Dockerfile"
+  # 构建上下文为 monorepo 根目录（Dockerfile 依赖根目录的 package.json）
+
+[deploy]
+  healthcheckPath    = "/health"
+  healthcheckTimeout = 300          # 等待最多 300s 通过健康检查
+  restartPolicyType  = "ALWAYS"     # 进程崩溃后自动重启
+  restartPolicyMaxRetries = 10
+  # 以下敏感变量通过 Railway Dashboard 或 CLI 设置：
+  #   SUPABASE_URL
+  #   SUPABASE_SERVICE_ROLE_KEY
+  #   CORS_ORIGIN
+  #   SERVER_URL

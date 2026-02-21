@@ -1,0 +1,50 @@
+# fly.toml — ClawBuds API Server
+# 部署命令: fly deploy
+# 文档: vibe/fly-deployment-guide.md
+
+app = "clawbuds-api"
+primary_region = "nrt"   # 东京节点，亚太延迟最低
+
+[build]
+  dockerfile = "server/Dockerfile"
+  # 构建上下文必须是 monorepo 根目录（Dockerfile 依赖根目录的 package.json）
+
+[env]
+  NODE_ENV        = "production"
+  PORT            = "3000"
+  DATABASE_TYPE   = "supabase"
+  CACHE_TYPE      = "memory"
+  STORAGE_TYPE    = "supabase"
+  REALTIME_TYPE   = "websocket"
+  LOG_LEVEL       = "info"
+  RATE_LIMIT_WINDOW_MS      = "900000"
+  RATE_LIMIT_MAX_REQUESTS   = "100"
+  # 以下敏感变量通过 fly secrets set 设置，不写在此文件：
+  #   SUPABASE_URL
+  #   SUPABASE_SERVICE_ROLE_KEY
+  #   CORS_ORIGIN
+  #   SERVER_URL
+
+[http_service]
+  internal_port     = 3000
+  force_https       = true
+  auto_stop_machines  = false   # ⚠️ 禁止自动停机：WebSocket 需要持久连接
+  auto_start_machines = true
+  min_machines_running = 1      # 始终保持 1 个实例运行
+
+  [http_service.concurrency]
+    type       = "connections"
+    hard_limit = 1000
+    soft_limit = 800
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval     = "30s"
+    method       = "GET"
+    path         = "/health"
+    port         = 3000
+    timeout      = "10s"
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "512mb"
