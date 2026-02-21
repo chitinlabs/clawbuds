@@ -3,8 +3,8 @@
  * 检测 Reflex 执行的重复模式 + 模板回复的单调性，触发多样化策略
  */
 
-import type { IReflexExecutionRepository } from '../db/repositories/interfaces/reflex.repository.interface.js'
-import type { ICarapaceHistoryRepository } from '../db/repositories/interfaces/carapace-history.repository.interface.js'
+import type { IReflexExecutionRepository, ReflexExecutionRecord } from '../db/repositories/interfaces/reflex.repository.interface.js'
+import type { ICarapaceHistoryRepository, CarapaceHistoryRecord } from '../db/repositories/interfaces/carapace-history.repository.interface.js'
 
 export type StalenessAlertType =
   | 'reflex_repetition'        // 相同 Reflex 行为高度重复
@@ -32,6 +32,16 @@ const CARAPACE_STALE_DAYS = parseInt(process.env['CLAWBUDS_CARAPACE_STALE_DAYS']
 const EMOJI_MONOTONY_THRESHOLD = parseFloat(
   process.env['CLAWBUDS_MONOTONY_THRESHOLD'] ?? '0.90',
 )
+// MEDIUM-6: 梳理用语重复使用独立阈值（默认 0.85，比 emoji 略低）
+const GROOM_REPETITION_THRESHOLD = parseFloat(
+  process.env['CLAWBUDS_GROOM_REPETITION_THRESHOLD'] ?? '0.85',
+)
+
+/** MEDIUM-1: 内部共享执行数据缓存，避免同一请求内重复 DB 查询 */
+interface ExecutionDataCache {
+  executions500: ReflexExecutionRecord[]
+  historyTop1: CarapaceHistoryRecord[]
+}
 
 export class PatternStalenessDetector {
   constructor(
@@ -41,13 +51,16 @@ export class PatternStalenessDetector {
 
   /**
    * 执行全量僵化检测，返回所有告警
+   * MEDIUM-1: 一次性获取执行数据，传给各子检测方法
    */
   async detect(clawId: string): Promise<StalenessAlert[]> {
+    const cache = await this.fetchData(clawId)
+
     const [reflexAlert, emojiAlert, staleAlert, groomAlert] = await Promise.all([
-      this.detectReflexRepetition(clawId),
-      this.detectEmojiMonotony(clawId),
-      this.detectCarapaceStaleness(clawId),
-      this.detectGroomPhraseRepetition(clawId),
+      this.detectReflexRepetition(cache.executions500),
+      this.detectEmojiMonotony(cache.executions500),
+      this.detectCarapaceStaleness(cache.historyTop1),
+      this.detectGroomPhraseRepetition(cache.executions500),
     ])
 
     return [reflexAlert, emojiAlert, staleAlert, groomAlert].filter(
@@ -58,15 +71,17 @@ export class PatternStalenessDetector {
   /**
    * 计算模式健康分
    * 综合 Reflex 多样性 + 模板多样性 + carapace 更新新鲜度
+   * MEDIUM-1: 一次性获取执行数据，传给各子计算方法
    */
   async computeHealthScore(clawId: string): Promise<PatternHealthScore> {
-    const [reflexDiversity, templateDiversity, carapaceFreshness, lastUpdated] =
-      await Promise.all([
-        this.computeReflexDiversity(clawId),
-        this.computeTemplateDiversity(clawId),
-        this.computeCarapaceFreshness(clawId),
-        this.getLastCarapaceUpdateTime(clawId),
-      ])
+    const cache = await this.fetchData(clawId)
+
+    const reflexDiversity = this.computeReflexDiversitySync(cache.executions500)
+    const templateDiversity = this.computeTemplateDiversitySync(cache.executions500)
+    const carapaceFreshness = this.computeCarapaceFreshnessSync(cache.historyTop1)
+    const lastUpdated = cache.historyTop1.length > 0
+      ? cache.historyTop1[0].createdAt
+      : new Date(0).toISOString()
 
     const overall = (reflexDiversity + templateDiversity + carapaceFreshness) / 3
 
@@ -81,42 +96,60 @@ export class PatternStalenessDetector {
 
   /**
    * 触发多样化策略（检测到僵化后触发）
+   * MEDIUM-2: 记录结构化日志，明确说明当前为"建议型"触发（不自动修改配置）
    */
   async triggerDiversification(clawId: string, alert: StalenessAlert): Promise<void> {
+    const prefix = `[PatternStaleness clawId=${clawId}]`
     switch (alert.type) {
       case 'emoji_monotony':
-        // 将 emoji 轮换建议记录到日志（实际配置需要通过 reflex update 命令）
-        // Phase 10 实现：记录建议，不自动修改 reflex 配置（需人工确认）
+        // Phase 10 设计决策：不自动修改 reflex 配置，需人工通过 micromolt apply 确认
+        // 建议命令：clawbuds reflex update phatic_micro_reaction --enable-emoji-rotation
+        process.env['NODE_ENV'] !== 'test' &&
+          process.stdout.write(`${prefix} emoji_monotony: ${alert.diversificationSuggestion}\n`)
         break
 
       case 'carapace_stale':
-        // carapace 长期未更新：不自动修改，只在简报中提醒用户主动审视
+        // Phase 10 设计决策：不自动修改 carapace.md，仅在简报中提醒用户
+        // 建议命令：clawbuds carapace history
+        process.env['NODE_ENV'] !== 'test' &&
+          process.stdout.write(`${prefix} carapace_stale: ${alert.diversificationSuggestion}\n`)
         break
 
       case 'reflex_repetition':
-        // 记录重复模式，待 Micro-Molt 建议系统汇总
+        // 记录重复模式，待 Micro-Molt 建议系统（维度 2）自动汇总
+        process.env['NODE_ENV'] !== 'test' &&
+          process.stdout.write(`${prefix} reflex_repetition: ${alert.description}\n`)
         break
 
       case 'groom_phrase_repetition':
-        // 梳理用语重复：不自动修改，需人工介入
+        // Phase 10 设计决策：不自动修改模板库，需人工介入扩展
+        process.env['NODE_ENV'] !== 'test' &&
+          process.stdout.write(`${prefix} groom_phrase_repetition: ${alert.diversificationSuggestion}\n`)
         break
     }
   }
 
-  // ─── 私有检测方法 ────────────────────────────────────────────────────────
+  // ─── 私有：共享数据获取（MEDIUM-1 核心修复）──────────────────────────────
 
-  private async detectReflexRepetition(clawId: string): Promise<StalenessAlert | null> {
+  private async fetchData(clawId: string): Promise<ExecutionDataCache> {
     const since = new Date(Date.now() - DAYS_30).toISOString()
-    const executions = await this.executionRepo.findByResult(clawId, 'executed', since, 500)
+    const [executions500, historyTop1] = await Promise.all([
+      this.executionRepo.findByResult(clawId, 'executed', since, 500),
+      this.historyRepo.findByOwner(clawId, { limit: 1 }),
+    ])
+    return { executions500, historyTop1 }
+  }
+
+  // ─── 私有检测方法（接受已获取的数据）────────────────────────────────────
+
+  private detectReflexRepetition(executions: ReflexExecutionRecord[]): StalenessAlert | null {
     if (executions.length < 10) return null
 
-    // 统计各 reflex 的执行频率
     const reflexCounts = new Map<string, number>()
     for (const exec of executions) {
       reflexCounts.set(exec.reflexId, (reflexCounts.get(exec.reflexId) ?? 0) + 1)
     }
 
-    // 如果某个 reflex 占总执行次数的 > 80%，则认为存在重复
     const dominantCount = Math.max(...reflexCounts.values())
     const dominantRate = dominantCount / executions.length
 
@@ -134,11 +167,7 @@ export class PatternStalenessDetector {
     return null
   }
 
-  private async detectEmojiMonotony(clawId: string): Promise<StalenessAlert | null> {
-    const since = new Date(Date.now() - DAYS_30).toISOString()
-    const executions = await this.executionRepo.findByResult(clawId, 'executed', since, 500)
-
-    // 筛选包含 emoji 的 phatic_micro_reaction 执行
+  private detectEmojiMonotony(executions: ReflexExecutionRecord[]): StalenessAlert | null {
     const emojiExecutions = executions.filter((exec) => {
       const details = exec.details as Record<string, unknown>
       return details?.['emoji'] !== undefined
@@ -146,7 +175,6 @@ export class PatternStalenessDetector {
 
     if (emojiExecutions.length < 10) return null
 
-    // 统计 emoji 分布
     const emojiCounts = new Map<string, number>()
     for (const exec of emojiExecutions) {
       const emoji = (exec.details as Record<string, unknown>)?.['emoji'] as string
@@ -171,11 +199,10 @@ export class PatternStalenessDetector {
     return null
   }
 
-  private async detectCarapaceStaleness(clawId: string): Promise<StalenessAlert | null> {
-    const history = await this.historyRepo.findByOwner(clawId, { limit: 1 })
-    if (history.length === 0) return null
+  private detectCarapaceStaleness(historyTop1: CarapaceHistoryRecord[]): StalenessAlert | null {
+    if (historyTop1.length === 0) return null
 
-    const lastUpdate = new Date(history[0].createdAt)
+    const lastUpdate = new Date(historyTop1[0].createdAt)
     const daysSinceUpdate = (Date.now() - lastUpdate.getTime()) / (24 * 60 * 60 * 1000)
 
     if (daysSinceUpdate > CARAPACE_STALE_DAYS) {
@@ -189,11 +216,7 @@ export class PatternStalenessDetector {
     return null
   }
 
-  private async detectGroomPhraseRepetition(clawId: string): Promise<StalenessAlert | null> {
-    const since = new Date(Date.now() - DAYS_30).toISOString()
-    const executions = await this.executionRepo.findByResult(clawId, 'executed', since, 200)
-
-    // 筛选包含 groomPhrase 的执行
+  private detectGroomPhraseRepetition(executions: ReflexExecutionRecord[]): StalenessAlert | null {
     const groomExecutions = executions.filter((exec) => {
       const details = exec.details as Record<string, unknown>
       return details?.['groomPhrase'] !== undefined
@@ -201,7 +224,6 @@ export class PatternStalenessDetector {
 
     if (groomExecutions.length < 5) return null
 
-    // 统计短语分布
     const phraseCounts = new Map<string, number>()
     for (const exec of groomExecutions) {
       const phrase = (exec.details as Record<string, unknown>)?.['groomPhrase'] as string
@@ -212,7 +234,8 @@ export class PatternStalenessDetector {
     const maxPhraseCount = Math.max(...phraseCounts.values())
     const maxPhraseRate = maxPhraseCount / total
 
-    if (maxPhraseRate >= EMOJI_MONOTONY_THRESHOLD) {
+    // MEDIUM-6: 使用独立阈值 GROOM_REPETITION_THRESHOLD，而非 emoji 阈值
+    if (maxPhraseRate >= GROOM_REPETITION_THRESHOLD) {
       return {
         type: 'groom_phrase_repetition',
         severity: 'medium',
@@ -223,29 +246,23 @@ export class PatternStalenessDetector {
     return null
   }
 
-  // ─── 健康评分计算辅助方法 ────────────────────────────────────────────────
+  // ─── 健康评分计算辅助（同步，接受已获取数据）────────────────────────────
 
-  private async computeReflexDiversity(clawId: string): Promise<number> {
-    const since = new Date(Date.now() - DAYS_30).toISOString()
-    const executions = await this.executionRepo.findByResult(clawId, 'executed', since, 500)
-    if (executions.length === 0) return 1.0  // 无执行 = 无僵化
+  private computeReflexDiversitySync(executions: ReflexExecutionRecord[]): number {
+    if (executions.length === 0) return 1.0
 
     const uniqueReflexes = new Set(executions.map((e) => e.reflexId)).size
     const totalReflexes = executions.length
-    // 多样性 = unique / total（最高为 1，但超过 0.3 就算健康）
     return Math.min(1, uniqueReflexes / Math.max(1, totalReflexes * 0.3))
   }
 
-  private async computeTemplateDiversity(clawId: string): Promise<number> {
-    const since = new Date(Date.now() - DAYS_30).toISOString()
-    const executions = await this.executionRepo.findByResult(clawId, 'executed', since, 200)
-
+  private computeTemplateDiversitySync(executions: ReflexExecutionRecord[]): number {
     const emojiExecutions = executions.filter((e) => {
       const details = e.details as Record<string, unknown>
       return details?.['emoji'] !== undefined
     })
 
-    if (emojiExecutions.length < 5) return 1.0  // 数据不足 = 假设健康
+    if (emojiExecutions.length < 5) return 1.0
 
     const emojiCounts = new Map<string, number>()
     for (const exec of emojiExecutions) {
@@ -254,24 +271,14 @@ export class PatternStalenessDetector {
     }
 
     const maxRate = Math.max(...emojiCounts.values()) / emojiExecutions.length
-    // 最主导的 emoji 占比越低，多样性越高
     return Math.max(0, 1 - maxRate)
   }
 
-  private async computeCarapaceFreshness(clawId: string): Promise<number> {
-    const history = await this.historyRepo.findByOwner(clawId, { limit: 1 })
-    if (history.length === 0) return 0.5  // 无历史 = 中等分
+  private computeCarapaceFreshnessSync(historyTop1: CarapaceHistoryRecord[]): number {
+    if (historyTop1.length === 0) return 0.5
 
-    const lastUpdate = new Date(history[0].createdAt)
+    const lastUpdate = new Date(historyTop1[0].createdAt)
     const daysSinceUpdate = (Date.now() - lastUpdate.getTime()) / (24 * 60 * 60 * 1000)
-
-    // 0 天 = 1.0，60 天 = 0.0，线性衰减
     return Math.max(0, 1 - daysSinceUpdate / CARAPACE_STALE_DAYS)
-  }
-
-  private async getLastCarapaceUpdateTime(clawId: string): Promise<string> {
-    const history = await this.historyRepo.findByOwner(clawId, { limit: 1 })
-    if (history.length === 0) return new Date(0).toISOString()
-    return history[0].createdAt
   }
 }

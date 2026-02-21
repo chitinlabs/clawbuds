@@ -51,7 +51,7 @@ micromoltCommand
       info('')
 
       if (opts.suggestion !== undefined) {
-        const idx = parseInt(opts.suggestion)
+        const idx = parseInt(opts.suggestion, 10)
         if (isNaN(idx) || idx < 0 || idx >= alerts.length) {
           error(`Invalid suggestion index: ${opts.suggestion}`)
           return
@@ -63,8 +63,9 @@ micromoltCommand
           await applyOrSkip(client, i, alerts[i], opts.yes)
         }
       }
-    } catch (err: any) {
-      error(`获取建议失败: ${err.message}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      error(`获取建议失败: ${message}`)
     }
   })
 
@@ -95,9 +96,10 @@ async function applyOrSkip(
 
   try {
     await client.applyMicroMoltSuggestion({ suggestionIndex: index, confirmed: true })
-    success(`    ✓ 已应用`)
-  } catch (err: any) {
-    error(`    ✗ 应用失败: ${err.message}`)
+    success(`    已应用`)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    error(`    应用失败: ${message}`)
   }
   info('')
 }

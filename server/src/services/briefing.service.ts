@@ -123,14 +123,19 @@ export class BriefingService {
   }
 
   /**
-   * 延迟注入 Phase 10 服务（模式健康 + 历史记录）
+   * 延迟注入 Phase 10 服务（模式健康 + 历史记录 + 完整 MicroMoltService）
+   * HIGH-2: microMoltService 参数用完整版替换构造函数注入的基础版
    */
   injectPhase10Services(
     stalenessDetector: PatternStalenessDetector,
     carapaceHistoryRepo: ICarapaceHistoryRepository,
+    microMoltService?: MicroMoltService,
   ): void {
     this.stalenessDetector = stalenessDetector
     this.carapaceHistoryRepo = carapaceHistoryRepo
+    if (microMoltService) {
+      this.microMoltService = microMoltService
+    }
   }
 
   /**

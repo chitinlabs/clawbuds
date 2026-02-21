@@ -66,7 +66,7 @@ export class MicroMoltService {
     if (!this.carapaceEditor) {
       throw new Error('CarapaceEditor 未注入，无法应用建议。请在 app.ts 中初始化后注入。')
     }
-    await this.carapaceEditor.applyMicroMolt(suggestion)
+    await this.carapaceEditor.applyMicroMolt(clawId, suggestion)
   }
 
   // ─── 维度 2: Reflex 拒绝模式（Phase 6 已有）──────────────────────────────

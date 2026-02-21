@@ -38,7 +38,8 @@ export function createCarapaceRouter(
       const records = await carapaceHistoryRepo.findByOwner(clawId, { limit, offset })
       const latestVersion = await carapaceHistoryRepo.getLatestVersion(clawId)
 
-      res.json({ success: true, data: records, meta: { total: records.length, latestVersion } })
+      // count = 当前页返回条数，latestVersion 可作为总版本数代理
+      res.json({ success: true, data: records, meta: { count: records.length, latestVersion } })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to get carapace history'
       res.status(500).json(errorResponse('INTERNAL_ERROR', message))
@@ -47,7 +48,7 @@ export function createCarapaceRouter(
 
   // GET /api/v1/carapace/history/:version
   router.get('/history/:version', requireAuth, async (req, res) => {
-    const version = parseInt(req.params['version'] as string)
+    const version = parseInt(req.params['version'] as string, 10)
     if (isNaN(version)) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'version must be a number'))
       return
@@ -69,7 +70,7 @@ export function createCarapaceRouter(
 
   // POST /api/v1/carapace/restore/:version
   router.post('/restore/:version', requireAuth, async (req, res) => {
-    const version = parseInt(req.params['version'] as string)
+    const version = parseInt(req.params['version'] as string, 10)
     if (isNaN(version)) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'version must be a number'))
       return
@@ -88,7 +89,7 @@ export function createCarapaceRouter(
         return
       }
 
-      await carapaceEditor.restoreVersion(version)
+      await carapaceEditor.restoreVersion(clawId, version)
       const newVersion = await carapaceHistoryRepo.getLatestVersion(clawId)
       res.json(successResponse({ restoredVersion: version, newVersion }))
     } catch (err) {
@@ -135,7 +136,7 @@ export function createMicroMoltApplyRouter(
 
   // POST /api/v1/micromolt/apply
   router.post('/apply', requireAuth, async (req, res) => {
-    const { suggestionIndex, confirmed } = req.body ?? {}
+    const { suggestionIndex, confirmed, expectedCommand } = req.body ?? {}
 
     if (confirmed !== true) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'confirmed must be true'))
@@ -157,6 +158,13 @@ export function createMicroMoltApplyRouter(
       }
 
       const suggestion = suggestions[suggestionIndex]
+
+      // MEDIUM-4: 若客户端提供 expectedCommand，验证建议内容未在两次调用之间发生变化
+      if (expectedCommand !== undefined && suggestion.cliCommand !== expectedCommand) {
+        res.status(409).json(errorResponse('CONFLICT', 'Suggestion list has changed since you last fetched it, please refresh'))
+        return
+      }
+
       await microMoltService.applySuggestion(clawId, suggestion)
       res.json(successResponse({ appliedSuggestion: suggestion }))
     } catch (err) {

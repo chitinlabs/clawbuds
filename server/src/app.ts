@@ -405,7 +405,7 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     const carapaceFilePath = process.env['CLAWBUDS_CARAPACE_PATH'] ?? ''
     // carapaceEditor 在有 carapaceFilePath 时启用（测试环境不启用）
     const carapaceEditor = carapaceFilePath
-      ? new CarapaceEditor(carapaceHistoryRepository, carapaceFilePath, 'system')
+      ? new CarapaceEditor(carapaceHistoryRepository, carapaceFilePath)
       : null
 
     // 升级 MicroMoltService：注入 Phase 10 新依赖
@@ -417,8 +417,9 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
       carapaceEditor ?? undefined,
     )
 
-    // Phase 10: 注入 PatternStalenessDetector + CarapaceHistoryRepo 到 BriefingService
-    briefingService.injectPhase10Services(stalenessDetector, carapaceHistoryRepository)
+    // Phase 10: 注入 PatternStalenessDetector + CarapaceHistoryRepo + 完整版 MicroMoltService 到 BriefingService
+    // HIGH-2: microMoltServiceFull 替换构造时注入的基础版，使简报建议包含 Phase 10 新维度
+    briefingService.injectPhase10Services(stalenessDetector, carapaceHistoryRepository, microMoltServiceFull)
 
     // Phase 10: 每周日 20:00 触发周报（CLAWBUDS_WEEKLY_BRIEFING_CRON 可配置）
     // 由 Daemon 注册，此处注释保留作为参考
@@ -466,6 +467,9 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1/briefings', createBriefingsRouter(briefingService, clawService))
     app.use('/api/v1/trust', createTrustRouter(trustService, clawService, friendshipService))
     app.use('/api/v1/threads', createThreadsRouter(threadService, clawService))
+    app.use('/api/v1/carapace', searchLimiter)       // Moderate: history queries + restore
+    app.use('/api/v1/pattern-health', searchLimiter)  // Moderate: health score computation
+    app.use('/api/v1/micromolt', webhookLimiter)       // Strict: carapace.md writes
     app.use('/api/v1/carapace', createCarapaceRouter(
       carapaceHistoryRepository,
       stalenessDetector,

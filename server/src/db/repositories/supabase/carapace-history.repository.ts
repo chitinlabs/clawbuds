@@ -32,6 +32,10 @@ function rowToRecord(row: CarapaceHistoryRow): CarapaceHistoryRecord {
   }
 }
 
+/** PostgreSQL UNIQUE 约束冲突错误码 */
+const PG_UNIQUE_VIOLATION = '23505'
+const MAX_VERSION_RETRIES = 3
+
 export class SupabaseCarapaceHistoryRepository implements ICarapaceHistoryRepository {
   constructor(private client: SupabaseClient) {}
 
@@ -42,35 +46,44 @@ export class SupabaseCarapaceHistoryRepository implements ICarapaceHistoryReposi
     changeReason: CarapaceChangeReason
     suggestedBy: 'system' | 'user'
   }): Promise<CarapaceHistoryRecord> {
-    const nextVersion = (await this.getLatestVersion(data.clawId)) + 1
+    // 重试逻辑：防止并发请求产生版本号竞态（UNIQUE(claw_id, version) 约束）
+    for (let attempt = 0; attempt < MAX_VERSION_RETRIES; attempt++) {
+      const nextVersion = (await this.getLatestVersion(data.clawId)) + 1
 
-    const { data: rows, error } = await this.client
-      .from('carapace_history')
-      .insert({
+      const { data: rows, error } = await this.client
+        .from('carapace_history')
+        .insert({
+          id: data.id,
+          claw_id: data.clawId,
+          version: nextVersion,
+          content: data.content,
+          change_reason: data.changeReason,
+          suggested_by: data.suggestedBy,
+        })
+        .select()
+
+      if (error) {
+        // 版本号冲突：重试（最多 MAX_VERSION_RETRIES 次）
+        if (error.code === PG_UNIQUE_VIOLATION && attempt < MAX_VERSION_RETRIES - 1) continue
+        throw new Error(error.message)
+      }
+
+      if (rows && (rows as CarapaceHistoryRow[]).length > 0) {
+        return rowToRecord((rows as CarapaceHistoryRow[])[0])
+      }
+
+      return {
         id: data.id,
-        claw_id: data.clawId,
+        clawId: data.clawId,
         version: nextVersion,
         content: data.content,
-        change_reason: data.changeReason,
-        suggested_by: data.suggestedBy,
-      })
-      .select()
-
-    if (error) throw new Error(error.message)
-
-    if (rows && (rows as CarapaceHistoryRow[]).length > 0) {
-      return rowToRecord((rows as CarapaceHistoryRow[])[0])
+        changeReason: data.changeReason,
+        suggestedBy: data.suggestedBy,
+        createdAt: new Date().toISOString(),
+      }
     }
 
-    return {
-      id: data.id,
-      clawId: data.clawId,
-      version: nextVersion,
-      content: data.content,
-      changeReason: data.changeReason,
-      suggestedBy: data.suggestedBy,
-      createdAt: new Date().toISOString(),
-    }
+    throw new Error(`Failed to create carapace history after ${MAX_VERSION_RETRIES} retries due to version conflicts`)
   }
 
   async getLatestVersion(clawId: string): Promise<number> {

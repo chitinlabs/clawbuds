@@ -47,7 +47,7 @@ describe.each(REPOSITORY_TYPES)('E2E: Carapace History API [%s]', (repositoryTyp
       expect(res.body.success).toBe(true)
       expect(Array.isArray(res.body.data)).toBe(true)
       expect(res.body.meta).toBeDefined()
-      expect(typeof res.body.meta.total).toBe('number')
+      expect(typeof res.body.meta.count).toBe('number')
       expect(typeof res.body.meta.latestVersion).toBe('number')
     })
 

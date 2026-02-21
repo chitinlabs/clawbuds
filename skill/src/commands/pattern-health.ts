@@ -64,7 +64,8 @@ patternHealthCommand.action(async (opts) => {
 
     const lastUpdate = healthScore.lastUpdated.slice(0, 10)
     info(`carapace.md 上次更新: ${lastUpdate}`)
-  } catch (err: any) {
-    error(`获取模式健康报告失败: ${err.message}`)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    error(`获取模式健康报告失败: ${message}`)
   }
 })

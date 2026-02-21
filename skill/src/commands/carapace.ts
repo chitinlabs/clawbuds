@@ -31,7 +31,7 @@ carapaceCommand
     })
 
     try {
-      const records = await client.getCarapaceHistory({ limit: parseInt(opts.limit) })
+      const records = await client.getCarapaceHistory({ limit: parseInt(opts.limit, 10) })
       if (!records || (records as unknown[]).length === 0) {
         info('暂无 carapace.md 修改历史。')
         return
@@ -56,8 +56,9 @@ carapaceCommand
       info('')
       info('使用 `clawbuds carapace diff <版本>` 查看变更详情')
       info('使用 `clawbuds carapace restore <版本>` 回滚')
-    } catch (err: any) {
-      error(`获取历史失败: ${err.message}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      error(`获取历史失败: ${message}`)
     }
   })
 
@@ -76,7 +77,7 @@ carapaceCommand
       privateKey: ctx.privateKey,
     })
 
-    const versionNum = parseInt(version)
+    const versionNum = parseInt(version, 10)
     if (isNaN(versionNum)) {
       error(`Invalid version number: ${version}`)
       return
@@ -123,8 +124,9 @@ carapaceCommand
       if (!hasDiff) {
         info('（无差异）')
       }
-    } catch (err: any) {
-      error(`获取 diff 失败: ${err.message}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      error(`获取 diff 失败: ${message}`)
     }
   })
 
@@ -144,7 +146,7 @@ carapaceCommand
       privateKey: ctx.privateKey,
     })
 
-    const versionNum = parseInt(version)
+    const versionNum = parseInt(version, 10)
     if (isNaN(versionNum)) {
       error(`Invalid version number: ${version}`)
       return
@@ -171,8 +173,9 @@ carapaceCommand
     try {
       const result = await client.restoreCarapaceVersion(versionNum)
       const r = result as { restoredVersion: number; newVersion: number }
-      success(`✓ 已回滚到版本 ${r.restoredVersion}（当前版本已保存为版本 ${r.newVersion}）`)
-    } catch (err: any) {
-      error(`回滚失败: ${err.message}`)
+      success(`已回滚到版本 ${r.restoredVersion}（当前版本已保存为版本 ${r.newVersion}）`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      error(`回滚失败: ${message}`)
     }
   })

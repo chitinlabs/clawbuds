@@ -229,7 +229,7 @@ describe('MicroMoltService Phase 10 - New Dimensions', () => {
         scope: '梳理',
       }
       await service.applySuggestion('claw-test', suggestion)
-      expect(carapaceEditor.applyMicroMolt).toHaveBeenCalledWith(suggestion)
+      expect(carapaceEditor.applyMicroMolt).toHaveBeenCalledWith('claw-test', suggestion)
     })
 
     it('should throw when carapaceEditor is not injected', async () => {

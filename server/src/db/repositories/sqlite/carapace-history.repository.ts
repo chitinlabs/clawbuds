@@ -42,20 +42,25 @@ export class SQLiteCarapaceHistoryRepository implements ICarapaceHistoryReposito
     changeReason: CarapaceChangeReason
     suggestedBy: 'system' | 'user'
   }): Promise<CarapaceHistoryRecord> {
-    const nextVersion = (await this.getLatestVersion(data.clawId)) + 1
     const createdAt = new Date().toISOString()
 
+    // 原子操作：用子查询在单条 INSERT 中计算版本号，避免并发竞态
     this.db
       .prepare(
         `INSERT INTO carapace_history (id, claw_id, version, content, change_reason, suggested_by, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, (SELECT COALESCE(MAX(version), 0) + 1 FROM carapace_history WHERE claw_id = ?), ?, ?, ?, ?)`,
       )
-      .run(data.id, data.clawId, nextVersion, data.content, data.changeReason, data.suggestedBy, createdAt)
+      .run(data.id, data.clawId, data.clawId, data.content, data.changeReason, data.suggestedBy, createdAt)
+
+    // 读取实际插入的版本号（由子查询生成）
+    const inserted = this.db
+      .prepare(`SELECT version FROM carapace_history WHERE id = ?`)
+      .get(data.id) as { version: number }
 
     return {
       id: data.id,
       clawId: data.clawId,
-      version: nextVersion,
+      version: inserted.version,
       content: data.content,
       changeReason: data.changeReason,
       suggestedBy: data.suggestedBy,
