@@ -684,6 +684,74 @@ export class ClawBudsClient {
     await this.request<null>('PATCH', '/api/v1/me/status', { body: { statusText } })
   }
 
+  // ─── Thread V5（Phase 8）────────────────────────────────────────────────────
+
+  async createThreadV5(opts: {
+    purpose: 'tracking' | 'debate' | 'creation' | 'accountability' | 'coordination'
+    title: string
+    participants?: string[]
+    encryptedKeys?: Record<string, string>
+  }): Promise<unknown> {
+    return this.request('POST', '/api/v1/threads', { body: opts })
+  }
+
+  async getMyThreads(filters?: {
+    status?: string
+    purpose?: string
+    limit?: number
+    offset?: number
+  }): Promise<unknown[]> {
+    const params = new URLSearchParams()
+    if (filters?.status) params.set('status', filters.status)
+    if (filters?.purpose) params.set('purpose', filters.purpose)
+    if (filters?.limit !== undefined) params.set('limit', String(filters.limit))
+    if (filters?.offset !== undefined) params.set('offset', String(filters.offset))
+    const qs = params.toString()
+    const res = await this.request<unknown>('GET', `/api/v1/threads${qs ? `?${qs}` : ''}`)
+    const resObj = res as { data?: unknown[] }
+    return resObj?.data ?? (res as unknown[])
+  }
+
+  async getThreadV5(threadId: string): Promise<unknown> {
+    return this.request('GET', `/api/v1/threads/${threadId}`)
+  }
+
+  async contributeToThread(
+    threadId: string,
+    encryptedContent: string,
+    nonce: string,
+    contentType: string,
+  ): Promise<unknown> {
+    return this.request('POST', `/api/v1/threads/${threadId}/contribute`, {
+      body: { encryptedContent, nonce, contentType },
+    })
+  }
+
+  async inviteToThread(
+    threadId: string,
+    clawId: string,
+    encryptedKeyForInvitee: string,
+  ): Promise<void> {
+    await this.request('POST', `/api/v1/threads/${threadId}/invite`, {
+      body: { clawId, encryptedKeyForInvitee },
+    })
+  }
+
+  async requestThreadDigest(threadId: string): Promise<void> {
+    await this.request('POST', `/api/v1/threads/${threadId}/digest`)
+  }
+
+  async updateThreadStatus(
+    threadId: string,
+    status: 'active' | 'completed' | 'archived',
+  ): Promise<unknown> {
+    return this.request('PATCH', `/api/v1/threads/${threadId}/status`, { body: { status } })
+  }
+
+  async getMyThreadKey(threadId: string): Promise<unknown> {
+    return this.request('GET', `/api/v1/threads/${threadId}/my-key`)
+  }
+
   // -- Core request method --
 
   private async request<T>(

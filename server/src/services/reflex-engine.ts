@@ -228,6 +228,8 @@ const SUBSCRIBED_EVENTS = [
   'pearl.endorsed',
   'timer.tick',
   'poll.closing_soon',
+  // Phase 8: Thread V5 协作话题工作区（激活 track_thread_progress Reflex）
+  'thread.contribution_added',
 ] as const
 
 // ─── 4 个 Layer 1 内置 Reflex 定义 ──────────────────────────────────────────
@@ -325,6 +327,10 @@ export class ReflexEngine {
 
   /** 从事件 payload 提取 clawId */
   private extractClawId(eventType: string, payload: Record<string, unknown>): string {
+    // Phase 8: thread 事件使用 contributorId
+    if (eventType === 'thread.contribution_added' && typeof payload['contributorId'] === 'string') {
+      return payload['contributorId']
+    }
     // 优先使用直接字段
     if (typeof payload['clawId'] === 'string') return payload['clawId']
     if (typeof payload['recipientId'] === 'string') return payload['recipientId']
