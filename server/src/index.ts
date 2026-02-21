@@ -12,6 +12,7 @@ import { SchedulerService } from './services/scheduler.service.js'
 const HEARTBEAT_INTERVAL_MS = parseInt(process.env.CLAWBUDS_HEARTBEAT_INTERVAL_MS ?? String(5 * 60 * 1000), 10) // 5 min (PRD §4.1)
 const DECAY_INTERVAL_MS = parseInt(process.env.CLAWBUDS_DECAY_INTERVAL_MS ?? String(24 * 60 * 60 * 1000), 10)   // 24 h
 const CLEANUP_INTERVAL_MS = parseInt(process.env.CLAWBUDS_CLEANUP_INTERVAL_MS ?? String(24 * 60 * 60 * 1000), 10) // 24 h
+const TRUST_DECAY_INTERVAL_MS = parseInt(process.env.CLAWBUDS_TRUST_DECAY_INTERVAL_MS ?? String(30 * 24 * 60 * 60 * 1000), 10) // 30 days (Phase 7)
 
 async function buildRepositoryOptions(): Promise<RepositoryFactoryOptions> {
   if (config.databaseType === 'supabase') {
@@ -72,4 +73,13 @@ if (ctx.heartbeatService && ctx.relationshipService) {
   scheduler.start()
   // eslint-disable-next-line no-console
   console.log('[scheduler] started: heartbeat, decay, cleanup timers registered')
+}
+
+// ─── Phase 7: 月度信任衰减 ───
+if (ctx.trustService) {
+  setInterval(() => {
+    ctx.trustService!.decayAll().catch(() => {})
+  }, TRUST_DECAY_INTERVAL_MS)
+  // eslint-disable-next-line no-console
+  console.log('[scheduler] trust monthly decay registered')
 }

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, dev, feat/phase-4-prd, feat/phase-5-prd, feat/phase-6-prd]
+    branches: [main, dev, feat/phase-4-prd, feat/phase-5-prd, feat/phase-6-prd, feat/phase-7-prd]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -23,7 +23,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter shared build
-      - run: pnpm --filter server test
+      - name: Run Server Tests
+        run: pnpm --filter server test
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   web-tests:
     name: Web Tests

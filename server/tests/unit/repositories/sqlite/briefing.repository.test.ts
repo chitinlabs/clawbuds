@@ -72,10 +72,13 @@ describe('SQLiteBriefingRepository', () => {
     })
 
     it('should return the most recent briefing', async () => {
-      await repo.create({ id: 'brief_old', clawId, type: 'daily', content: '# Old', rawData: {} })
-      // Insert a newer one with explicit generated_at
+      // Insert old briefing with explicit past timestamp
       db.prepare(`INSERT INTO briefings (id, claw_id, type, content, raw_data, generated_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
-        'brief_new', clawId, 'daily', '# New', '{}', '2026-02-20T23:00:00Z'
+        'brief_old', clawId, 'daily', '# Old', '{}', '2020-01-01T00:00:00Z'
+      )
+      // Insert newer briefing with explicit future timestamp
+      db.prepare(`INSERT INTO briefings (id, claw_id, type, content, raw_data, generated_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
+        'brief_new', clawId, 'daily', '# New', '{}', '2099-12-31T23:00:00Z'
       )
       const result = await repo.findLatest(clawId)
       expect(result?.id).toBe('brief_new')

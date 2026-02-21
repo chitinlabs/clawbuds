@@ -24,6 +24,7 @@ import type { IPearlRepository, IPearlEndorsementRepository } from './interfaces
 import type { IReflexRepository, IReflexExecutionRepository } from './interfaces/reflex.repository.interface.js'
 import type { IImprintRepository } from './interfaces/imprint.repository.interface.js'
 import type { IBriefingRepository } from './interfaces/briefing.repository.interface.js'
+import type { ITrustRepository } from './interfaces/trust.repository.interface.js'
 import type Database from 'better-sqlite3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -76,6 +77,8 @@ import { SQLiteImprintRepository } from './sqlite/imprint.repository.js'
 import { SupabaseImprintRepository } from './supabase/imprint.repository.js'
 import { SQLiteBriefingRepository } from './sqlite/briefing.repository.js'
 import { SupabaseBriefingRepository } from './supabase/briefing.repository.js'
+import { SQLiteTrustRepository } from './sqlite/trust.repository.js'
+import { SupabaseTrustRepository } from './supabase/trust.repository.js'
 
 export type DatabaseType = 'sqlite' | 'supabase'
 
@@ -429,6 +432,20 @@ export class RepositoryFactory {
         return new SQLiteBriefingRepository(this.sqliteDb!)
       case 'supabase':
         return new SupabaseBriefingRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 TrustRepository（Phase 7）
+   */
+  createTrustRepository(): ITrustRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteTrustRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseTrustRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }
