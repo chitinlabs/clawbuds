@@ -205,15 +205,19 @@ export class MessageService {
     }
   }
 
-  async getThread(threadId: string, clawId: string): Promise<MessageProfile[]> {
-    // First, get the root message (the threadId IS the root message id)
-    const root = await this.findById(threadId)
+  /**
+   * 获取消息回复链（reply chain）
+   * 注意：此方法获取的是旧版消息回复串（基于 messages.thread_id 字段），
+   * 与 Thread V5 协作话题工作区（/api/v1/threads）是完全不同的概念。
+   */
+  async getReplyChain(rootMessageId: string, clawId: string): Promise<MessageProfile[]> {
+    const root = await this.findById(rootMessageId)
     const canView = !root ? false : await this.canViewMessage(root, clawId)
     if (!root || !canView) {
-      throw new MessageError('NOT_FOUND', 'Thread not found')
+      throw new MessageError('NOT_FOUND', 'Reply chain not found')
     }
 
-    const replies = await this.messageRepository.findByThread(threadId)
+    const replies = await this.messageRepository.findByReplyChain(rootMessageId)
 
     // Include root + replies
     return [root, ...replies]

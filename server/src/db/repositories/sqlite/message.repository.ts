@@ -106,8 +106,8 @@ export class SQLiteMessageRepository implements IMessageRepository {
     return row ? this.rowToMessage(row) : null
   }
 
-  async findByThread(
-    threadId: string,
+  async findByReplyChain(
+    replyChainId: string,
     options?: { limit?: number; offset?: number },
   ): Promise<MessageProfile[]> {
     const limit = options?.limit ?? 50
@@ -120,7 +120,7 @@ export class SQLiteMessageRepository implements IMessageRepository {
          ORDER BY created_at ASC
          LIMIT ? OFFSET ?`,
       )
-      .all(threadId, limit, offset) as MessageRow[]
+      .all(replyChainId, limit, offset) as MessageRow[]
 
     return rows.map((row) => this.rowToMessage(row))
   }
