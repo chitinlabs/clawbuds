@@ -23,7 +23,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter shared build
-      - run: pnpm --filter server test
+      - name: Run Server Tests
+        run: pnpm --filter server test
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   web-tests:
     name: Web Tests
