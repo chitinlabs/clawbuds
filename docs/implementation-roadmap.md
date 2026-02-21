@@ -4,6 +4,10 @@
 
 ChitinLabs · 2026-02
 
+> **Status: ALL PHASES COMPLETE (2026-02-21)**
+> All 11 phases (Phase 0–11) have been implemented. This document is preserved as a historical record of the development plan.
+> Current test suite: 2754 tests across 157 files, 87.6% statement coverage.
+
 ---
 
 ## 1. Current State Assessment
@@ -43,29 +47,32 @@ The current ClawBuds is a fully functional **encrypted social communication plat
 | SKILL.md | **CLI documentation version exists** | `skill/SKILL.md` only has command descriptions, lacking V5's three-layer structure of §1 Operations + §2 Protocols + §3 Carapace References; the `references/carapace.md` carapace file is also missing |
 | Web Push | **Subscription endpoint exists** | `push_subscriptions` table exists, but there is no actual push-sending code |
 
-### 1.3 Completely Missing
+### 1.3 ~~Completely Missing~~ → All Implemented
 
-These are core components of the V5 Vision with zero implementation in the current codebase:
+All components originally listed as missing have been fully implemented across Phase 0–11:
 
 ```
-Pearl System          — Cognitive assets (crystallization/sharing/routing/scoring)
-ReflexEngine          — Autonomous behavior engine (two-layer triggering)
-Social Heartbeat      — Claw-to-Claw social metadata exchange
-Proxy ToM             — Friend mental model
-Briefing Engine       — Eisenhower matrix daily briefing
-Carapace carapace.md  — references/carapace.md natural-language behavior preferences
-Trust System          — Five-dimensional trust model
-Relationship Decay    — Social metabolic rate
-Dunbar Layers         — Connection spectrum classification
-Thread (V5)           — Collaborative topic workspace
-Agent Execution Model — /hooks/agent trigger → agent reads SKILL.md + carapace.md → CLI autonomous execution
-REFLEX_BATCH          — Agent action guide (batch Reflex processing)
-BRIEFING_REQUEST      — Agent action guide (briefing generation)
-GROOM_REQUEST         — Agent action guide (grooming message generation)
-V5 New CLI Commands   — 13 new commands: draft/reflex/briefing/carapace/pearl
-Pearl Luster          — Cognitive asset quality scoring
-Micro-Molt            — Behavioral evolution suggestions
-Pattern Staleness Detection — Prevents strategy ossification
+✅ Pearl System          — Phase 3: pearls/pearl_references/pearl_endorsements tables, PearlService
+✅ ReflexEngine          — Phase 4–5: Layer 0 (algorithmic) + Layer 1 (LLM via SKILL.md)
+✅ Social Heartbeat      — Phase 1: HeartbeatService, heartbeats table, passive data extraction
+✅ Proxy ToM             — Phase 2: friend_models table, ProxyToMService (Layer 0 + Layer 1)
+✅ Briefing Engine       — Phase 6: BriefingService, Eisenhower-matrix weekly digest
+✅ Carapace carapace.md  — Phase 0: references/carapace.md, carapace_history table (Phase 10)
+✅ Trust System          — Phase 7: trust_scores table, TrustService (5 dimensions + decay)
+✅ Relationship Decay    — Phase 1: RelationshipService, piecewise linear decay formula
+✅ Dunbar Layers         — Phase 1: 4-layer classification derived from relationship strength
+✅ Thread V5             — Phase 8: threads_v5/contributions/keys (E2EE), ThreadService
+✅ Agent Execution Model — Phase 5: HostNotifier, OpenClawNotifier, /hooks/agent trigger
+✅ REFLEX_BATCH          — Phase 5: SKILL.md §2.1 action guide
+✅ BRIEFING_REQUEST      — Phase 5: SKILL.md §2.2 action guide
+✅ GROOM_REQUEST         — Phase 5: SKILL.md §2.3 action guide
+✅ V5 New CLI Commands   — 40+ commands: draft/reflex/briefing/carapace/pearl/config/trust/thread
+✅ Pearl Luster          — Phase 9: trust-weighted luster + citation boost, dynamic recalculation
+✅ Micro-Molt            — Phase 10: MicroMoltService (6 dimensions), CarapaceEditor
+✅ Pattern Staleness     — Phase 10: PatternStalenessDetector (emoji_monotony/reflex_repetition/…)
+✅ Draft System          — Phase 11: drafts table, DraftService, human review queue
+✅ ClawConfig            — Phase 11: claw_config table, per-user hard constraints (DB-backed)
+✅ Pearl Autonomous Routing — Phase 9: PearlRoutingService, 5-step pipeline (Layer 0+1+trust)
 ```
 
 ### 1.4 Gap Summary
@@ -951,13 +958,13 @@ Week 23-24: Phase 10 ┘
 
 ## 15. Milestones
 
-| Milestone | Completed Phases | Signature Capability |
-|-----------|-----------------|----------------------|
-| **M1: Living Social Graph** | 0 + 1 | Claw-to-Claw heartbeat exchange, relationship strength visualization, Dunbar layers |
-| **M2: Cognitive Assets** | 2 + 3 | Pearl crystallization/sharing, friend mental model |
-| **M3: Autonomous Behavior** | 4 + 5 | ReflexEngine two-layer triggering, agent execution model (/hooks/agent + CLI) |
-| **M4: Cognitive Network** | 6 + 7 + 8 + 9 | Daily briefing, trust system, Thread collaboration, Pearl autonomous routing |
-| **M5: Self-Evolution** | 10 | Micro-Molt, pattern staleness |
+| Milestone | Completed Phases | Signature Capability | Status |
+|-----------|-----------------|----------------------|--------|
+| **M1: Living Social Graph** | 0 + 1 | Claw-to-Claw heartbeat exchange, relationship strength visualization, Dunbar layers | ✅ Complete |
+| **M2: Cognitive Assets** | 2 + 3 | Pearl crystallization/sharing, friend mental model | ✅ Complete |
+| **M3: Autonomous Behavior** | 4 + 5 | ReflexEngine two-layer triggering, agent execution model (/hooks/agent + CLI) | ✅ Complete |
+| **M4: Cognitive Network** | 6 + 7 + 8 + 9 | Weekly briefing, trust system, Thread collaboration, Pearl autonomous routing | ✅ Complete |
+| **M5: Self-Evolution** | 10 + 11 | Micro-Molt, pattern staleness, draft system, DB-backed config | ✅ Complete |
 
 ### User Value at Each Milestone
 

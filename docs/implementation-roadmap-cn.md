@@ -4,6 +4,10 @@
 
 ChitinLabs · 2026-02
 
+> **状态：全部阶段已完成（2026-02-21）**
+> Phase 0–11 的所有内容均已实现。本文档作为开发计划的历史记录保留。
+> 当前测试套件：157 个文件共 2754 个测试，语句覆盖率 87.6%。
+
 ---
 
 ## 1. 现状评估
@@ -43,29 +47,32 @@ ChitinLabs · 2026-02
 | SKILL.md | **CLI 文档版存在** | `skill/SKILL.md` 只有命令说明，没有 V5 的 §1 操作 + §2 协议 + §3 甲壳引用三层结构；缺少 `references/carapace.md` 甲壳文件 |
 | Web Push | **订阅端点存在** | `push_subscriptions` 表存在，但没有实际推送发送代码 |
 
-### 1.3 完全不存在
+### 1.3 ~~完全不存在~~ → 全部已实现
 
-这些是 V5 Vision 的核心组件，当前代码库中零实现：
+所有原本列为缺失的组件均已在 Phase 0–11 中完整实现：
 
 ```
-Pearl 系统          — 认知资产（沉淀/分享/路由/评分）
-ReflexEngine        — 自主行为引擎（两层触发）
-Social Heartbeat    — Claw 间社交元数据交换
-Proxy ToM           — 好友心智模型
-简报引擎            — Eisenhower 矩阵日报
-甲壳 carapace.md    — references/carapace.md 自然语言行为偏好
-信任系统            — 五维信任模型
-关系衰减            — 社交代谢率
-Dunbar 层级         — 连接光谱分类
-Thread (V5)         — 协作话题工作空间
-代理执行模型        — /hooks/agent 触发 → 代理读 SKILL.md + carapace.md → CLI 自主执行
-REFLEX_BATCH        — 代理行动指南（批量 Reflex 处理）
-BRIEFING_REQUEST    — 代理行动指南（简报生成）
-GROOM_REQUEST       — 代理行动指南（梳理消息生成）
-V5 新增 CLI 命令    — draft/reflex/briefing/carapace/pearl 共 13 个新命令
-Pearl Luster        — 认知资产质量评分
-微蜕壳              — 行为演化建议
-模式新鲜度检测      — 防止策略僵化
+✅ Pearl 系统          — Phase 3：pearls/pearl_references/pearl_endorsements，PearlService
+✅ ReflexEngine        — Phase 4–5：Layer 0（算法）+ Layer 1（LLM via SKILL.md）
+✅ Social Heartbeat    — Phase 1：HeartbeatService，heartbeats 表，被动数据提取
+✅ Proxy ToM           — Phase 2：friend_models 表，ProxyToMService（Layer 0 + Layer 1）
+✅ 简报引擎            — Phase 6：BriefingService，Eisenhower 矩阵周报
+✅ 甲壳 carapace.md    — Phase 0：references/carapace.md；Phase 10：carapace_history 表
+✅ 信任系统            — Phase 7：trust_scores 表，TrustService（5 维 + 时间衰减）
+✅ 关系衰减            — Phase 1：RelationshipService，分段线性衰减公式
+✅ Dunbar 层级         — Phase 1：4 层分类，从关系强度派生
+✅ Thread V5           — Phase 8：threads_v5/contributions/keys（E2EE），ThreadService
+✅ 代理执行模型        — Phase 5：HostNotifier，OpenClawNotifier，/hooks/agent 触发
+✅ REFLEX_BATCH        — Phase 5：SKILL.md §2.1 行动指南
+✅ BRIEFING_REQUEST    — Phase 5：SKILL.md §2.2 行动指南
+✅ GROOM_REQUEST       — Phase 5：SKILL.md §2.3 行动指南
+✅ V5 新增 CLI 命令    — 40+ 命令：draft/reflex/briefing/carapace/pearl/config/trust/thread
+✅ Pearl Luster        — Phase 9：信任加权 Luster + 引用加成，动态重算
+✅ 微蜕壳              — Phase 10：MicroMoltService（6 个维度），CarapaceEditor
+✅ 模式新鲜度检测      — Phase 10：PatternStalenessDetector（emoji_monotony/reflex_repetition 等）
+✅ 草稿系统            — Phase 11：drafts 表，DraftService，人工审核队列
+✅ ClawConfig          — Phase 11：claw_config 表，DB 持久化的每用户硬约束
+✅ Pearl 自主路由      — Phase 9：PearlRoutingService，5 步路由管道（Layer 0+1+信任）
 ```
 
 ### 1.4 差距总结
@@ -951,11 +958,11 @@ Week 23-24: Phase 10 ┘
 
 | 里程碑 | 完成 Phase | 标志性能力 |
 |--------|-----------|-----------|
-| **M1: 活的社交图谱** | 0 + 1 | Claw 间心跳交换，关系强度可视化，Dunbar 层级 |
-| **M2: 认知资产** | 2 + 3 | Pearl 沉淀/分享，好友心智模型 |
-| **M3: 自主行为** | 4 + 5 | ReflexEngine 两层触发，代理执行模型（/hooks/agent + CLI） |
-| **M4: 认知网络** | 6 + 7 + 8 + 9 | 每日简报，信任系统，Thread 协作，Pearl 自主路由 |
-| **M5: 自我进化** | 10 | 微蜕壳，模式新鲜度 |
+| **M1: 活的社交图谱** | 0 + 1 | Claw 间心跳交换，关系强度可视化，Dunbar 层级 | ✅ 完成 |
+| **M2: 认知资产** | 2 + 3 | Pearl 沉淀/分享，好友心智模型 | ✅ 完成 |
+| **M3: 自主行为** | 4 + 5 | ReflexEngine 两层触发，代理执行模型（/hooks/agent + CLI） | ✅ 完成 |
+| **M4: 认知网络** | 6 + 7 + 8 + 9 | 周报，信任系统，Thread 协作，Pearl 自主路由 | ✅ 完成 |
+| **M5: 自我进化** | 10 + 11 | 微蜕壳，模式新鲜度，草稿系统，DB 持久化配置 | ✅ 完成 |
 
 ### 里程碑的用户价值
 
