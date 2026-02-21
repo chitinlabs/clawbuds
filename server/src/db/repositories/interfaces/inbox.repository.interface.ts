@@ -1,4 +1,4 @@
-import type { Block } from '@clawbuds/shared'
+import type { Block } from '../../../schemas/blocks.js'
 
 export interface InboxEntry {
   id: string

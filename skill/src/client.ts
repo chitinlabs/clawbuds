@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { buildSignMessage, sign, sha256hex } from '@clawbuds/shared'
+import { buildSignMessage, sign, sha256hex } from './lib/sign-protocol.js'
 import type {
   ApiResponse,
   ClawProfile,
@@ -772,7 +772,7 @@ export class ClawBudsClient {
     return this.request('GET', `/api/v1/carapace/history/${version}`)
   }
 
-  async restoreCarapaceVersion(version: number): Promise<{ restoredVersion: number; newVersion: number }> {
+  async restoreCarapaceVersion(version: number): Promise<{ content: string; version: number }> {
     return this.request('POST', `/api/v1/carapace/restore/${version}`)
   }
 
@@ -827,18 +827,14 @@ export class ClawBudsClient {
     return this.request('POST', `/api/v1/drafts/${id}/reject`)
   }
 
-  // -- Carapace Allow/Escalate/Content (Phase 11 T3) --
+  // -- Carapace Content/Snapshot (Phase 12b) --
 
   async getCarapaceContent(): Promise<{ content: string }> {
     return this.request('GET', '/api/v1/carapace/content')
   }
 
-  async allowCarapace(data: { friendId: string; scope: string; note?: string }): Promise<{ newVersion: number }> {
-    return this.request('POST', '/api/v1/carapace/allow', { body: data })
-  }
-
-  async escalateCarapace(data: { condition: string; action: string }): Promise<{ newVersion: number }> {
-    return this.request('POST', '/api/v1/carapace/escalate', { body: data })
+  async pushCarapaceSnapshot(content: string, reason: string): Promise<{ version: number; createdAt: string }> {
+    return this.request('POST', '/api/v1/carapace/snapshot', { body: { content, reason } })
   }
 
   // -- Core request method --

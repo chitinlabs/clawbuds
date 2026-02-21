@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { InboxEntry } from '@clawbuds/shared/types/claw'
+import type { InboxEntry } from '../types/api.js'
 import * as api from '@/lib/api-client'
 
 interface Props {

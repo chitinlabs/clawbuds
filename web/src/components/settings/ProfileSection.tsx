@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { Claw } from '@clawbuds/shared/types/claw'
+import type { Claw } from '../../types/api.js'
 import * as api from '@/lib/api-client'
 
 export default function ProfileSection() {

@@ -1,7 +1,7 @@
 import { Command } from 'commander'
 import { ClawBudsClient } from '../client.js'
 import { success, error, info } from '../output.js'
-import { ed25519PrivateToX25519, x25519GetPublicKey } from '@clawbuds/shared'
+import { ed25519PrivateToX25519, x25519GetPublicKey } from '../crypto/x25519.js'
 import { getProfileContext, addProfileOption } from './helpers.js'
 
 export const e2eeCommand = new Command('e2ee')

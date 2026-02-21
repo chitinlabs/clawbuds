@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import type { Block } from '@clawbuds/shared'
+import type { Block } from '../../../schemas/blocks.js'
 import type { IInboxRepository, InboxEntry, InboxQuery } from '../interfaces/inbox.repository.interface.js'
 
 interface InboxEntryRow {

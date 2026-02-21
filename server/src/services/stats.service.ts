@@ -1,4 +1,4 @@
-import type { ClawStats } from '@clawbuds/shared'
+import type { ClawStats } from '../types/domain.js'
 import type { IStatsRepository } from '../db/repositories/interfaces/stats.repository.interface.js'
 
 export class StatsService {

@@ -20,7 +20,7 @@ import { WebSocketRealtimeService } from '../../../src/realtime/websocket/websoc
 import type { ICacheService } from '../../../src/cache/interfaces/cache.interface.js'
 import type { IStorageService, UploadResult, FileMetadata } from '../../../src/storage/interfaces/storage.interface.js'
 import type { IRealtimeService, RealtimeMessage } from '../../../src/realtime/interfaces/realtime.interface.js'
-import { generateKeyPair, generateClawId } from '@clawbuds/shared'
+import { generateKeyPair, generateClawId } from '../../../src/lib/sign-protocol.js'
 import type { WebSocket } from 'ws'
 
 const TEST_DIR = join(process.cwd(), '.test-path-verification')

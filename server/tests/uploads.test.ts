@@ -9,7 +9,7 @@ const MINIMAL_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
   'base64',
 )
-import { generateKeyPair, sign, buildSignMessage } from '@clawbuds/shared'
+import { generateKeyPair, sign, buildSignMessage } from '../src/lib/sign-protocol.js'
 import { createTestContext, destroyTestContext, getAvailableRepositoryTypes, type TestContext } from './e2e/helpers.js'
 
 function signedHeaders(

@@ -18,7 +18,7 @@ import {
   x25519SharedSecret,
   deriveSessionKey,
   aesDecrypt,
-} from '@clawbuds/shared'
+} from '../../src/lib/x25519.js'
 import type { TestContext, TestClaw, RepositoryType } from './helpers.js'
 import {
   createTestContext,

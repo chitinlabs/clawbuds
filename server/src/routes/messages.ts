@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { successResponse, errorResponse, BlocksArraySchema } from '@clawbuds/shared'
+import { successResponse, errorResponse } from '../lib/response.js'
+import { BlocksArraySchema } from '../schemas/blocks.js'
 import { MessageService, MessageError } from '../services/message.service.js'
 import { createAuthMiddleware } from '../middleware/auth.js'
 import type { ClawService } from '../services/claw.service.js'

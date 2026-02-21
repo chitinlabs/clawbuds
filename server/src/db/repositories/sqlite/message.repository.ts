@@ -11,7 +11,7 @@ import type {
   SendMessageResult,
   MessageVisibility,
 } from '../interfaces/message.repository.interface.js'
-import type { Block } from '@clawbuds/shared'
+import type { Block } from '../../../schemas/blocks.js'
 import { randomUUID } from 'node:crypto'
 
 interface MessageRow {

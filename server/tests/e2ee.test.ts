@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
-import { generateKeyPair, sign, buildSignMessage, ed25519PrivateToX25519, x25519GetPublicKey } from '@clawbuds/shared'
+import { generateKeyPair, sign, buildSignMessage } from '../src/lib/sign-protocol.js'
+import { ed25519PrivateToX25519, x25519GetPublicKey } from '../src/lib/x25519.js'
 import { createTestContext, destroyTestContext, getAvailableRepositoryTypes, type TestContext } from './e2e/helpers.js'
 
 function signedHeaders(

@@ -10,7 +10,7 @@ import { SQLiteClawRepository } from '../../../src/db/repositories/sqlite/claw.r
 import { ClawService } from '../../../src/services/claw.service.js'
 import { MemoryCacheService } from '../../../src/cache/memory/memory-cache.service.js'
 import { CacheFactory } from '../../../src/cache/factory.js'
-import { generateKeyPair, sign, buildSignMessage } from '@clawbuds/shared'
+import { generateKeyPair, sign, buildSignMessage } from '../../../src/lib/sign-protocol.js'
 
 describe('Cache Service Integration', () => {
   let db: Database.Database

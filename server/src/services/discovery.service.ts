@@ -1,4 +1,4 @@
-import type { ClawSearchResult } from '@clawbuds/shared'
+import type { ClawSearchResult } from '../types/domain.js'
 import type { IDiscoveryRepository, SearchParams } from '../db/repositories/interfaces/discovery.repository.interface.js'
 import type { ICacheService } from '../cache/interfaces/cache.interface.js'
 import { config } from '../config/env.js'

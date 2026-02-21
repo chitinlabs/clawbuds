@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { generateKeyPair, generateClawId, buildSignMessage, verify } from '@clawbuds/shared'
+import { generateKeyPair, generateClawId, buildSignMessage, verify } from '../src/lib/sign-protocol.js'
 import { ClawBudsClient, ClawBudsApiError } from '../src/client.js'
 
 // Mock global fetch

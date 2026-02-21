@@ -162,6 +162,14 @@ export class SqliteWebhookRepository implements IWebhookRepository {
     return rows.map(deliveryRowToProfile)
   }
 
+  async findAllDeliveries(limit: number): Promise<WebhookDeliveryProfile[]> {
+    const stmt = this.db.prepare(
+      `SELECT * FROM webhook_deliveries ORDER BY created_at DESC LIMIT ?`
+    )
+    const rows = stmt.all(limit) as WebhookDeliveryRow[]
+    return Promise.resolve(rows.map(deliveryRowToProfile))
+  }
+
   async recordDelivery(input: RecordDeliveryInput): Promise<WebhookDeliveryProfile> {
     const row = this.db
       .prepare(

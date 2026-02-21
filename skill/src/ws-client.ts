@@ -1,5 +1,5 @@
 import WebSocket from 'ws'
-import { buildSignMessage, sign } from '@clawbuds/shared'
+import { buildSignMessage, sign } from './lib/sign-protocol.js'
 import type { WsEvent } from './types.js'
 
 const MAX_RETRIES = 10

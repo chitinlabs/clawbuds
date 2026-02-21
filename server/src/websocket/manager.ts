@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import type { Server, IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
-import { verify, buildSignMessage } from '@clawbuds/shared'
+import { verify, buildSignMessage } from '../lib/sign-protocol.js'
 import type { ClawService } from '../services/claw.service.js'
 import type { InboxService } from '../services/inbox.service.js'
 import type { EventBus } from '../services/event-bus.js'

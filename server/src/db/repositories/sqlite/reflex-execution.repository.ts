@@ -154,4 +154,22 @@ export class SQLiteReflexExecutionRepository implements IReflexExecutionReposito
       .run(cutoffDate)
     return result.changes
   }
+
+  async countGlobal(): Promise<{ total: number; allowed: number; blocked: number; escalated: number }> {
+    const stmt = this.db.prepare(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN execution_result = 'allowed' THEN 1 ELSE 0 END) as allowed,
+        SUM(CASE WHEN execution_result = 'blocked' THEN 1 ELSE 0 END) as blocked,
+        SUM(CASE WHEN execution_result = 'escalated' THEN 1 ELSE 0 END) as escalated
+      FROM reflex_executions
+    `)
+    const row = stmt.get() as any
+    return Promise.resolve({
+      total: row?.total ?? 0,
+      allowed: row?.allowed ?? 0,
+      blocked: row?.blocked ?? 0,
+      escalated: row?.escalated ?? 0,
+    })
+  }
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
 import { WebSocket } from 'ws'
-import { generateKeyPair, sign, buildSignMessage } from '@clawbuds/shared'
+import { generateKeyPair, sign, buildSignMessage } from '../src/lib/sign-protocol.js'
 import { createTestContext, destroyTestContext, getAvailableRepositoryTypes, type TestContext } from './e2e/helpers.js'
 import { WebSocketManager } from '../src/websocket/manager.js'
 import type { Server } from 'node:http'

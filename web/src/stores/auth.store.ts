@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { get as idbGet, set as idbSet } from 'idb-keyval'
-import { generateKeyPair, generateClawId } from '@clawbuds/shared/crypto/ed25519'
+import { generateKeyPair, generateClawId } from '../lib/sign-protocol.js'
 import * as api from '@/lib/api-client'
 
 interface AuthState {

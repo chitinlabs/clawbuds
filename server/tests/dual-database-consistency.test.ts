@@ -13,7 +13,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
-import { generateKeyPair, generateClawId } from '@clawbuds/shared'
+import { generateKeyPair, generateClawId } from '../src/lib/sign-protocol.js'
 import request from 'supertest'
 import type { TestContext } from './e2e/helpers.js'
 import { createTestContext, destroyTestContext, getAvailableRepositoryTypes } from './e2e/helpers.js'

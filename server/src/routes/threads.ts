@@ -13,7 +13,7 @@
 
 import { Router, type Response } from 'express'
 import { z } from 'zod'
-import { successResponse, errorResponse } from '@clawbuds/shared'
+import { successResponse, errorResponse } from '../lib/response.js'
 import { createAuthMiddleware } from '../middleware/auth.js'
 import type { ThreadService } from '../services/thread.service.js'
 import { ThreadServiceError } from '../services/thread.service.js'

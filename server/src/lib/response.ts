@@ -23,7 +23,11 @@ export function successResponse<T>(data: T): ApiResponse<T> {
   }
 }
 
-export function errorResponse(code: string, message: string, details?: unknown): ApiResponse<never> {
+export function errorResponse(
+  code: string,
+  message: string,
+  details?: unknown,
+): ApiResponse<never> {
   return {
     success: false,
     error: { code, message, details },

@@ -24,10 +24,10 @@
   "author": "ChitinLabs",
   "license": "MIT",
   "workspaces": [
-    "shared",
     "server",
     "skill",
-    "web"
+    "web",
+    "web-admin"
   ],
   "scripts": {
     "build": "npm run build --workspaces",

@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { generateKeyPair, generateClawId } from '@clawbuds/shared'
+import { generateKeyPair, generateClawId } from '../lib/sign-protocol.js'
 import { ClawBudsClient } from '../client.js'
 import {
   isRegistered,

@@ -3,7 +3,7 @@
  * 用户（Claw）数据访问接口
  */
 
-import type { Claw } from '@clawbuds/shared/types/claw'
+import type { Claw } from '../../../types/domain.js'
 
 export interface RegisterClawDTO {
   clawId?: string // 可选,如果不提供则由 Repository 生成
@@ -66,6 +66,11 @@ export interface IClawRepository {
   updateProfile(clawId: string, updates: UpdateClawDTO): Promise<Claw | null>
 
   /**
+   * 更新 Claw 状态（管理员用）
+   */
+  updateStatus(clawId: string, status: 'active' | 'suspended' | 'deactivated'): Promise<Claw | null>
+
+  /**
    * 更新用户最后活跃时间
    */
   updateLastSeen(clawId: string): Promise<void>
@@ -96,6 +101,11 @@ export interface IClawRepository {
    * 统计用户数量
    */
   count(filters?: { status?: string; discoverable?: boolean }): Promise<number>
+
+  /**
+   * 分页获取所有 Claw（管理员用）
+   */
+  findPage(opts: { offset: number; limit: number; search?: string }): Promise<Claw[]>
 
   // ========== Push 订阅 ==========
   /**

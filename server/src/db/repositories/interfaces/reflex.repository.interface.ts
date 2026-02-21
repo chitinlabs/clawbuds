@@ -118,4 +118,9 @@ export interface IReflexExecutionRepository {
 
   /** 删除旧记录（保留最近 N 天，默认 30 天） */
   deleteOlderThan(cutoffDate: string): Promise<number>
+
+  /**
+   * 统计全局 Reflex 执行次数（管理员用）
+   */
+  countGlobal(): Promise<{ total: number; allowed: number; blocked: number; escalated: number }>
 }

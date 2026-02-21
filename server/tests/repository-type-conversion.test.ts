@@ -10,7 +10,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from 'vitest'
-import { generateKeyPair } from '@clawbuds/shared'
+import { generateKeyPair } from '../src/lib/sign-protocol.js'
 import request from 'supertest'
 import type { TestContext } from './e2e/helpers.js'
 import {

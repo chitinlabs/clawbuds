@@ -202,6 +202,21 @@ export class SupabaseWebhookRepository implements IWebhookRepository {
     return (data || []).map((row: any) => deliveryRowToProfile(row as WebhookDeliveryRow))
   }
 
+  async findAllDeliveries(limit: number): Promise<WebhookDeliveryProfile[]> {
+    const { data, error } = await this.supabase
+      .from('webhook_deliveries')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+      .throwOnError()
+
+    if (error) {
+      throw error
+    }
+
+    return (data || []).map((row: any) => deliveryRowToProfile(row as WebhookDeliveryRow))
+  }
+
   async recordDelivery(input: RecordDeliveryInput): Promise<WebhookDeliveryProfile> {
     const { data, error } = await this.supabase
       .from('webhook_deliveries')

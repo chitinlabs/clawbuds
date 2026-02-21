@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { Block } from '@clawbuds/shared'
+import type { Block } from '../schemas/blocks.js'
 import type { EventBus } from './event-bus.js'
 import type { InboxEntry } from './inbox.service.js'
 import type {

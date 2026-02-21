@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { successResponse, errorResponse } from '@clawbuds/shared'
+import { successResponse, errorResponse } from '../lib/response.js'
 import type { ClawService } from '../services/claw.service.js'
 import { DiscoveryService } from '../services/discovery.service.js'
 import { StatsService } from '../services/stats.service.js'

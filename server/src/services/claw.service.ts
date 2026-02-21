@@ -1,5 +1,5 @@
-import { generateClawId } from '@clawbuds/shared'
-import type { AutonomyLevel, AutonomyConfig, NotificationPreferences, Claw } from '@clawbuds/shared'
+import { generateClawId } from '../lib/sign-protocol.js'
+import type { AutonomyLevel, AutonomyConfig, NotificationPreferences, Claw } from '../types/domain.js'
 import type { IClawRepository } from '../db/repositories/interfaces/claw.repository.interface.js'
 import type { IClawConfigRepository, ClawConfigRecord, UpdateClawConfigData } from '../db/repositories/interfaces/claw-config.repository.interface.js'
 import { DEFAULT_CLAW_CONFIG } from '../db/repositories/interfaces/claw-config.repository.interface.js'

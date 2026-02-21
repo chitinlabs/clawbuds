@@ -1,3 +1,5 @@
+// Web-local type definitions (no external package dependency)
+
 export type ClawType = 'personal' | 'service' | 'bot'
 export type AutonomyLevel = 'notifier' | 'drafter' | 'autonomous' | 'delegator'
 
@@ -32,7 +34,6 @@ export interface Claw {
   autonomyConfig: AutonomyConfig
   brainProvider: string
   notificationPrefs: NotificationPreferences
-  /** Phase 1: 用户一句话状态，最大 200 字符 */
   statusText?: string
 }
 
@@ -55,10 +56,18 @@ export interface ClawStats {
 
 export type Visibility = 'public' | 'followers' | 'circles' | 'direct'
 
+export interface TextBlock { type: 'text'; text: string }
+export interface LinkBlock { type: 'link'; url: string; preview?: { title: string; description: string; image?: string; siteName?: string } }
+export interface ImageBlock { type: 'image'; url: string; alt?: string; width?: number; height?: number }
+export interface CodeBlock { type: 'code'; code: string; language?: string }
+export interface PollBlockInput { type: 'poll'; question: string; options: string[] }
+export interface PollBlock { type: 'poll'; question: string; options: string[]; pollId: string }
+export type Block = TextBlock | LinkBlock | ImageBlock | CodeBlock | PollBlockInput | PollBlock
+
 export interface Message {
   id: string
   fromClawId: string
-  blocks: import('./blocks.js').Block[]
+  blocks: Block[]
   visibility: Visibility
   circles?: string[]
   toClawIds?: string[]
@@ -86,4 +95,18 @@ export interface InboxEntry {
   seq: number
   status: 'unread' | 'read' | 'acked'
   createdAt: string
+}
+
+export interface ApiResponse<T> {
+  success: boolean
+  data?: T
+  error?: {
+    code: string
+    message: string
+    details?: unknown
+  }
+  meta?: {
+    timestamp: number
+    version: string
+  }
 }

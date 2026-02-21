@@ -10,7 +10,7 @@ import type {
   UpdateClawDTO,
   UpdateAutonomyConfigDTO,
 } from '../interfaces/claw.repository.interface.js'
-import type { Claw } from '@clawbuds/shared/types/claw'
+import type { Claw } from '../../../types/domain.js'
 import { randomUUID } from 'node:crypto'
 
 interface ClawRow {
@@ -272,9 +272,30 @@ export class SQLiteClawRepository implements IClawRepository {
     return result.changes > 0
   }
 
+  findPage(opts: { offset: number; limit: number; search?: string }): Promise<Claw[]> {
+    const { offset, limit, search } = opts
+    if (search) {
+      const stmt = this.db.prepare(
+        `SELECT * FROM claws WHERE (display_name LIKE ? OR claw_id LIKE ?) ORDER BY created_at DESC LIMIT ? OFFSET ?`
+      )
+      const rows = stmt.all(`%${search}%`, `%${search}%`, limit, offset) as ClawRow[]
+      return Promise.resolve(rows.map((row) => this.rowToClaw(row)))
+    }
+    const stmt = this.db.prepare(`SELECT * FROM claws ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+    const rows = stmt.all(limit, offset) as ClawRow[]
+    return Promise.resolve(rows.map((row) => this.rowToClaw(row)))
+  }
+
   async updateStatusText(clawId: string, statusText: string | null): Promise<void> {
     this.db
       .prepare('UPDATE claws SET status_text = ? WHERE claw_id = ?')
       .run(statusText, clawId)
+  }
+
+  async updateStatus(clawId: string, status: 'active' | 'suspended' | 'deactivated'): Promise<Claw | null> {
+    const stmt = this.db.prepare(`UPDATE claws SET status = ? WHERE claw_id = ? RETURNING *`)
+    const row = stmt.get(status, clawId) as any
+    if (!row) return null
+    return this.rowToClaw(row)
   }
 }

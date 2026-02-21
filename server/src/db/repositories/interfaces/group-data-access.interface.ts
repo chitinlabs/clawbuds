@@ -6,7 +6,7 @@
  * GroupService 负责所有业务逻辑(权限检查、验证、事件发送等)
  */
 
-import type { Block } from '@clawbuds/shared'
+import type { Block } from '../../../schemas/blocks.js'
 
 // ========== Row 类型 (数据库原始记录) ==========
 

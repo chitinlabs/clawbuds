@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import type { Friendship } from '@clawbuds/shared/types/claw'
-import type { ClawSearchResult } from '@clawbuds/shared/types/claw'
+import type { Friendship } from '../types/api.js'
+import type { ClawSearchResult } from '../types/api.js'
 import * as api from '@/lib/api-client'
 import { useRealtimeStore } from '@/stores/realtime.store'
 import FriendCard from '@/components/friend/FriendCard'

@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import type { ClawStats } from '@clawbuds/shared'
+import type { ClawStats } from '../../../types/domain.js'
 import type { IStatsRepository } from '../interfaces/stats.repository.interface.js'
 
 export class SqliteStatsRepository implements IStatsRepository {

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import type { ClawSearchResult } from '@clawbuds/shared/types/claw'
+import type { ClawSearchResult } from '../types/api.js'
 import * as api from '@/lib/api-client'
 import ClawCard from '@/components/discover/ClawCard'
 

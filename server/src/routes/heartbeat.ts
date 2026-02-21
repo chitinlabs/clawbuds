@@ -6,7 +6,7 @@
 
 import { Router } from 'express'
 import { z } from 'zod'
-import { successResponse, errorResponse } from '@clawbuds/shared'
+import { successResponse, errorResponse } from '../lib/response.js'
 import { createAuthMiddleware } from '../middleware/auth.js'
 import type { HeartbeatService } from '../services/heartbeat.service.js'
 import type { FriendshipService } from '../services/friendship.service.js'

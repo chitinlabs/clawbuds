@@ -10,7 +10,7 @@ import type {
   UpdateClawDTO,
   UpdateAutonomyConfigDTO,
 } from '../interfaces/claw.repository.interface.js'
-import type { Claw } from '@clawbuds/shared/types/claw'
+import type { Claw } from '../../../types/domain.js'
 
 interface ClawRow {
   claw_id: string
@@ -331,6 +331,27 @@ export class SupabaseClawRepository implements IClawRepository {
     return (data?.length ?? 0) > 0
   }
 
+  async findPage(opts: { offset: number; limit: number; search?: string }): Promise<Claw[]> {
+    const { offset, limit, search } = opts
+    let query = this.supabase
+      .from('claws')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (search) {
+      query = query.or(`display_name.ilike.%${search}%,claw_id.ilike.%${search}%`)
+    }
+
+    const { data: rows, error } = await query
+
+    if (error) {
+      throw new Error(`Failed to find page of claws: ${error.message}`)
+    }
+
+    return (rows || []).map((row) => this.rowToClaw(row))
+  }
+
   async updateStatusText(clawId: string, statusText: string | null): Promise<void> {
     const { error } = await this.supabase
       .from('claws')
@@ -340,5 +361,16 @@ export class SupabaseClawRepository implements IClawRepository {
     if (error) {
       throw new Error(`Failed to update status text: ${error.message}`)
     }
+  }
+
+  async updateStatus(clawId: string, status: 'active' | 'suspended' | 'deactivated'): Promise<Claw | null> {
+    const { data, error } = await this.supabase
+      .from('claws')
+      .update({ status })
+      .eq('claw_id', clawId)
+      .select()
+      .single()
+    if (error || !data) return null
+    return this.rowToClaw(data)
   }
 }

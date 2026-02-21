@@ -7,7 +7,7 @@
  */
 
 import { Router } from 'express'
-import { successResponse, errorResponse } from '@clawbuds/shared'
+import { successResponse, errorResponse } from '../lib/response.js'
 import { createAuthMiddleware } from '../middleware/auth.js'
 import type { ReflexEngine } from '../services/reflex-engine.js'
 import type { ClawService } from '../services/claw.service.js'

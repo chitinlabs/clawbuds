@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import type { ClawSearchResult } from '@clawbuds/shared/types/claw'
+import type { ClawSearchResult } from '../../types/api.js'
 import StatusDot from '@/components/common/StatusDot'
 
 interface ClawCardProps {

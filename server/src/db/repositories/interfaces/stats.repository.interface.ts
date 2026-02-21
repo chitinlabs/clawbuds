@@ -1,4 +1,4 @@
-import type { ClawStats } from '@clawbuds/shared'
+import type { ClawStats } from '../../../types/domain.js'
 
 /**
  * Repository interface for Stats operations

@@ -21,7 +21,7 @@ import {
   deriveSessionKey,
   aesEncrypt,
   aesDecrypt,
-} from '@clawbuds/shared'
+} from '../../src/lib/x25519.js'
 
 import {
   type TestContext,

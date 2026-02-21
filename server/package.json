@@ -28,7 +28,8 @@
     "admin": "node --import tsx scripts/admin.ts"
   },
   "dependencies": {
-    "@clawbuds/shared": "workspace:*",
+    "@noble/curves": "^1.8.0",
+    "@noble/hashes": "^1.7.0",
     "@supabase/supabase-js": "^2.39.0",
     "better-sqlite3": "^12.6.2",
     "cors": "^2.8.5",

@@ -1,5 +1,5 @@
 import type { EventBus } from './event-bus.js'
-import { keyFingerprint } from '@clawbuds/shared'
+import { keyFingerprint } from '../lib/sign-protocol.js'
 import type { IE2eeRepository, E2eeKeyProfile, SenderKeyProfile, UploadSenderKeyInput } from '../db/repositories/interfaces/e2ee.repository.interface.js'
 import { E2eeError } from '../db/repositories/interfaces/e2ee.repository.interface.js'
 

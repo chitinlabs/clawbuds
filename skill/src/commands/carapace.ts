@@ -1,14 +1,20 @@
 /**
- * carapace 命令（Phase 10 + Phase 11）
- * clawbuds carapace show               — 查看当前 carapace.md 内容
- * clawbuds carapace allow              — 添加授权规则
- * clawbuds carapace escalate           — 添加升级规则
- * clawbuds carapace history            — 查看修改历史
- * clawbuds carapace diff <version>     — 查看版本 diff
- * clawbuds carapace restore <version>  — 回滚到指定版本
+ * carapace 命令（Phase 10 + Phase 12b）
+ * clawbuds carapace show               — 查看本地 carapace.md 内容
+ * clawbuds carapace allow              — 追加授权规则到本地文件，推送快照
+ * clawbuds carapace escalate           — 追加升级规则到本地文件，推送快照
+ * clawbuds carapace history            — 查看服务器修改历史
+ * clawbuds carapace diff <version>     — 对比本地文件与服务器版本
+ * clawbuds carapace restore <version>  — 从服务器获取版本，写入本地文件，推送快照
+ *
+ * Phase 12b: server 不再持有 carapace.md，所有文件操作在客户端完成。
+ * 修改后调用 POST /carapace/snapshot 将新版本推送到服务器历史。
  */
 
 import { Command } from 'commander'
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { homedir } from 'node:os'
 import { ClawBudsClient } from '../client.js'
 import { success, error, info } from '../output.js'
 import { getProfileContext, addProfileOption } from './helpers.js'
@@ -17,30 +23,47 @@ export const carapaceCommand = new Command('carapace').description('Manage carap
 
 addProfileOption(carapaceCommand)
 
+// ─── 本地 carapace.md 路径工具 ────────────────────────────────────────────────
+
+function getCarapaceFilePath(): string {
+  const configDir = process.env['CLAWBUDS_CONFIG_DIR'] ?? join(homedir(), '.clawbuds')
+  return join(configDir, 'references', 'carapace.md')
+}
+
+function readLocalCarapace(): string {
+  const filePath = getCarapaceFilePath()
+  if (!existsSync(filePath)) return ''
+  return readFileSync(filePath, 'utf-8')
+}
+
+function writeLocalCarapace(content: string): void {
+  const filePath = getCarapaceFilePath()
+  mkdirSync(join(filePath, '..'), { recursive: true })
+  writeFileSync(filePath, content, 'utf-8')
+}
+
 // ─── carapace show ────────────────────────────────────────────────────────────
 
 carapaceCommand
   .command('show')
-  .description('Show current carapace.md content')
+  .description('Show local carapace.md content')
   .action(async (opts) => {
     const ctx = getProfileContext(opts)
     if (!ctx) return
 
-    const client = new ClawBudsClient({
-      serverUrl: ctx.profile.serverUrl,
-      clawId: ctx.profile.clawId,
-      privateKey: ctx.privateKey,
-    })
-
     try {
-      const result = await client.getCarapaceContent()
+      const content = readLocalCarapace()
+      if (!content) {
+        info('本地 carapace.md 为空或不存在。使用 `clawbuds carapace restore` 从服务器获取历史版本。')
+        return
+      }
       info('─'.repeat(60))
-      info(result.content)
+      info(content)
       info('─'.repeat(60))
       info('使用 `clawbuds carapace allow` 或 `clawbuds carapace escalate` 快速追加规则')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
-      error(`获取 carapace.md 失败: ${message}`)
+      error(`读取 carapace.md 失败: ${message}`)
     }
   })
 
@@ -48,7 +71,7 @@ carapaceCommand
 
 carapaceCommand
   .command('allow')
-  .description('Add an allow rule to carapace.md')
+  .description('Append an allow rule to local carapace.md and push snapshot')
   .requiredOption('--friend <id>', 'Friend claw ID')
   .requiredOption('--scope <scope>', 'Scope description (e.g. "日常梳理消息")')
   .option('--note <note>', 'Reason or note for this rule')
@@ -63,12 +86,14 @@ carapaceCommand
     })
 
     try {
-      const result = await client.allowCarapace({
-        friendId: opts.friend,
-        scope: opts.scope,
-        note: opts.note,
-      })
-      success(`已添加授权规则（carapace.md 版本 ${result.newVersion}）`)
+      const current = readLocalCarapace()
+      const noteStr = opts.note ? ` — ${opts.note}` : ''
+      const rule = `\n## Allow: ${opts.friend}\n\n- 范围：${opts.scope}${noteStr}\n`
+      const updated = current + rule
+
+      writeLocalCarapace(updated)
+      const result = await client.pushCarapaceSnapshot(updated, 'allow')
+      success(`已添加授权规则（carapace.md 版本 ${result.version}）`)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
       error(`添加授权规则失败: ${message}`)
@@ -79,7 +104,7 @@ carapaceCommand
 
 carapaceCommand
   .command('escalate')
-  .description('Add an escalate rule to carapace.md')
+  .description('Append an escalate rule to local carapace.md and push snapshot')
   .requiredOption('--when <condition>', 'Condition for escalation (e.g. "Pearl 涉及金融话题")')
   .requiredOption('--action <action>', 'Action to take (e.g. "需要人工审阅")')
   .action(async (opts) => {
@@ -93,11 +118,13 @@ carapaceCommand
     })
 
     try {
-      const result = await client.escalateCarapace({
-        condition: opts.when,
-        action: opts.action,
-      })
-      success(`已添加升级规则（carapace.md 版本 ${result.newVersion}）`)
+      const current = readLocalCarapace()
+      const rule = `\n## Escalate\n\n- 条件：${opts.when}\n- 操作：${opts.action}\n`
+      const updated = current + rule
+
+      writeLocalCarapace(updated)
+      const result = await client.pushCarapaceSnapshot(updated, 'escalate')
+      success(`已添加升级规则（carapace.md 版本 ${result.version}）`)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
       error(`添加升级规则失败: ${message}`)
@@ -108,7 +135,7 @@ carapaceCommand
 
 carapaceCommand
   .command('history')
-  .description('View carapace.md modification history')
+  .description('View carapace.md modification history (from server)')
   .option('--limit <n>', 'Number of entries to show', '20')
   .action(async (opts) => {
     const ctx = getProfileContext(opts)
@@ -156,7 +183,7 @@ carapaceCommand
 
 carapaceCommand
   .command('diff <version>')
-  .description('Show diff between current and a specific version')
+  .description('Show diff between local carapace.md and a specific version')
   .action(async (version, opts) => {
     const ctx = getProfileContext(opts)
     if (!ctx) return
@@ -174,8 +201,8 @@ carapaceCommand
     }
 
     try {
-      const [records, targetRecord] = await Promise.all([
-        client.getCarapaceHistory({ limit: 1 }),
+      const [localContent, targetRecord] = await Promise.all([
+        Promise.resolve(readLocalCarapace()),
         client.getCarapaceVersion(versionNum),
       ])
 
@@ -184,28 +211,26 @@ carapaceCommand
         return
       }
 
-      const latest = records[0] as Record<string, unknown> | undefined
       const target = targetRecord as Record<string, unknown>
 
-      info(`carapace.md 版本 ${versionNum} → ${latest ? String(latest['version']) : '(当前)'}`)
+      info(`carapace.md 本地 → 版本 ${versionNum}`)
       info('')
 
       const targetLines = String(target['content']).split('\n')
-      const latestLines = (latest ? String(latest['content']) : '').split('\n')
+      const localLines = localContent.split('\n')
 
-      // 简单 diff：找出新增和删除的行
       const targetSet = new Set(targetLines)
-      const latestSet = new Set(latestLines)
+      const localSet = new Set(localLines)
 
       let hasDiff = false
-      for (const line of latestLines) {
+      for (const line of localLines) {
         if (!targetSet.has(line) && line.trim()) {
           info(`+ ${line}`)
           hasDiff = true
         }
       }
       for (const line of targetLines) {
-        if (!latestSet.has(line) && line.trim()) {
+        if (!localSet.has(line) && line.trim()) {
           info(`- ${line}`)
           hasDiff = true
         }
@@ -224,7 +249,7 @@ carapaceCommand
 
 carapaceCommand
   .command('restore <version>')
-  .description('Restore carapace.md to a specific version (current version auto-saved)')
+  .description('Restore local carapace.md from server version and push snapshot')
   .option('-y, --yes', 'Skip confirmation prompt')
   .action(async (version, opts) => {
     const ctx = getProfileContext(opts)
@@ -247,7 +272,7 @@ carapaceCommand
       const rl = createInterface({ input: process.stdin, output: process.stdout })
       const confirmed = await new Promise<boolean>((resolve) => {
         rl.question(
-          `? 确认回滚到版本 ${versionNum}？当前版本将自动备份。[y/N] `,
+          `? 确认从服务器版本 ${versionNum} 恢复本地 carapace.md？[y/N] `,
           (ans) => {
             rl.close()
             resolve(ans.toLowerCase() === 'y')
@@ -261,9 +286,16 @@ carapaceCommand
     }
 
     try {
-      const result = await client.restoreCarapaceVersion(versionNum)
-      const r = result as { restoredVersion: number; newVersion: number }
-      success(`已回滚到版本 ${r.restoredVersion}（当前版本已保存为版本 ${r.newVersion}）`)
+      // 1. 从服务器获取版本内容
+      const restored = await client.restoreCarapaceVersion(versionNum)
+      const r = restored as { content: string; version: number }
+
+      // 2. 写入本地文件
+      writeLocalCarapace(r.content)
+
+      // 3. 推送快照到服务器（记录恢复操作）
+      const pushed = await client.pushCarapaceSnapshot(r.content, 'restore')
+      success(`已从服务器版本 ${r.version} 恢复本地 carapace.md（新快照版本 ${pushed.version}）`)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
       error(`回滚失败: ${message}`)

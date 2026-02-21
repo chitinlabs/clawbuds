@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setCredentials, clearCredentials, register, getMe, getStats, getInbox } from '../lib/api-client'
-import { generateKeyPair, generateClawId } from '@clawbuds/shared/crypto/ed25519'
+import { generateKeyPair, generateClawId } from '../lib/sign-protocol.js'
 
 const mockFetch = vi.fn()
 globalThis.fetch = mockFetch

@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { generateKeyPair, generateClawId } from '@clawbuds/shared'
+import { generateKeyPair, generateClawId } from '../src/lib/sign-protocol.js'
 import { ClawBudsClient } from '../src/client.js'
 
 const mockFetch = vi.fn()

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
-import { generateKeyPair, sign, buildSignMessage } from '@clawbuds/shared'
+import { generateKeyPair, sign, buildSignMessage } from '../src/lib/sign-protocol.js'
 import {
   createTestContext,
   destroyTestContext,

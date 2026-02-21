@@ -1,16 +1,16 @@
 /**
- * E2E Test: carapace allow/escalate/content API（Phase 11 T3）
- * POST /api/v1/carapace/allow
- * POST /api/v1/carapace/escalate
- * GET  /api/v1/carapace/content
+ * E2E Test: carapace allow/escalate/content API（Phase 12b 更新）
+ *
+ * Phase 12b 变更：
+ * - POST /api/v1/carapace/allow    已删除（返回 404）
+ * - POST /api/v1/carapace/escalate 已删除（返回 404）
+ * - GET  /api/v1/carapace/content  改为读 DB 最新快照（不再依赖 CLAWBUDS_CARAPACE_PATH）
+ *
+ * allow/escalate 操作已移至客户端（skill commands），客户端直接操作本地文件并推送快照。
  * 参数化运行：SQLite + Supabase
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { writeFileSync, mkdirSync } from 'node:fs'
-import { randomUUID } from 'node:crypto'
 import request from 'supertest'
 import type { TestContext, TestClaw, RepositoryType } from './helpers.js'
 import {
@@ -23,34 +23,23 @@ import {
 
 const REPOSITORY_TYPES = getAvailableRepositoryTypes()
 
-describe.each(REPOSITORY_TYPES)('E2E: Carapace Allow/Escalate API [%s]', (repositoryType: RepositoryType) => {
+describe.each(REPOSITORY_TYPES)('E2E: Carapace Phase 12b API [%s]', (repositoryType: RepositoryType) => {
   let tc: TestContext
   let alice: TestClaw
-  let tmpCarapacePath: string
 
   beforeEach(async () => {
-    // 创建临时 carapace.md 文件供测试使用
-    const tmpDir = join(tmpdir(), `carapace-e2e-${randomUUID()}`)
-    mkdirSync(tmpDir, { recursive: true })
-    tmpCarapacePath = join(tmpDir, 'carapace.md')
-    writeFileSync(tmpCarapacePath, '## 基本原则\n\n所有消息先通知我。\n', 'utf-8')
-
-    // 必须在 createTestContext（创建 app）之前设置环境变量
-    // 因为 CarapaceEditor 在 app 启动时用 CLAWBUDS_CARAPACE_PATH 初始化
-    process.env['CLAWBUDS_CARAPACE_PATH'] = tmpCarapacePath
-    process.env['CLAWBUDS_DATA_DIR'] = tmpDir  // 路径验证需要 DATA_DIR 包含 carapacePath
-
+    // Phase 12b: 不再需要 CLAWBUDS_CARAPACE_PATH 或 CLAWBUDS_DATA_DIR
+    delete process.env['CLAWBUDS_CARAPACE_PATH']
+    delete process.env['CLAWBUDS_DATA_DIR']
     tc = createTestContext({ repositoryType })
     alice = await registerClaw(tc.app, 'Alice')
   })
 
   afterEach(() => {
     destroyTestContext(tc)
-    delete process.env['CLAWBUDS_CARAPACE_PATH']
-    delete process.env['CLAWBUDS_DATA_DIR']
   })
 
-  // ─── GET /api/v1/carapace/content ────────────────────────────────────────
+  // ─── GET /api/v1/carapace/content（Phase 12b: 读 DB 快照）────────────────
 
   describe('GET /api/v1/carapace/content', () => {
     it('should return 401 without auth', async () => {
@@ -58,84 +47,47 @@ describe.each(REPOSITORY_TYPES)('E2E: Carapace Allow/Escalate API [%s]', (reposi
       expect(res.status).toBe(401)
     })
 
-    it('should return current carapace.md content', async () => {
+    it('should return empty string when no snapshot has been pushed', async () => {
       const h = signedHeaders('GET', '/api/v1/carapace/content', alice.clawId, alice.keys.privateKey)
       const res = await request(tc.app).get('/api/v1/carapace/content').set(h)
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
+      expect(res.body.data.content).toBe('')
+    })
+
+    it('should return snapshot content after client pushes snapshot', async () => {
+      // 客户端推送快照（Phase 12b 流程：客户端修改本地文件后调用此端点）
+      const content = '## 基本原则\n\n所有消息先通知我。\n'
+      const snapBody = { content, reason: 'manual' }
+      const snapH = signedHeaders('POST', '/api/v1/carapace/snapshot', alice.clawId, alice.keys.privateKey, snapBody)
+      await request(tc.app).post('/api/v1/carapace/snapshot').set(snapH).send(snapBody)
+
+      const h = signedHeaders('GET', '/api/v1/carapace/content', alice.clawId, alice.keys.privateKey)
+      const res = await request(tc.app).get('/api/v1/carapace/content').set(h)
+      expect(res.status).toBe(200)
       expect(res.body.data.content).toContain('基本原则')
     })
   })
 
-  // ─── POST /api/v1/carapace/allow ─────────────────────────────────────────
+  // ─── POST /api/v1/carapace/allow（Phase 12b: 已删除）────────────────────
 
-  describe('POST /api/v1/carapace/allow', () => {
-    it('should return 401 without auth', async () => {
-      const res = await request(tc.app).post('/api/v1/carapace/allow')
-        .send({ friendId: 'alice', scope: '日常消息' })
-      expect(res.status).toBe(401)
-    })
-
-    it('should return 400 when friendId is missing', async () => {
-      const body = { scope: '日常消息' }
-      const h = signedHeaders('POST', '/api/v1/carapace/allow', alice.clawId, alice.keys.privateKey, body)
-      const res = await request(tc.app).post('/api/v1/carapace/allow').set(h).send(body)
-      expect(res.status).toBe(400)
-    })
-
-    it('should return 400 when scope is missing', async () => {
-      const body = { friendId: 'alice' }
-      const h = signedHeaders('POST', '/api/v1/carapace/allow', alice.clawId, alice.keys.privateKey, body)
-      const res = await request(tc.app).post('/api/v1/carapace/allow').set(h).send(body)
-      expect(res.status).toBe(400)
-    })
-
-    it('should add allow rule and return new version', async () => {
+  describe('POST /api/v1/carapace/allow (deleted in Phase 12b)', () => {
+    it('should return 404 (endpoint removed)', async () => {
       const body = { friendId: 'bob', scope: '日常梳理消息' }
       const h = signedHeaders('POST', '/api/v1/carapace/allow', alice.clawId, alice.keys.privateKey, body)
       const res = await request(tc.app).post('/api/v1/carapace/allow').set(h).send(body)
-
-      expect(res.status).toBe(200)
-      expect(res.body.success).toBe(true)
-      expect(typeof res.body.data.newVersion).toBe('number')
-    })
-
-    it('should not remove existing content after allow', async () => {
-      const body = { friendId: 'charlie', scope: '日常消息' }
-      const h = signedHeaders('POST', '/api/v1/carapace/allow', alice.clawId, alice.keys.privateKey, body)
-      await request(tc.app).post('/api/v1/carapace/allow').set(h).send(body)
-
-      const h2 = signedHeaders('GET', '/api/v1/carapace/content', alice.clawId, alice.keys.privateKey)
-      const res = await request(tc.app).get('/api/v1/carapace/content').set(h2)
-      expect(res.body.data.content).toContain('基本原则')  // 原有内容未被删除
-      expect(res.body.data.content).toContain('charlie')   // 新规则已追加
+      expect(res.status).toBe(404)
     })
   })
 
-  // ─── POST /api/v1/carapace/escalate ──────────────────────────────────────
+  // ─── POST /api/v1/carapace/escalate（Phase 12b: 已删除）─────────────────
 
-  describe('POST /api/v1/carapace/escalate', () => {
-    it('should return 401 without auth', async () => {
-      const res = await request(tc.app).post('/api/v1/carapace/escalate')
-        .send({ condition: 'test', action: 'test' })
-      expect(res.status).toBe(401)
-    })
-
-    it('should return 400 when condition is missing', async () => {
-      const body = { action: '需要人工确认' }
-      const h = signedHeaders('POST', '/api/v1/carapace/escalate', alice.clawId, alice.keys.privateKey, body)
-      const res = await request(tc.app).post('/api/v1/carapace/escalate').set(h).send(body)
-      expect(res.status).toBe(400)
-    })
-
-    it('should add escalate rule and return new version', async () => {
+  describe('POST /api/v1/carapace/escalate (deleted in Phase 12b)', () => {
+    it('should return 404 (endpoint removed)', async () => {
       const body = { condition: 'Pearl 涉及金融话题', action: '需要人工审阅' }
       const h = signedHeaders('POST', '/api/v1/carapace/escalate', alice.clawId, alice.keys.privateKey, body)
       const res = await request(tc.app).post('/api/v1/carapace/escalate').set(h).send(body)
-
-      expect(res.status).toBe(200)
-      expect(res.body.success).toBe(true)
-      expect(typeof res.body.data.newVersion).toBe('number')
+      expect(res.status).toBe(404)
     })
   })
 })

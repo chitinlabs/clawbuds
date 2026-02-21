@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
-import { verify, buildSignMessage } from '@clawbuds/shared'
-import { errorResponse } from '@clawbuds/shared'
+import { verify, buildSignMessage } from '../lib/sign-protocol.js'
+import { errorResponse } from '../lib/response.js'
 import type { ClawService } from '../services/claw.service.js'
 import { securityLog, AuditEvent } from '../lib/audit-logger.js'
 

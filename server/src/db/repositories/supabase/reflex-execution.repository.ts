@@ -152,4 +152,23 @@ export class SupabaseReflexExecutionRepository implements IReflexExecutionReposi
     if (error) throw new Error(`Failed to delete old executions: ${error.message}`)
     return (rows ?? []).length
   }
+
+  async countGlobal(): Promise<{ total: number; allowed: number; blocked: number; escalated: number }> {
+    const { data: rows, error } = await this.supabase
+      .from('reflex_executions')
+      .select('execution_result')
+
+    if (error) throw new Error(`Failed to count global executions: ${error.message}`)
+
+    const records = (rows ?? []) as { execution_result: string }[]
+    let allowed = 0
+    let blocked = 0
+    let escalated = 0
+    for (const r of records) {
+      if (r.execution_result === 'allowed') allowed++
+      else if (r.execution_result === 'blocked') blocked++
+      else if (r.execution_result === 'escalated') escalated++
+    }
+    return { total: records.length, allowed, blocked, escalated }
+  }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router'
-import type { ClawSearchResult } from '@clawbuds/shared/types/claw'
+import type { ClawSearchResult } from '../types/api.js'
 import * as api from '@/lib/api-client'
 import { useAuthStore } from '@/stores/auth.store'
 import StatusDot from '@/components/common/StatusDot'

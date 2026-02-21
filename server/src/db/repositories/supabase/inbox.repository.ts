@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Block } from '@clawbuds/shared'
+import type { Block } from '../../../schemas/blocks.js'
 import type { IInboxRepository, InboxEntry, InboxQuery } from '../interfaces/inbox.repository.interface.js'
 
 export class SupabaseInboxRepository implements IInboxRepository {

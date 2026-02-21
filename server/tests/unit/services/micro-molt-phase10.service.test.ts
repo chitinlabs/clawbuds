@@ -9,7 +9,6 @@ import type { IReflexExecutionRepository } from '../../../src/db/repositories/in
 import type { IBriefingRepository } from '../../../src/db/repositories/interfaces/briefing.repository.interface.js'
 import type { PearlService } from '../../../src/services/pearl.service.js'
 import type { RelationshipService } from '../../../src/services/relationship.service.js'
-import type { CarapaceEditor } from '../../../src/services/carapace-editor.js'
 
 function createMockExecutionRepo(): IReflexExecutionRepository {
   return {
@@ -57,36 +56,24 @@ function createMockRelationshipService(): RelationshipService {
   } as unknown as RelationshipService
 }
 
-function createMockCarapaceEditor(): CarapaceEditor {
-  return {
-    allow: vi.fn().mockResolvedValue(undefined),
-    escalate: vi.fn().mockResolvedValue(undefined),
-    applyMicroMolt: vi.fn().mockResolvedValue(undefined),
-    restoreVersion: vi.fn().mockResolvedValue(undefined),
-  } as unknown as CarapaceEditor
-}
-
 describe('MicroMoltService Phase 10 - New Dimensions', () => {
   let service: MicroMoltService
   let executionRepo: IReflexExecutionRepository
   let briefingRepo: IBriefingRepository
   let pearlService: PearlService
   let relationshipService: RelationshipService
-  let carapaceEditor: CarapaceEditor
 
   beforeEach(() => {
     executionRepo = createMockExecutionRepo()
     briefingRepo = createMockBriefingRepo()
     pearlService = createMockPearlService()
     relationshipService = createMockRelationshipService()
-    carapaceEditor = createMockCarapaceEditor()
 
     service = new MicroMoltService(
       executionRepo,
       briefingRepo,
       pearlService,
       relationshipService,
-      carapaceEditor,
     )
   })
 
@@ -219,7 +206,7 @@ describe('MicroMoltService Phase 10 - New Dimensions', () => {
   // ─── applySuggestion ────────────────────────────────────────────────────
 
   describe('applySuggestion', () => {
-    it('should call carapaceEditor.applyMicroMolt', async () => {
+    it('should resolve without error (Phase 12b: server no longer writes file)', async () => {
       const suggestion = {
         type: 'allow' as const,
         description: '对 Alice 添加自动授权',
@@ -228,19 +215,7 @@ describe('MicroMoltService Phase 10 - New Dimensions', () => {
         friendId: 'alice',
         scope: '梳理',
       }
-      await service.applySuggestion('claw-test', suggestion)
-      expect(carapaceEditor.applyMicroMolt).toHaveBeenCalledWith('claw-test', suggestion)
-    })
-
-    it('should throw when carapaceEditor is not injected', async () => {
-      const serviceWithoutEditor = new MicroMoltService(executionRepo, briefingRepo)
-      const suggestion = {
-        type: 'allow' as const,
-        description: '测试',
-        cliCommand: 'test',
-        confidence: 0.5,
-      }
-      await expect(serviceWithoutEditor.applySuggestion('claw-test', suggestion)).rejects.toThrow()
+      await expect(service.applySuggestion('claw-test', suggestion)).resolves.toBeUndefined()
     })
   })
 

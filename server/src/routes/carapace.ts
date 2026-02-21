@@ -1,29 +1,35 @@
 /**
- * Carapace History API Routes（Phase 10 + Phase 11）
+ * Carapace History API Routes（Phase 10 + Phase 12b）
  * GET  /api/v1/carapace/history          — 获取 carapace.md 修改历史
  * GET  /api/v1/carapace/history/:version — 获取指定版本
- * POST /api/v1/carapace/restore/:version — 回滚到指定版本
- * GET  /api/v1/carapace/content          — 获取当前 carapace.md 内容（Phase 11 T3）
- * POST /api/v1/carapace/allow            — 追加授权规则（Phase 11 T3）
- * POST /api/v1/carapace/escalate         — 追加升级规则（Phase 11 T3）
+ * POST /api/v1/carapace/restore/:version — 返回版本内容（客户端负责写文件）
+ * GET  /api/v1/carapace/content          — 读取 DB 最新快照
+ * POST /api/v1/carapace/snapshot         — 接收客户端推送的最新快照（Phase 12b）
  * GET  /api/v1/pattern-health            — 获取模式健康评分
  * POST /api/v1/micromolt/apply           — 应用指定的 Micro-Molt 建议
  */
 
 import { Router } from 'express'
-import { successResponse, errorResponse } from '@clawbuds/shared'
+import { randomUUID } from 'node:crypto'
+import { successResponse, errorResponse } from '../lib/response.js'
 import { createAuthMiddleware } from '../middleware/auth.js'
 import type { ClawService } from '../services/claw.service.js'
-import type { ICarapaceHistoryRepository } from '../db/repositories/interfaces/carapace-history.repository.interface.js'
+import type { ICarapaceHistoryRepository, CarapaceChangeReason } from '../db/repositories/interfaces/carapace-history.repository.interface.js'
 import type { PatternStalenessDetector } from '../services/pattern-staleness-detector.js'
-import type { CarapaceEditor } from '../services/carapace-editor.js'
 import type { MicroMoltService } from '../services/micro-molt.service.js'
 import type { BriefingService } from '../services/briefing.service.js'
+
+const VALID_SNAPSHOT_REASONS = ['allow', 'escalate', 'restore', 'manual'] as const
+type SnapshotReason = typeof VALID_SNAPSHOT_REASONS[number]
+
+// 将 API 传入的 reason 映射为 CarapaceChangeReason
+function toChangeReason(reason: SnapshotReason): CarapaceChangeReason {
+  return reason === 'manual' ? 'manual_edit' : reason
+}
 
 export function createCarapaceRouter(
   carapaceHistoryRepo: ICarapaceHistoryRepository,
   stalenessDetector: PatternStalenessDetector,
-  carapaceEditor: CarapaceEditor | null,
   microMoltService: MicroMoltService,
   briefingService: BriefingService,
   clawService: ClawService,
@@ -71,7 +77,7 @@ export function createCarapaceRouter(
     }
   })
 
-  // POST /api/v1/carapace/restore/:version
+  // POST /api/v1/carapace/restore/:version（Phase 12b: 返回内容，客户端负责写本地文件）
   router.post('/restore/:version', requireAuth, async (req, res) => {
     const version = parseInt(req.params['version'] as string, 10)
     if (isNaN(version)) {
@@ -87,91 +93,53 @@ export function createCarapaceRouter(
         return
       }
 
-      if (!carapaceEditor) {
-        res.status(503).json(errorResponse('SERVICE_UNAVAILABLE', 'CarapaceEditor not configured'))
-        return
-      }
-
-      await carapaceEditor.restoreVersion(clawId, version)
-      const newVersion = await carapaceHistoryRepo.getLatestVersion(clawId)
-      res.json(successResponse({ restoredVersion: version, newVersion }))
+      // Phase 12b: 只返回内容，不写文件（文件操作移到客户端）
+      res.json(successResponse({ content: target.content, version: target.version }))
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to restore carapace version'
+      const message = err instanceof Error ? err.message : 'Failed to get carapace version'
       res.status(500).json(errorResponse('INTERNAL_ERROR', message))
     }
   })
 
-  // GET /api/v1/carapace/content（Phase 11 T3）
+  // GET /api/v1/carapace/content（Phase 12b: 读取 DB 最新快照，不再依赖文件系统）
   router.get('/content', requireAuth, async (req, res) => {
-    if (!carapaceEditor) {
-      res.status(503).json(errorResponse('SERVICE_UNAVAILABLE', 'CarapaceEditor not configured (set CLAWBUDS_CARAPACE_PATH)'))
-      return
-    }
     try {
-      const content = await carapaceEditor.getContent()
-      res.json(successResponse({ content }))
+      const clawId = req.clawId as string
+      const latest = await carapaceHistoryRepo.getLatestVersion(clawId)
+      if (!latest) {
+        res.json(successResponse({ content: '' }))
+        return
+      }
+      const record = await carapaceHistoryRepo.findByVersion(clawId, latest)
+      res.json(successResponse({ content: record?.content ?? '' }))
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to read carapace'
       res.status(500).json(errorResponse('INTERNAL_ERROR', message))
     }
   })
 
-  // POST /api/v1/carapace/allow（Phase 11 T3）
-  router.post('/allow', requireAuth, async (req, res) => {
-    const { friendId, scope, note } = req.body ?? {}
-    if (!friendId || typeof friendId !== 'string') {
-      res.status(400).json(errorResponse('VALIDATION_ERROR', 'friendId is required'))
+  // POST /api/v1/carapace/snapshot（Phase 12b: 接收客户端推送的快照）
+  router.post('/snapshot', requireAuth, async (req, res) => {
+    const { content, reason } = req.body ?? {}
+    if (typeof content !== 'string') {
+      res.status(400).json(errorResponse('VALIDATION_ERROR', 'content is required and must be a string'))
       return
     }
-    if (!scope || typeof scope !== 'string') {
-      res.status(400).json(errorResponse('VALIDATION_ERROR', 'scope is required'))
-      return
-    }
-    if (friendId.length > 200 || scope.length > 500 || (note && note.length > 500)) {
-      res.status(400).json(errorResponse('VALIDATION_ERROR', 'Input exceeds maximum length'))
-      return
-    }
-    if (!carapaceEditor) {
-      res.status(503).json(errorResponse('SERVICE_UNAVAILABLE', 'CarapaceEditor not configured'))
-      return
-    }
-    try {
-      const clawId = req.clawId as string
-      await carapaceEditor.allow(clawId, friendId, scope, note)
-      const newVersion = await carapaceHistoryRepo.getLatestVersion(clawId)
-      res.json(successResponse({ newVersion }))
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to add allow rule'
-      res.status(500).json(errorResponse('INTERNAL_ERROR', message))
-    }
-  })
+    const snapshotReason: SnapshotReason = VALID_SNAPSHOT_REASONS.includes(reason) ? reason : 'manual'
 
-  // POST /api/v1/carapace/escalate（Phase 11 T3）
-  router.post('/escalate', requireAuth, async (req, res) => {
-    const { condition, action } = req.body ?? {}
-    if (!condition || typeof condition !== 'string') {
-      res.status(400).json(errorResponse('VALIDATION_ERROR', 'condition is required'))
-      return
-    }
-    if (!action || typeof action !== 'string') {
-      res.status(400).json(errorResponse('VALIDATION_ERROR', 'action is required'))
-      return
-    }
-    if (condition.length > 500 || action.length > 500) {
-      res.status(400).json(errorResponse('VALIDATION_ERROR', 'Input exceeds maximum length'))
-      return
-    }
-    if (!carapaceEditor) {
-      res.status(503).json(errorResponse('SERVICE_UNAVAILABLE', 'CarapaceEditor not configured'))
-      return
-    }
     try {
       const clawId = req.clawId as string
-      await carapaceEditor.escalate(clawId, condition, action)
+      await carapaceHistoryRepo.create({
+        id: randomUUID(),
+        clawId,
+        content,
+        changeReason: toChangeReason(snapshotReason),
+        suggestedBy: 'user',
+      })
       const newVersion = await carapaceHistoryRepo.getLatestVersion(clawId)
-      res.json(successResponse({ newVersion }))
+      res.json(successResponse({ version: newVersion, createdAt: new Date().toISOString() }))
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to add escalate rule'
+      const message = err instanceof Error ? err.message : 'Failed to save carapace snapshot'
       res.status(500).json(errorResponse('INTERNAL_ERROR', message))
     }
   })

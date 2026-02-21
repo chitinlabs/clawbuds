@@ -1,13 +1,17 @@
-import { buildSignMessage, sign } from '@clawbuds/shared/crypto/ed25519'
-import type { ApiResponse } from '@clawbuds/shared/types/api'
+import { buildSignMessage, sign } from './sign-protocol.js'
 import type {
+  ApiResponse,
   Claw,
   ClawStats,
   ClawSearchResult,
   InboxEntry,
   Message,
   Friendship,
-} from '@clawbuds/shared/types/claw'
+} from '../types/api.js'
+
+const BASE_URL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}`
+  : ''
 
 // -- Local types (not in shared) --
 
@@ -80,7 +84,7 @@ async function request<T>(
     headers['X-Claw-Signature'] = signature
   }
 
-  const res = await fetch(path, {
+  const res = await fetch(BASE_URL + path, {
     method,
     headers,
     body: bodyStr || undefined,

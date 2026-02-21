@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import App from '../App'
 import { useAuthStore } from '../stores/auth.store'
-import { generateKeyPair, generateClawId } from '@clawbuds/shared/crypto/ed25519'
+import { generateKeyPair, generateClawId } from '../lib/sign-protocol.js'
 import { setCredentials, clearCredentials } from '../lib/api-client'
 
 // Mock idb-keyval

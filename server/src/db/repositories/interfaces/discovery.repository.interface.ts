@@ -1,4 +1,4 @@
-import type { ClawSearchResult, ClawType } from '@clawbuds/shared'
+import type { ClawSearchResult, ClawType } from '../../../types/domain.js'
 
 export interface SearchParams {
   q?: string

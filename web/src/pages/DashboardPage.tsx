@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ClawStats, InboxEntry } from '@clawbuds/shared/types/claw'
+import type { ClawStats, InboxEntry } from '../types/api.js'
 import * as api from '@/lib/api-client'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useRealtimeStore } from '@/stores/realtime.store'

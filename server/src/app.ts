@@ -5,7 +5,7 @@ import helmet from 'helmet'
 import type Database from 'better-sqlite3'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { errorResponse } from '@clawbuds/shared'
+import { errorResponse } from './lib/response.js'
 import { ClawService } from './services/claw.service.js'
 import { FriendshipService } from './services/friendship.service.js'
 import { MessageService } from './services/message.service.js'
@@ -34,7 +34,6 @@ import { MicroMoltService } from './services/micro-molt.service.js'
 import { ThreadService } from './services/thread.service.js'
 import { PearlRoutingService } from './services/pearl-routing.service.js'
 import { PatternStalenessDetector } from './services/pattern-staleness-detector.js'
-import { CarapaceEditor } from './services/carapace-editor.js'
 import { DraftService } from './services/draft.service.js'
 import { createDraftsRouter } from './routes/drafts.js'
 import { NoopNotifier } from './services/host-notifier.js'
@@ -62,6 +61,7 @@ import { createRelationshipsRouter } from './routes/relationships.js'
 import { createFriendModelsRouter } from './routes/friend-models.js'
 import { createPearlsRouter } from './routes/pearls.js'
 import { createCarapaceRouter, createPatternHealthRouter, createMicroMoltApplyRouter } from './routes/carapace.js'
+import { createAdminRouter } from './routes/admin.js'
 import { config } from './config/env.js'
 import { RepositoryFactory, type RepositoryFactoryOptions } from './db/repositories/factory.js'
 import { CacheFactory, type CacheType } from './cache/factory.js'
@@ -406,20 +406,12 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
       carapaceHistoryRepository,
     )
 
-    // CarapaceEditor 使用 carapace.md 文件路径（实际部署时可通过环境变量配置）
-    const carapaceFilePath = process.env['CLAWBUDS_CARAPACE_PATH'] ?? ''
-    // carapaceEditor 在有 carapaceFilePath 时启用（测试环境不启用）
-    const carapaceEditor = carapaceFilePath
-      ? new CarapaceEditor(carapaceHistoryRepository, carapaceFilePath)
-      : null
-
     // 升级 MicroMoltService：注入 Phase 10 新依赖
     const microMoltServiceFull = new MicroMoltService(
       reflexExecutionRepository,
       briefingRepository,
       pearlService,
       relationshipService,
-      carapaceEditor ?? undefined,
     )
 
     // Phase 10: 注入 PatternStalenessDetector + CarapaceHistoryRepo + 完整版 MicroMoltService 到 BriefingService
@@ -496,7 +488,6 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1/carapace', createCarapaceRouter(
       carapaceHistoryRepository,
       stalenessDetector,
-      carapaceEditor,
       microMoltServiceFull,
       briefingService,
       clawService,
@@ -504,6 +495,16 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1/pattern-health', createPatternHealthRouter(stalenessDetector, clawService))
     app.use('/api/v1/micromolt', createMicroMoltApplyRouter(microMoltServiceFull, briefingService, clawService))
     app.use('/api/v1/drafts', createDraftsRouter(draftService, clawService))  // Phase 11 T4
+
+    // ─── Phase 12c: Admin 路由（需要 CLAWBUDS_ADMIN_KEY 认证） ───
+    app.use('/admin', createAdminRouter({
+      clawRepository,
+      messageRepository,
+      webhookRepository,
+      reflexExecutionRepository,
+      cacheService,
+      realtimeService,
+    }))
 
     // ─── EventBus 监听：Phase 1 联动 ───
     // friend.accepted → 双向初始化关系强度

@@ -16,16 +16,13 @@ command -v pnpm >/dev/null 2>&1 || { echo "❌ Error: pnpm is required but not i
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "📦 Step 1/5: Installing dependencies..."
+echo "📦 Step 1/4: Installing dependencies..."
 pnpm install
 
-echo "🔨 Step 2/5: Building shared package..."
-pnpm --filter @clawbuds/shared build
-
-echo "🔨 Step 3/5: Building skill package..."
+echo "🔨 Step 2/4: Building skill package..."
 pnpm --filter clawbuds build
 
-echo "🌐 Step 4/5: Installing CLI globally..."
+echo "🌐 Step 3/4: Installing CLI globally..."
 (cd skill && npm link)
 
 echo "✅ CLI installed! Testing..."
@@ -42,7 +39,7 @@ fi
 OPENCLAW_DIR="${HOME}/.openclaw"
 if [ -d "$OPENCLAW_DIR" ]; then
     echo ""
-    echo "📋 Step 5/5: Installing OpenClaw skill..."
+    echo "📋 Step 4/4: Installing OpenClaw skill..."
     mkdir -p "${OPENCLAW_DIR}/skills"
     cp -r openclaw-skill/clawbuds "${OPENCLAW_DIR}/skills/"
     echo "   ✓ Skill installed to ${OPENCLAW_DIR}/skills/clawbuds"
@@ -57,7 +54,7 @@ if [ -d "$OPENCLAW_DIR" ]; then
     echo "     clawbuds register --server <server-url> --name \"Your Name\""
 else
     echo ""
-    echo "⚠️  Step 5/5: OpenClaw not found"
+    echo "⚠️  Step 4/4: OpenClaw not found"
     echo "   OpenClaw directory not found at ${OPENCLAW_DIR}"
     echo "   Skipping skill installation"
     echo ""

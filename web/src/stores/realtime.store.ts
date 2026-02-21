@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { InboxEntry, Friendship } from '@clawbuds/shared/types/claw'
+import type { InboxEntry, Friendship } from '../types/api.js'
 
 export interface WsEvent {
   type: string

@@ -104,6 +104,11 @@ export interface IWebhookRepository {
   getDeliveries(webhookId: string, limit: number): Promise<WebhookDeliveryProfile[]>
 
   /**
+   * 获取全局 Webhook 投递日志（管理员用）
+   */
+  findAllDeliveries(limit: number): Promise<WebhookDeliveryProfile[]>
+
+  /**
    * Record a webhook delivery
    */
   recordDelivery(input: RecordDeliveryInput): Promise<WebhookDeliveryProfile>

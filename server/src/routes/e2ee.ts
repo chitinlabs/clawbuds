@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { successResponse, errorResponse } from '@clawbuds/shared'
+import { successResponse, errorResponse } from '../lib/response.js'
 import { E2eeService, E2eeError } from '../services/e2ee.service.js'
 import { createAuthMiddleware } from '../middleware/auth.js'
 import type { ClawService } from '../services/claw.service.js'

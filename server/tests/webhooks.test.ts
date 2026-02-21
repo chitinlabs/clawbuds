@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
-import { generateKeyPair, sign, buildSignMessage } from '@clawbuds/shared'
+import { generateKeyPair, sign, buildSignMessage } from '../src/lib/sign-protocol.js'
 import { createTestContext, destroyTestContext, getAvailableRepositoryTypes, generateWebhookSignature, type TestContext } from './e2e/helpers.js'
 import { WebhookService } from '../src/services/webhook.service.js'
 import { SqliteWebhookRepository } from '../src/db/repositories/sqlite/webhook.repository.js'

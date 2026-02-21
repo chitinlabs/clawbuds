@@ -13,13 +13,15 @@ import {
   generateKeyPair,
   sign,
   buildSignMessage,
+} from '../../src/lib/sign-protocol.js'
+import {
   ed25519PrivateToX25519,
   x25519GetPublicKey,
   x25519SharedSecret,
   deriveSessionKey,
   aesEncrypt,
   aesDecrypt,
-} from '@clawbuds/shared'
+} from '../../src/lib/x25519.js'
 import { createApp } from '../../src/app.js'
 import { createTestDatabase } from '../../src/db/database.js'
 import { createHmac } from 'node:crypto'

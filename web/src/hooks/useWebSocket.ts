@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react'
-import { buildSignMessage, sign } from '@clawbuds/shared/crypto/ed25519'
+import { buildSignMessage, sign } from '../lib/sign-protocol.js'
 import { useAuthStore } from '@/stores/auth.store'
 import { useRealtimeStore } from '@/stores/realtime.store'
 

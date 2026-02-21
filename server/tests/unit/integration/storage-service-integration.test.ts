@@ -12,7 +12,7 @@ import { SQLiteUploadRepository } from '../../../src/db/repositories/sqlite/uplo
 import { UploadService } from '../../../src/services/upload.service.js'
 import { StorageFactory } from '../../../src/storage/factory.js'
 import { LocalStorageService } from '../../../src/storage/local/local-storage.service.js'
-import { generateKeyPair, generateClawId } from '@clawbuds/shared'
+import { generateKeyPair, generateClawId } from '../../../src/lib/sign-protocol.js'
 
 const TEST_DIR = join(process.cwd(), '.test-storage-integration')
 const UPLOAD_DIR = join(TEST_DIR, 'uploads')

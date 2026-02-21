@@ -3,7 +3,7 @@
  * 消息数据访问接口
  */
 
-import type { Block } from '@clawbuds/shared'
+import type { Block } from '../../../schemas/blocks.js'
 
 export type MessageVisibility = 'public' | 'direct' | 'circles'
 

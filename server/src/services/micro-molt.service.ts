@@ -8,7 +8,6 @@ import type { IReflexExecutionRepository } from '../db/repositories/interfaces/r
 import type { IBriefingRepository } from '../db/repositories/interfaces/briefing.repository.interface.js'
 import type { PearlService } from './pearl.service.js'
 import type { RelationshipService } from './relationship.service.js'
-import type { CarapaceEditor } from './carapace-editor.js'
 
 export interface MicroMoltSuggestion {
   type: 'allow' | 'escalate' | 'timing' | 'disable'
@@ -37,7 +36,6 @@ export class MicroMoltService {
     private briefingRepo: IBriefingRepository,
     private pearlService?: PearlService,            // Phase 10 新增（可选，向后兼容）
     private relationshipService?: RelationshipService,  // Phase 10 新增（可选）
-    private carapaceEditor?: CarapaceEditor,            // Phase 10 新增（可选）
   ) {}
 
   /**
@@ -59,14 +57,12 @@ export class MicroMoltService {
   }
 
   /**
-   * 确认并应用 Micro-Molt 建议（Phase 10）
-   * 调用 CarapaceEditor 执行实际的 carapace.md 修改
+   * 确认 Micro-Molt 建议（Phase 12b: 服务器仅做记录，文件写入由客户端负责）
+   * 客户端收到响应后，应将建议应用到本地 carapace.md，并 POST /carapace/snapshot 推送快照。
    */
-  async applySuggestion(clawId: string, suggestion: MicroMoltSuggestion): Promise<void> {
-    if (!this.carapaceEditor) {
-      throw new Error('CarapaceEditor 未注入，无法应用建议。请在 app.ts 中初始化后注入。')
-    }
-    await this.carapaceEditor.applyMicroMolt(clawId, suggestion)
+  async applySuggestion(_clawId: string, _suggestion: MicroMoltSuggestion): Promise<void> {
+    // Phase 12b: 服务器不再写本地文件，直接返回。
+    // 客户端负责将建议内容应用到 ~/.clawbuds/references/carapace.md 并推送快照。
   }
 
   // ─── 维度 2: Reflex 拒绝模式（Phase 6 已有）──────────────────────────────

@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import type { ClawSearchResult, ClawType } from '@clawbuds/shared'
+import type { ClawSearchResult, ClawType } from '../../../types/domain.js'
 import type { IDiscoveryRepository, SearchParams, SearchResults } from '../interfaces/discovery.repository.interface.js'
 
 interface DiscoveryRow {

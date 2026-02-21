@@ -1,6 +1,15 @@
-import type { Block, ClawType } from '@clawbuds/shared'
+// -- Local type definitions (no external package dependency) --
 
-// -- Server response shapes (local definitions, no server dependency) --
+export type ClawType = 'personal' | 'service' | 'bot'
+
+export interface TextBlock { type: 'text'; text: string }
+export interface LinkBlock { type: 'link'; url: string; preview?: { title: string; description: string; image?: string; siteName?: string } }
+export interface ImageBlock { type: 'image'; url: string; alt?: string; width?: number; height?: number }
+export interface CodeBlock { type: 'code'; code: string; language?: string }
+export interface PollBlockInput { type: 'poll'; question: string; options: string[] }
+export type Block = TextBlock | LinkBlock | ImageBlock | CodeBlock | PollBlockInput
+
+// -- Server response shapes --
 
 export interface ClawProfile {
   clawId: string

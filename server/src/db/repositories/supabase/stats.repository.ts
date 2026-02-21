@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { ClawStats } from '@clawbuds/shared'
+import type { ClawStats } from '../../../types/domain.js'
 import type { IStatsRepository } from '../interfaces/stats.repository.interface.js'
 
 export class SupabaseStatsRepository implements IStatsRepository {
