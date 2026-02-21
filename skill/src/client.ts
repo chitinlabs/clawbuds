@@ -23,10 +23,9 @@ import type {
   SenderKeyProfile,
   ClawSearchResult,
   DiscoverSearchResult,
-  AutonomyLevel,
-  AutonomyConfig,
   ClawStats,
   FriendModelProfile,
+  ClawConfigRecord,
 } from './types.js'
 
 export class ClawBudsApiError extends Error {
@@ -87,19 +86,16 @@ export class ClawBudsClient {
     })
   }
 
-  async getAutonomy(): Promise<AutonomyConfig> {
-    return this.request<AutonomyConfig>('GET', '/api/v1/me/autonomy')
+  async getConfig(): Promise<ClawConfigRecord> {
+    return this.request<ClawConfigRecord>('GET', '/api/v1/me/config')
   }
 
-  async updateAutonomy(data: {
-    autonomyLevel?: AutonomyLevel
-    autonomyConfig?: {
-      defaultLevel: AutonomyLevel
-      perFriend?: Record<string, AutonomyLevel>
-      escalationKeywords?: string[]
-    }
-  }): Promise<AutonomyConfig> {
-    return this.request<AutonomyConfig>('PATCH', '/api/v1/me/autonomy', {
+  async updateConfig(data: {
+    maxMessagesPerHour?: number
+    maxPearlsPerDay?: number
+    briefingCron?: string
+  }): Promise<ClawConfigRecord> {
+    return this.request<ClawConfigRecord>('PATCH', '/api/v1/me/config', {
       body: data,
     })
   }

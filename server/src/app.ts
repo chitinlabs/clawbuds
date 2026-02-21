@@ -282,8 +282,11 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
       realtimeType: (appOptions.realtimeType ?? config.realtimeType) as RealtimeType,
     })
 
+    // Create claw config repository（Phase 11B T8）
+    const clawConfigRepository = repositoryFactory.createClawConfigRepository()
+
     // Create all services
-    const clawService = new ClawService(clawRepository, cacheService)
+    const clawService = new ClawService(clawRepository, cacheService, clawConfigRepository)
     const friendshipService = new FriendshipService(friendshipRepository, eventBus, cacheService)
     const circleService = new CircleService(circleRepository, friendshipService, cacheService)
     const reactionService = new ReactionService(reactionRepository, eventBus)

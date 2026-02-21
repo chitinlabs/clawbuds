@@ -96,6 +96,9 @@ import { SupabaseCarapaceHistoryRepository } from './supabase/carapace-history.r
 import type { IDraftRepository } from './interfaces/draft.repository.interface.js'
 import { SQLiteDraftRepository } from './sqlite/draft.repository.js'
 import { SupabaseDraftRepository } from './supabase/draft.repository.js'
+import type { IClawConfigRepository } from './interfaces/claw-config.repository.interface.js'
+import { SQLiteClawConfigRepository } from './sqlite/claw-config.repository.js'
+import { SupabaseClawConfigRepository } from './supabase/claw-config.repository.js'
 
 export type DatabaseType = 'sqlite' | 'supabase'
 
@@ -533,6 +536,20 @@ export class RepositoryFactory {
         return new SQLiteDraftRepository(this.sqliteDb!)
       case 'supabase':
         return new SupabaseDraftRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 ClawConfigRepository（Phase 11B T8）
+   */
+  createClawConfigRepository(): IClawConfigRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteClawConfigRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseClawConfigRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }

@@ -140,78 +140,58 @@ describe.each(getAvailableRepositoryTypes())('Profile API [%s]', (repositoryType
     })
   })
 
-  describe('GET /api/v1/me/autonomy', () => {
+  describe('GET /api/v1/me/config', () => {
     it('should require auth', async () => {
-      const res = await request(app).get('/api/v1/me/autonomy')
+      const res = await request(app).get('/api/v1/me/config')
       expect(res.status).toBe(401)
     })
 
-    it('should return default autonomy config', async () => {
+    it('should return default config for new claw', async () => {
       const { keys, clawId } = await registerClaw(app, { displayName: 'Alice' })
 
-      const headers = signedHeaders('GET', '/api/v1/me/autonomy', clawId, keys.privateKey)
-      const res = await request(app).get('/api/v1/me/autonomy').set(headers)
+      const headers = signedHeaders('GET', '/api/v1/me/config', clawId, keys.privateKey)
+      const res = await request(app).get('/api/v1/me/config').set(headers)
 
       expect(res.status).toBe(200)
-      expect(res.body.data.autonomyLevel).toBe('notifier')
-      // T7: autonomy columns dropped; autonomyConfig returns hardcoded default
-      expect(res.body.data.autonomyConfig.defaultLevel).toBe('notifier')
+      expect(res.body.data.maxMessagesPerHour).toBe(20)
+      expect(res.body.data.maxPearlsPerDay).toBe(10)
+      expect(res.body.data.briefingCron).toBe('0 20 * * *')
     })
   })
 
-  describe('PATCH /api/v1/me/autonomy', () => {
+  describe('PATCH /api/v1/me/config', () => {
     it('should require auth', async () => {
-      const res = await request(app).patch('/api/v1/me/autonomy').send({ autonomyLevel: 'drafter' })
+      const res = await request(app).patch('/api/v1/me/config').send({ maxMessagesPerHour: 30 })
       expect(res.status).toBe(401)
     })
 
-    // T7 (Phase 11B): autonomy_level/autonomy_config columns dropped.
-    // PATCH /me/autonomy is now a no-op – updates accepted but not persisted.
-    it('should accept autonomy level update (no-op since T7)', async () => {
+    it('should update maxMessagesPerHour', async () => {
       const { keys, clawId } = await registerClaw(app, { displayName: 'Alice' })
 
-      const body = { autonomyLevel: 'drafter' }
-      const headers = signedHeaders('PATCH', '/api/v1/me/autonomy', clawId, keys.privateKey, body)
-      const res = await request(app).patch('/api/v1/me/autonomy').set(headers).send(body)
+      const body = { maxMessagesPerHour: 30 }
+      const headers = signedHeaders('PATCH', '/api/v1/me/config', clawId, keys.privateKey, body)
+      const res = await request(app).patch('/api/v1/me/config').set(headers).send(body)
 
       expect(res.status).toBe(200)
-      // autonomyLevel stays at hardcoded default 'notifier' (columns dropped)
-      expect(res.body.data.autonomyLevel).toBe('notifier')
-    })
-
-    it('should accept autonomy config update (no-op since T7)', async () => {
-      const { keys, clawId } = await registerClaw(app, { displayName: 'Alice' })
-
-      const body = {
-        autonomyConfig: {
-          defaultLevel: 'autonomous' as const,
-          escalationKeywords: ['urgent', 'help'],
-        },
-      }
-      const headers = signedHeaders('PATCH', '/api/v1/me/autonomy', clawId, keys.privateKey, body)
-      const res = await request(app).patch('/api/v1/me/autonomy').set(headers).send(body)
-
-      expect(res.status).toBe(200)
-      // autonomyConfig stays at hardcoded default {} (columns dropped)
-      expect(res.body.success).toBe(true)
+      expect(res.body.data.maxMessagesPerHour).toBe(30)
     })
 
     it('should reject empty update', async () => {
       const { keys, clawId } = await registerClaw(app, { displayName: 'Alice' })
 
       const body = {}
-      const headers = signedHeaders('PATCH', '/api/v1/me/autonomy', clawId, keys.privateKey, body)
-      const res = await request(app).patch('/api/v1/me/autonomy').set(headers).send(body)
+      const headers = signedHeaders('PATCH', '/api/v1/me/config', clawId, keys.privateKey, body)
+      const res = await request(app).patch('/api/v1/me/config').set(headers).send(body)
 
       expect(res.status).toBe(400)
     })
 
-    it('should reject invalid autonomy level', async () => {
+    it('should reject out-of-range maxMessagesPerHour', async () => {
       const { keys, clawId } = await registerClaw(app, { displayName: 'Alice' })
 
-      const body = { autonomyLevel: 'invalid' }
-      const headers = signedHeaders('PATCH', '/api/v1/me/autonomy', clawId, keys.privateKey, body)
-      const res = await request(app).patch('/api/v1/me/autonomy').set(headers).send(body)
+      const body = { maxMessagesPerHour: 0 }
+      const headers = signedHeaders('PATCH', '/api/v1/me/config', clawId, keys.privateKey, body)
+      const res = await request(app).patch('/api/v1/me/config').set(headers).send(body)
 
       expect(res.status).toBe(400)
     })

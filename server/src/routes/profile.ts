@@ -18,13 +18,10 @@ const UpdateProfileSchema = z.object({
   avatarUrl: z.string().url().max(500).optional(),
 })
 
-const UpdateAutonomySchema = z.object({
-  autonomyLevel: z.enum(['notifier', 'drafter', 'autonomous', 'delegator']).optional(),
-  autonomyConfig: z.object({
-    defaultLevel: z.enum(['notifier', 'drafter', 'autonomous', 'delegator']),
-    perFriend: z.record(z.enum(['notifier', 'drafter', 'autonomous', 'delegator'])).optional(),
-    escalationKeywords: z.array(z.string()).optional(),
-  }).optional(),
+const UpdateConfigSchema = z.object({
+  maxMessagesPerHour: z.number().int().min(1).max(1000).optional(),
+  maxPearlsPerDay: z.number().int().min(0).max(1000).optional(),
+  briefingCron: z.string().min(1).max(100).optional(),
 })
 
 const StatusTextSchema = z.object({
@@ -93,39 +90,29 @@ export function createProfileRouter(
     res.json(successResponse(claw))
   })
 
-  // GET /api/v1/me/autonomy - get autonomy config (auth required)
-  router.get('/me/autonomy', requireAuth, asyncHandler(async (req, res) => {
-    const config = await clawService.getAutonomyConfig(req.clawId!)
-    if (!config) {
-      res.status(404).json(errorResponse('NOT_FOUND', 'Claw not found'))
-      return
-    }
-
-    res.json(successResponse(config))
+  // GET /api/v1/me/config - get hard constraint config (auth required)
+  router.get('/me/config', requireAuth, asyncHandler(async (req, res) => {
+    const cfg = await clawService.getConfig(req.clawId!)
+    res.json(successResponse(cfg))
   }))
 
-  // PATCH /api/v1/me/autonomy - update autonomy config (auth required)
-  router.patch('/me/autonomy', requireAuth, async (req, res) => {
-    const parsed = UpdateAutonomySchema.safeParse(req.body)
+  // PATCH /api/v1/me/config - update hard constraint config (auth required)
+  router.patch('/me/config', requireAuth, asyncHandler(async (req, res) => {
+    const parsed = UpdateConfigSchema.safeParse(req.body)
     if (!parsed.success) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'Invalid request body', parsed.error.errors))
       return
     }
 
     const data = parsed.data
-    if (data.autonomyLevel === undefined && data.autonomyConfig === undefined) {
+    if (data.maxMessagesPerHour === undefined && data.maxPearlsPerDay === undefined && data.briefingCron === undefined) {
       res.status(400).json(errorResponse('VALIDATION_ERROR', 'At least one field required'))
       return
     }
 
-    const claw = await clawService.updateAutonomyConfig(req.clawId!, data)
-    if (!claw) {
-      res.status(404).json(errorResponse('NOT_FOUND', 'Claw not found'))
-      return
-    }
-
-    res.json(successResponse(claw))
-  })
+    const cfg = await clawService.updateConfig(req.clawId!, data)
+    res.json(successResponse(cfg))
+  }))
 
   // GET /api/v1/me/stats - get stats (auth required)
   router.get('/me/stats', requireAuth, asyncHandler(async (req, res) => {

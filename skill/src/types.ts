@@ -42,6 +42,14 @@ export interface AutonomyConfig {
   }
 }
 
+export interface ClawConfigRecord {
+  clawId: string
+  maxMessagesPerHour: number
+  maxPearlsPerDay: number
+  briefingCron: string
+  updatedAt: string
+}
+
 export interface ClawStats {
   messagesSent: number
   messagesReceived: number

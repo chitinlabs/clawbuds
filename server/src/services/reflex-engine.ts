@@ -32,10 +32,11 @@ const LAYER_ORDER: Record<string, number> = {
   core: 3,
 }
 
-// ─── HardConstraints（Phase 4 硬编码默认值） ──────────────────────────────────
-const HARD_CONSTRAINTS = {
-  maxMessagesPerHour: 20,
-}
+// ─── HardConstraints 默认值（当 DB 不可用时的后备值） ─────────────────────────
+const DEFAULT_MAX_MESSAGES_PER_HOUR = 20
+
+// 5 分钟缓存（毫秒）
+const CONFIG_CACHE_TTL_MS = 5 * 60 * 1000
 
 // ─── Layer 0 匹配逻辑（纯函数，无副作用） ─────────────────────────────────────
 
@@ -277,9 +278,17 @@ const LAYER1_BUILTIN_REFLEXES: Array<Omit<ReflexRecord, 'id' | 'clawId' | 'creat
   },
 ]
 
+// 配置缓存条目
+interface ConfigCacheEntry {
+  maxMessagesPerHour: number
+  fetchedAt: number
+}
+
 export class ReflexEngine {
   private batchProcessor: ReflexBatchProcessor | null = null
   private pearlRoutingService: PearlRoutingService | null = null
+  // 每用户配置缓存（5 分钟 TTL，避免每次事件触发都查库）
+  private configCache = new Map<string, ConfigCacheEntry>()
 
   constructor(
     private reflexRepo: IReflexRepository,
@@ -358,18 +367,39 @@ export class ReflexEngine {
   }
 
   /**
+   * 从 DB 获取 maxMessagesPerHour（5 分钟缓存）
+   */
+  private async getMaxMessagesPerHour(clawId: string): Promise<number> {
+    const now = Date.now()
+    const cached = this.configCache.get(clawId)
+    if (cached && now - cached.fetchedAt < CONFIG_CACHE_TTL_MS) {
+      return cached.maxMessagesPerHour
+    }
+    try {
+      const cfg = await this.clawService.getConfig(clawId)
+      this.configCache.set(clawId, { maxMessagesPerHour: cfg.maxMessagesPerHour, fetchedAt: now })
+      return cfg.maxMessagesPerHour
+    } catch {
+      return DEFAULT_MAX_MESSAGES_PER_HOUR
+    }
+  }
+
+  /**
    * EventBus 事件处理入口
    */
   async onEvent(event: BusEvent): Promise<void> {
     if (!event.clawId) return
 
-    const reflexes = await this.reflexRepo.findEnabled(event.clawId, 0)  // Layer 0 only
+    const [reflexes, maxMsgsPerHour] = await Promise.all([
+      this.reflexRepo.findEnabled(event.clawId, 0),  // Layer 0 only
+      this.getMaxMessagesPerHour(event.clawId),
+    ])
 
     for (const reflex of reflexes) {
       if (reflex.triggerLayer === 0) {
         const matched = matchLayer0(reflex, event)
         if (matched) {
-          const allowed = this.checkHardConstraints(reflex, event)
+          const allowed = this.checkHardConstraints(reflex, event, maxMsgsPerHour)
           if (allowed) {
             await this.execute(reflex, event)
           } else {
@@ -383,13 +413,13 @@ export class ReflexEngine {
     }
   }
 
-  /** 硬约束检查 */
-  private checkHardConstraints(reflex: ReflexRecord, event: BusEvent): boolean {
+  /** 硬约束检查（maxMessagesPerHour 从 DB 缓存读取，由 onEvent 传入） */
+  private checkHardConstraints(reflex: ReflexRecord, event: BusEvent, maxMessagesPerHour: number): boolean {
     // audit 和 keepalive 不受限制
     if (reflex.behavior === 'audit' || reflex.behavior === 'keepalive') return true
 
     // 检查每小时消息上限
-    return getMessageCount(event.clawId) < HARD_CONSTRAINTS.maxMessagesPerHour
+    return getMessageCount(event.clawId) < maxMessagesPerHour
   }
 
   /** 执行 Layer 0 Reflex */
@@ -447,7 +477,8 @@ export class ReflexEngine {
     const commonTags = domainTags.filter((t) => senderInterests.includes(t))
     if (commonTags.length < minCommonTags) return
 
-    if (!this.checkHardConstraints(reflex, event)) {
+    const maxMsgs = this.configCache.get(event.clawId)?.maxMessagesPerHour ?? DEFAULT_MAX_MESSAGES_PER_HOUR
+    if (!this.checkHardConstraints(reflex, event, maxMsgs)) {
       await this.logExecution(reflex, event, 'blocked', { reason: 'hard_constraint' })
       return
     }

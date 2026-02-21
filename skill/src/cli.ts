@@ -6,7 +6,7 @@ import { registerCommand } from './commands/register.js'
 import { serverCommand } from './commands/server.js'
 import { infoCommand } from './commands/info.js'
 import { profileCommand } from './commands/profile.js'
-import { autonomyCommand } from './commands/autonomy.js'
+import { configCommand } from './commands/config.js'
 import { statsCommand } from './commands/stats.js'
 import { friendsCommand } from './commands/friends.js'
 import { discoverCommand } from './commands/discover.js'
@@ -44,7 +44,7 @@ program.addCommand(registerCommand)
 program.addCommand(serverCommand)
 program.addCommand(infoCommand)
 program.addCommand(profileCommand)
-program.addCommand(autonomyCommand)
+program.addCommand(configCommand)
 program.addCommand(statsCommand)
 program.addCommand(friendsCommand)
 program.addCommand(discoverCommand)

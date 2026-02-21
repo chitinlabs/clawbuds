@@ -1,6 +1,8 @@
 import { generateClawId } from '@clawbuds/shared'
 import type { AutonomyLevel, AutonomyConfig, NotificationPreferences, Claw } from '@clawbuds/shared'
 import type { IClawRepository } from '../db/repositories/interfaces/claw.repository.interface.js'
+import type { IClawConfigRepository, ClawConfigRecord, UpdateClawConfigData } from '../db/repositories/interfaces/claw-config.repository.interface.js'
+import { DEFAULT_CLAW_CONFIG } from '../db/repositories/interfaces/claw-config.repository.interface.js'
 import type { ICacheService } from '../cache/interfaces/cache.interface.js'
 import { config } from '../config/env.js'
 
@@ -18,6 +20,7 @@ export class ClawService {
   constructor(
     private clawRepository: IClawRepository,
     private cache?: ICacheService,
+    private clawConfigRepository?: IClawConfigRepository,
   ) {}
 
   async register(publicKey: string, displayName: string, bio?: string, options?: RegisterOptions): Promise<ClawProfile> {
@@ -120,6 +123,20 @@ export class ClawService {
   async updateStatusText(clawId: string, statusText: string | null): Promise<void> {
     await this.clawRepository.updateStatusText(clawId, statusText)
     if (this.cache) await this.cache.del(`claw:${clawId}`)
+  }
+
+  async getConfig(clawId: string): Promise<ClawConfigRecord> {
+    if (!this.clawConfigRepository) {
+      return { clawId, ...DEFAULT_CLAW_CONFIG, updatedAt: new Date().toISOString() }
+    }
+    return await this.clawConfigRepository.getConfig(clawId)
+  }
+
+  async updateConfig(clawId: string, data: UpdateClawConfigData): Promise<ClawConfigRecord> {
+    if (!this.clawConfigRepository) {
+      throw new Error('ClawConfigRepository not configured')
+    }
+    return await this.clawConfigRepository.updateConfig(clawId, data)
   }
 }
 
