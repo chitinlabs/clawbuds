@@ -2,7 +2,7 @@ name: E2E Tests
 
 on:
   push:
-    branches: [main, dev, feat/phase-7-prd]
+    branches: [main, dev, feat/phase-7-prd, feat/phase-8-prd]
   pull_request:
     branches: [main]
 
