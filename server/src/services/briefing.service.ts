@@ -9,6 +9,8 @@ import type { HostNotifier, AgentPayload } from './host-notifier.js'
 import type { MicroMoltService, MicroMoltSuggestion } from './micro-molt.service.js'
 import type { IThreadRepository, ThreadPurpose } from '../db/repositories/interfaces/thread.repository.interface.js'
 import type { IThreadContributionRepository } from '../db/repositories/interfaces/thread.repository.interface.js'
+import type { PatternStalenessDetector, StalenessAlert, PatternHealthScore } from './pattern-staleness-detector.js'
+import type { ICarapaceHistoryRepository, CarapaceHistoryRecord } from '../db/repositories/interfaces/carapace-history.repository.interface.js'
 
 // Phase 8: Thread 更新摘要（用于简报）
 export interface ThreadUpdate {
@@ -36,8 +38,12 @@ export interface BriefingRawData {
   pendingDrafts: DraftSummary[]
   heartbeatInsights: HeartbeatInsight[]
   microMoltSuggestions: MicroMoltSuggestion[]
-  threadUpdates: ThreadUpdate[]      // Phase 8: Thread 活动汇总
-  routingStats: PearlRoutingStats    // Phase 9: Pearl 路由活跃度
+  threadUpdates: ThreadUpdate[]              // Phase 8: Thread 活动汇总
+  routingStats: PearlRoutingStats            // Phase 9: Pearl 路由活跃度
+  // Phase 10: 周报专有字段（日报时为 undefined）
+  patternHealth?: PatternHealthScore         // 模式健康评分
+  carapaceHistory?: CarapaceHistoryRecord[]  // carapace.md 演化历史
+  stalenessAlerts?: StalenessAlert[]         // 模式僵化告警
 }
 
 export interface MessageSummary {
@@ -94,6 +100,9 @@ export interface HeartbeatInsight {
 }
 
 export class BriefingService {
+  private stalenessDetector?: PatternStalenessDetector    // Phase 10: 可选
+  private carapaceHistoryRepo?: ICarapaceHistoryRepository  // Phase 10: 可选
+
   constructor(
     private briefingRepo: IBriefingRepository,
     private hostNotifier: HostNotifier,
@@ -111,6 +120,61 @@ export class BriefingService {
   ): void {
     this.threadRepo = threadRepo
     this.threadContribRepo = threadContribRepo
+  }
+
+  /**
+   * 延迟注入 Phase 10 服务（模式健康 + 历史记录）
+   */
+  injectPhase10Services(
+    stalenessDetector: PatternStalenessDetector,
+    carapaceHistoryRepo: ICarapaceHistoryRepository,
+  ): void {
+    this.stalenessDetector = stalenessDetector
+    this.carapaceHistoryRepo = carapaceHistoryRepo
+  }
+
+  /**
+   * 收集周报数据（Phase 10：在日报基础上增加模式健康 + carapace 演化历史）
+   */
+  async collectWeeklyData(clawId: string): Promise<BriefingRawData> {
+    const dailyData = await this.collectDailyData(clawId)
+
+    if (!this.stalenessDetector || !this.carapaceHistoryRepo) {
+      return dailyData
+    }
+
+    const [patternHealth, carapaceHistory, stalenessAlerts] = await Promise.all([
+      this.stalenessDetector.computeHealthScore(clawId),
+      this.carapaceHistoryRepo.findByOwner(clawId, { limit: 5 }),
+      this.stalenessDetector.detect(clawId),
+    ])
+
+    // 完整版 microMoltSuggestions 覆盖日报中的简化版
+    const microMoltSuggestions = await this.microMoltService.generateSuggestions(clawId)
+
+    return {
+      ...dailyData,
+      patternHealth,
+      carapaceHistory,
+      stalenessAlerts,
+      microMoltSuggestions,
+    }
+  }
+
+  /**
+   * 触发每周简报生成（Phase 10，每周日 20:00 由 Cron 调用）
+   */
+  async triggerWeeklyBriefing(clawId: string): Promise<string> {
+    const rawData = await this.collectWeeklyData(clawId)
+    const id = `brief_${randomUUID().replace(/-/g, '').slice(0, 12)}`
+    await this.briefingRepo.create({
+      id,
+      clawId,
+      type: 'weekly',
+      content: this.renderWeeklyFallbackTemplate(rawData),
+      rawData: rawData as unknown as Record<string, unknown>,
+    })
+    return id
   }
 
   /**
@@ -287,6 +351,36 @@ export class BriefingService {
       '',
       rawData.microMoltSuggestions.length > 0
         ? `## Micro-Molt 建议\n${rawData.microMoltSuggestions.map((s) => `- ${s.description}\n  → \`${s.cliCommand}\``).join('\n')}`
+        : '',
+    ].join('\n')
+  }
+
+  private renderWeeklyFallbackTemplate(rawData: BriefingRawData): string {
+    const now = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+    const health = rawData.patternHealth
+    const healthBar = health
+      ? `整体健康: ${Math.round(health.overall * 100)}% (Reflex: ${Math.round(health.reflexDiversity * 100)}% / 模板: ${Math.round(health.templateDiversity * 100)}% / 策略: ${Math.round(health.carapaceFreshness * 100)}%)`
+      : '（模式健康数据不可用）'
+    const alertsText = rawData.stalenessAlerts?.length
+      ? rawData.stalenessAlerts.map((a) => `⚠️ [${a.severity}] ${a.description}`).join('\n')
+      : '✓ 未检测到严重僵化'
+    const historyText = rawData.carapaceHistory?.length
+      ? rawData.carapaceHistory.map((h) => `${h.createdAt.slice(0, 10)}  [${h.changeReason}] 版本 ${h.version}`).join('\n')
+      : '（无修改历史）'
+    return [
+      `# 本周模式健康报告  ${now}`,
+      '',
+      `## 模式健康评分`,
+      healthBar,
+      '',
+      `## 僵化检测`,
+      alertsText,
+      '',
+      `## carapace.md 演化历史（最近 5 次）`,
+      historyText,
+      '',
+      rawData.microMoltSuggestions.length > 0
+        ? `## Micro-Molt 建议（${rawData.microMoltSuggestions.length} 条）\n${rawData.microMoltSuggestions.map((s) => `- ${s.description}\n  → \`${s.cliCommand}\``).join('\n')}`
         : '',
     ].join('\n')
   }

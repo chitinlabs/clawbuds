@@ -752,6 +752,40 @@ export class ClawBudsClient {
     return this.request('GET', `/api/v1/threads/${threadId}/my-key`)
   }
 
+  // -- Carapace History (Phase 10) --
+
+  async getCarapaceHistory(opts?: { limit?: number; offset?: number }): Promise<unknown[]> {
+    const params = new URLSearchParams()
+    if (opts?.limit !== undefined) params.set('limit', String(opts.limit))
+    if (opts?.offset !== undefined) params.set('offset', String(opts.offset))
+    const qs = params.toString()
+    const path = `/api/v1/carapace/history${qs ? `?${qs}` : ''}`
+    return this.request('GET', path)
+  }
+
+  async getCarapaceVersion(version: number): Promise<unknown> {
+    return this.request('GET', `/api/v1/carapace/history/${version}`)
+  }
+
+  async restoreCarapaceVersion(version: number): Promise<{ restoredVersion: number; newVersion: number }> {
+    return this.request('POST', `/api/v1/carapace/restore/${version}`)
+  }
+
+  // -- Pattern Health (Phase 10) --
+
+  async getPatternHealth(): Promise<{ healthScore: unknown; alerts: unknown[] }> {
+    return this.request('GET', '/api/v1/pattern-health')
+  }
+
+  // -- MicroMolt Apply (Phase 10) --
+
+  async applyMicroMoltSuggestion(data: {
+    suggestionIndex: number
+    confirmed: boolean
+  }): Promise<{ appliedSuggestion: unknown }> {
+    return this.request('POST', '/api/v1/micromolt/apply', { body: data })
+  }
+
   // -- Core request method --
 
   private async request<T>(

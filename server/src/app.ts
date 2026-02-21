@@ -33,6 +33,8 @@ import { TrustService } from './services/trust.service.js'
 import { MicroMoltService } from './services/micro-molt.service.js'
 import { ThreadService } from './services/thread.service.js'
 import { PearlRoutingService } from './services/pearl-routing.service.js'
+import { PatternStalenessDetector } from './services/pattern-staleness-detector.js'
+import { CarapaceEditor } from './services/carapace-editor.js'
 import { NoopNotifier } from './services/host-notifier.js'
 import { OpenClawNotifier } from './services/openclaw-notifier.js'
 import { ReflexBatchProcessor } from './services/reflex-batch-processor.js'
@@ -57,6 +59,7 @@ import { createHeartbeatRouter } from './routes/heartbeat.js'
 import { createRelationshipsRouter } from './routes/relationships.js'
 import { createFriendModelsRouter } from './routes/friend-models.js'
 import { createPearlsRouter } from './routes/pearls.js'
+import { createCarapaceRouter, createPatternHealthRouter, createMicroMoltApplyRouter } from './routes/carapace.js'
 import { config } from './config/env.js'
 import { RepositoryFactory, type RepositoryFactoryOptions } from './db/repositories/factory.js'
 import { CacheFactory, type CacheType } from './cache/factory.js'
@@ -390,6 +393,42 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
       }
     })
 
+    // ─── Phase 10: Micro-Molt 完整版 + PatternStalenessDetector ───
+
+    const carapaceHistoryRepository = repositoryFactory.createCarapaceHistoryRepository()
+    const stalenessDetector = new PatternStalenessDetector(
+      reflexExecutionRepository,
+      carapaceHistoryRepository,
+    )
+
+    // CarapaceEditor 使用 carapace.md 文件路径（实际部署时可通过环境变量配置）
+    const carapaceFilePath = process.env['CLAWBUDS_CARAPACE_PATH'] ?? ''
+    // carapaceEditor 在有 carapaceFilePath 时启用（测试环境不启用）
+    const carapaceEditor = carapaceFilePath
+      ? new CarapaceEditor(carapaceHistoryRepository, carapaceFilePath, 'system')
+      : null
+
+    // 升级 MicroMoltService：注入 Phase 10 新依赖
+    const microMoltServiceFull = new MicroMoltService(
+      reflexExecutionRepository,
+      briefingRepository,
+      pearlService,
+      relationshipService,
+      carapaceEditor ?? undefined,
+    )
+
+    // Phase 10: 注入 PatternStalenessDetector + CarapaceHistoryRepo 到 BriefingService
+    briefingService.injectPhase10Services(stalenessDetector, carapaceHistoryRepository)
+
+    // Phase 10: 每周日 20:00 触发周报（CLAWBUDS_WEEKLY_BRIEFING_CRON 可配置）
+    // 由 Daemon 注册，此处注释保留作为参考
+    // scheduleCron('0 20 * * 0', async () => {
+    //   const claws = await clawService.listAll()
+    //   for (const claw of claws) {
+    //     await briefingService.triggerWeeklyBriefing(claw.clawId).catch(() => {})
+    //   }
+    // })
+
     ctx.clawService = clawService
     ctx.inboxService = inboxService
     ctx.eventBus = eventBus
@@ -427,6 +466,16 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1/briefings', createBriefingsRouter(briefingService, clawService))
     app.use('/api/v1/trust', createTrustRouter(trustService, clawService, friendshipService))
     app.use('/api/v1/threads', createThreadsRouter(threadService, clawService))
+    app.use('/api/v1/carapace', createCarapaceRouter(
+      carapaceHistoryRepository,
+      stalenessDetector,
+      carapaceEditor,
+      microMoltServiceFull,
+      briefingService,
+      clawService,
+    ))
+    app.use('/api/v1/pattern-health', createPatternHealthRouter(stalenessDetector, clawService))
+    app.use('/api/v1/micromolt', createMicroMoltApplyRouter(microMoltServiceFull, briefingService, clawService))
 
     // ─── EventBus 监听：Phase 1 联动 ───
     // friend.accepted → 双向初始化关系强度
