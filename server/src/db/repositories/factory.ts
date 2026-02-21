@@ -79,6 +79,17 @@ import { SQLiteBriefingRepository } from './sqlite/briefing.repository.js'
 import { SupabaseBriefingRepository } from './supabase/briefing.repository.js'
 import { SQLiteTrustRepository } from './sqlite/trust.repository.js'
 import { SupabaseTrustRepository } from './supabase/trust.repository.js'
+import type {
+  IThreadRepository,
+  IThreadContributionRepository,
+  IThreadKeyRepository,
+} from './interfaces/thread.repository.interface.js'
+import { SQLiteThreadRepository } from './sqlite/thread.repository.js'
+import { SQLiteThreadContributionRepository } from './sqlite/thread-contribution.repository.js'
+import { SQLiteThreadKeyRepository } from './sqlite/thread-key.repository.js'
+import { SupabaseThreadRepository } from './supabase/thread.repository.js'
+import { SupabaseThreadContributionRepository } from './supabase/thread-contribution.repository.js'
+import { SupabaseThreadKeyRepository } from './supabase/thread-key.repository.js'
 
 export type DatabaseType = 'sqlite' | 'supabase'
 
@@ -446,6 +457,48 @@ export class RepositoryFactory {
         return new SQLiteTrustRepository(this.sqliteDb!)
       case 'supabase':
         return new SupabaseTrustRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 ThreadRepository（Phase 8）
+   */
+  createThreadRepository(): IThreadRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteThreadRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseThreadRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 ThreadContributionRepository（Phase 8）
+   */
+  createThreadContributionRepository(): IThreadContributionRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteThreadContributionRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseThreadContributionRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 ThreadKeyRepository（Phase 8）
+   */
+  createThreadKeyRepository(): IThreadKeyRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteThreadKeyRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseThreadKeyRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }

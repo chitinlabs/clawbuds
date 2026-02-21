@@ -31,6 +31,7 @@ import { ImprintService } from './services/imprint.service.js'
 import { BriefingService } from './services/briefing.service.js'
 import { TrustService } from './services/trust.service.js'
 import { MicroMoltService } from './services/micro-molt.service.js'
+import { ThreadService } from './services/thread.service.js'
 import { NoopNotifier } from './services/host-notifier.js'
 import { OpenClawNotifier } from './services/openclaw-notifier.js'
 import { ReflexBatchProcessor } from './services/reflex-batch-processor.js'
@@ -38,6 +39,7 @@ import { createReflexesRouter } from './routes/reflexes.js'
 import { createImprintsRouter } from './routes/imprints.js'
 import { createBriefingsRouter } from './routes/briefings.js'
 import { createTrustRouter } from './routes/trust.js'
+import { createThreadsRouter } from './routes/threads.js'
 import { createAuthRouter } from './routes/auth.js'
 import { createFriendsRouter } from './routes/friends.js'
 import { createMessagesRouter } from './routes/messages.js'
@@ -348,6 +350,22 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     const trustRepository = repositoryFactory.createTrustRepository()
     const trustService = new TrustService(trustRepository, relationshipService, friendshipService, eventBus)
 
+    // ─── Phase 8: ThreadService ───
+    const threadRepository = repositoryFactory.createThreadRepository()
+    const threadContributionRepository = repositoryFactory.createThreadContributionRepository()
+    const threadKeyRepository = repositoryFactory.createThreadKeyRepository()
+    const threadService = new ThreadService(
+      threadRepository,
+      threadContributionRepository,
+      threadKeyRepository,
+      friendshipService,
+      hostNotifier,
+      eventBus,
+    )
+
+    // Phase 8: 将 Thread repos 注入 BriefingService（延迟注入，避免循环依赖）
+    briefingService.injectThreadRepos(threadRepository, threadContributionRepository)
+
     ctx.clawService = clawService
     ctx.inboxService = inboxService
     ctx.eventBus = eventBus
@@ -384,6 +402,7 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1/imprints', createImprintsRouter(imprintService, clawService))
     app.use('/api/v1/briefings', createBriefingsRouter(briefingService, clawService))
     app.use('/api/v1/trust', createTrustRouter(trustService, clawService, friendshipService))
+    app.use('/api/v1/threads', createThreadsRouter(threadService, clawService))
 
     // ─── EventBus 监听：Phase 1 联动 ───
     // friend.accepted → 双向初始化关系强度

@@ -3,6 +3,7 @@ import type { InboxEntry } from './inbox.service.js'
 import type { FriendshipProfile } from './friendship.service.js'
 import type { MessageProfile } from './message.service.js'
 import type { DunbarLayer } from '../db/repositories/interfaces/relationship-strength.repository.interface.js'
+import type { ThreadPurpose, ThreadStatus, ContributionType } from '../db/repositories/interfaces/thread.repository.interface.js'
 
 export interface HeartbeatPayload {
   interests?: string[]
@@ -43,6 +44,26 @@ export interface EventMap {
   // Phase 4: ReflexEngine 定时器事件
   'timer.tick': { clawId: string; intervalMs: number; timestamp: string }
   'poll.closing_soon': { clawId: string; pollId: string; closesAt: string }
+  // Phase 8: Thread V5 协作话题工作区
+  'thread.created': {
+    threadId: string
+    creatorId: string
+    purpose: ThreadPurpose
+    participantIds: string[]
+  }
+  'thread.contribution_added': {
+    threadId: string
+    contributorId: string
+    contributionId: string
+    contentType: ContributionType
+    purpose: ThreadPurpose         // 用于 track_thread_progress 的意图策略
+    contributionCount: number      // 当前总贡献数
+  }
+  'thread.status_changed': {
+    threadId: string
+    oldStatus: ThreadStatus
+    newStatus: ThreadStatus
+  }
 }
 
 export type EventName = keyof EventMap

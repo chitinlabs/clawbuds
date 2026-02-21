@@ -7,6 +7,18 @@ import { randomUUID } from 'node:crypto'
 import type { IBriefingRepository, BriefingRecord } from '../db/repositories/interfaces/briefing.repository.interface.js'
 import type { HostNotifier, AgentPayload } from './host-notifier.js'
 import type { MicroMoltService, MicroMoltSuggestion } from './micro-molt.service.js'
+import type { IThreadRepository, ThreadPurpose } from '../db/repositories/interfaces/thread.repository.interface.js'
+import type { IThreadContributionRepository } from '../db/repositories/interfaces/thread.repository.interface.js'
+
+// Phase 8: Thread 更新摘要（用于简报）
+export interface ThreadUpdate {
+  threadId: string
+  title: string
+  purpose: ThreadPurpose
+  newContributions: number    // 过去 24 小时新增贡献数
+  lastContributorId: string
+  hasDigestPending: boolean   // 是否有 AI 摘要待生成
+}
 
 export interface BriefingRawData {
   messages: MessageSummary[]
@@ -17,6 +29,7 @@ export interface BriefingRawData {
   pendingDrafts: DraftSummary[]
   heartbeatInsights: HeartbeatInsight[]
   microMoltSuggestions: MicroMoltSuggestion[]
+  threadUpdates: ThreadUpdate[]  // Phase 8: Thread 活动汇总
 }
 
 export interface MessageSummary {
@@ -77,14 +90,29 @@ export class BriefingService {
     private briefingRepo: IBriefingRepository,
     private hostNotifier: HostNotifier,
     private microMoltService: MicroMoltService,
+    private threadRepo?: IThreadRepository,               // Phase 8: 可选，Thread 更新
+    private threadContribRepo?: IThreadContributionRepository,  // Phase 8: 可选
   ) {}
+
+  /**
+   * 延迟注入 Thread Repositories（Phase 8，避免循环依赖）
+   */
+  injectThreadRepos(
+    threadRepo: IThreadRepository,
+    threadContribRepo: IThreadContributionRepository,
+  ): void {
+    this.threadRepo = threadRepo
+    this.threadContribRepo = threadContribRepo
+  }
 
   /**
    * 收集每日数据（生成简报原始素材）
    * Phase 6 基础版：只收集 MicroMolt 建议；其他数据源在 Phase 7+ 集成
+   * Phase 8 新增：Thread 更新汇总
    */
   async collectDailyData(clawId: string): Promise<BriefingRawData> {
     const microMoltSuggestions = await this.microMoltService.generateSuggestions(clawId)
+    const threadUpdates = await this.collectThreadUpdates(clawId)
     return {
       messages: [],
       reflexAlerts: [],
@@ -94,7 +122,45 @@ export class BriefingService {
       pendingDrafts: [],
       heartbeatInsights: [],
       microMoltSuggestions,
+      threadUpdates,
     }
+  }
+
+  /**
+   * 收集 Thread 更新数据（Phase 8）
+   * 返回过去 24 小时有新贡献的 Thread 摘要
+   */
+  async collectThreadUpdates(clawId: string): Promise<ThreadUpdate[]> {
+    if (!this.threadRepo || !this.threadContribRepo) return []
+
+    const threads = await this.threadRepo.findByParticipant(clawId, {
+      status: 'active',
+      limit: 50,
+    })
+
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    const updates: ThreadUpdate[] = []
+
+    for (const thread of threads) {
+      const recentContribs = await this.threadContribRepo.findByThread(thread.id, {
+        since: since24h,
+        limit: 100,
+      })
+
+      if (recentContribs.length === 0) continue
+
+      const lastContrib = recentContribs[recentContribs.length - 1]
+      updates.push({
+        threadId: thread.id,
+        title: thread.title,
+        purpose: thread.purpose,
+        newContributions: recentContribs.length,
+        lastContributorId: lastContrib.contributorId,
+        hasDigestPending: false,  // 简化：暂不追踪摘要状态
+      })
+    }
+
+    return updates
   }
 
   /**
