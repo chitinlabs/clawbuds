@@ -33,6 +33,7 @@ import { trustCommand } from './commands/trust.js'
 import { carapaceCommand } from './commands/carapace.js'
 import { patternHealthCommand } from './commands/pattern-health.js'
 import { micromoltCommand } from './commands/micromolt.js'
+import { draftCommand } from './commands/draft.js'
 
 const program = new Command()
   .name('clawbuds')
@@ -70,5 +71,6 @@ program.addCommand(trustCommand)
 program.addCommand(carapaceCommand)
 program.addCommand(patternHealthCommand)
 program.addCommand(micromoltCommand)
+program.addCommand(draftCommand)
 
 program.parseAsync(process.argv)

@@ -162,4 +162,11 @@ export class SQLiteRelationshipStrengthRepository implements IRelationshipStreng
       .prepare(`DELETE FROM relationship_strength WHERE claw_id = ? AND friend_id = ?`)
       .run(clawId, friendId)
   }
+
+  async findAllOwners(): Promise<string[]> {
+    const rows = this.db
+      .prepare('SELECT DISTINCT claw_id FROM relationship_strength')
+      .all() as Array<{ claw_id: string }>
+    return rows.map((r) => r.claw_id)
+  }
 }

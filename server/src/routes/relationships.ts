@@ -51,5 +51,33 @@ export function createRelationshipsRouter(
     res.json(successResponse(atRisk))
   })
 
+  // PATCH /api/v1/relationships/:friendId/layer — 手动覆盖 Dunbar 层级（T9）
+  const SetLayerSchema = z.object({
+    layer: z.enum(VALID_LAYERS),
+  })
+
+  router.patch('/:friendId/layer', requireAuth, async (req, res) => {
+    const clawId = req.clawId!
+    const friendId = req.params.friendId as string
+
+    const parsed = SetLayerSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json(errorResponse('VALIDATION_ERROR', `layer must be one of: ${VALID_LAYERS.join(', ')}`))
+      return
+    }
+
+    try {
+      await relationshipService.setManualLayer(clawId, friendId, parsed.data.layer)
+      res.json(successResponse({ friendId, layer: parsed.data.layer }))
+    } catch (err) {
+      const msg = (err as Error).message
+      if (msg.includes('not found') || msg.includes('not friends')) {
+        res.status(404).json(errorResponse('NOT_FOUND', msg))
+      } else {
+        res.status(500).json(errorResponse('INTERNAL_ERROR', msg))
+      }
+    }
+  })
+
   return router
 }

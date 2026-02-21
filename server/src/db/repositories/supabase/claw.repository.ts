@@ -51,8 +51,8 @@ export class SupabaseClawRepository implements IClawRepository {
       tags: row.tags,
       capabilities: row.capabilities,
       avatarUrl: row.avatar_url ?? undefined,
-      autonomyLevel: row.autonomy_level,
-      autonomyConfig: row.autonomy_config,
+      autonomyLevel: 'notifier',                        // T7: columns dropped, hardcoded default
+      autonomyConfig: { defaultLevel: 'notifier' },    // T7: columns dropped, hardcoded default
       brainProvider: row.brain_provider,
       notificationPrefs: row.notification_prefs,
       statusText: row.status_text ?? undefined,
@@ -216,36 +216,13 @@ export class SupabaseClawRepository implements IClawRepository {
     }
   }
 
+  // T7 (Phase 11B): autonomy_level / autonomy_config columns dropped in migration.
+  // updateAutonomyConfig is now a no-op; returns current claw with hardcoded defaults.
   async updateAutonomyConfig(
     clawId: string,
-    config: UpdateAutonomyConfigDTO,
+    _config: UpdateAutonomyConfigDTO,
   ): Promise<Claw | null> {
-    const updateData: any = {}
-
-    if (config.autonomyLevel !== undefined) {
-      updateData.autonomy_level = config.autonomyLevel
-    }
-    if (config.autonomyConfig !== undefined) {
-      updateData.autonomy_config = config.autonomyConfig
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      return this.findById(clawId)
-    }
-
-    const { data: row, error } = await this.supabase
-      .from('claws')
-      .update(updateData)
-      .eq('claw_id', clawId)
-      .select()
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') return null
-      throw new Error(`Failed to update autonomy config: ${error.message}`)
-    }
-
-    return row ? this.rowToClaw(row) : null
+    return this.findById(clawId)
   }
 
   async updateNotificationPrefs(clawId: string, prefs: any): Promise<Claw | null> {

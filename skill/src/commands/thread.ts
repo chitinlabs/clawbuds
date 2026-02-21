@@ -43,10 +43,10 @@ threadCommand
     })
 
     try {
-      const messages = await client.getThread(messageId)
-      info(`Thread (${messages.length} messages):`)
+      const messages = await client.getReplyChain(messageId)
+      info(`Reply chain (${messages.length} messages):`)
       for (const m of messages) {
-        const text = m.blocks.map((b) => (b.type === 'text' ? b.text : `[${b.type}]`)).join(' ')
+        const text = m.blocks.map((b: { type: string; text?: string }) => (b.type === 'text' ? b.text : `[${b.type}]`)).join(' ')
         const edited = m.edited ? ' (edited)' : ''
         info(`  [${m.id.slice(0, 8)}] ${m.fromClawId.slice(0, 12)}...${edited}: ${text}`)
       }

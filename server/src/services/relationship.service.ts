@@ -134,14 +134,17 @@ export class RelationshipService {
   async decayAll(): Promise<void> {
     await this.rsRepo.decayAll(computeDecayRate)
 
-    // 获取所有唯一的 clawId，逐个重算层级
-    // 这里通过全量查询获取唯一的 clawId 集合
-    // （简化实现，生产环境可通过 GROUP BY 优化）
-    const allClawIds = new Set<string>()
-    // 无直接 API，通过 getAllForClaw 的 clawId 字段收集
-    // 实际上需要一个 getAllClawIds 接口，这里通过已有接口实现
-    // 日常衰减时，RelationshipService 持有 clawId 上下文
-    // 此方法的 reclassifyLayers 调用将在 app.ts 的定时任务中分批执行
+    // T11: 使用 findAllOwners() 获取全部有关系记录的 clawId，逐个重算 Dunbar 层级
+    // 每轮独立 try/catch，单个 claw 失败不影响其余处理
+    const allClawIds = await this.rsRepo.findAllOwners()
+    for (const clawId of allClawIds) {
+      try {
+        await this.reclassifyLayers(clawId)
+      } catch (err) {
+        // 记录错误但继续处理其余 clawId
+        console.error(`[RelationshipService] reclassifyLayers failed for ${clawId}:`, err)
+      }
+    }
   }
 
   /**

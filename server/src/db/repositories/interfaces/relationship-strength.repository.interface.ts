@@ -67,4 +67,10 @@ export interface IRelationshipStrengthRepository {
    * 删除关系强度记录（好友关系解除时）
    */
   delete(clawId: string, friendId: string): Promise<void>
+
+  /**
+   * 获取所有有关系强度记录的 clawId 列表（用于 decayAll 遍历）
+   * Phase 11B T11
+   */
+  findAllOwners(): Promise<string[]>
 }

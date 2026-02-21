@@ -11,6 +11,12 @@ import type { IThreadRepository, ThreadPurpose } from '../db/repositories/interf
 import type { IThreadContributionRepository } from '../db/repositories/interfaces/thread.repository.interface.js'
 import type { PatternStalenessDetector, StalenessAlert, PatternHealthScore } from './pattern-staleness-detector.js'
 import type { ICarapaceHistoryRepository, CarapaceHistoryRecord } from '../db/repositories/interfaces/carapace-history.repository.interface.js'
+import type { IDraftRepository } from '../db/repositories/interfaces/draft.repository.interface.js'
+import type { IInboxRepository } from '../db/repositories/interfaces/inbox.repository.interface.js'
+import type { IReflexExecutionRepository } from '../db/repositories/interfaces/reflex.repository.interface.js'
+import type { IPearlRepository } from '../db/repositories/interfaces/pearl.repository.interface.js'
+import type { RelationshipService } from './relationship.service.js'
+import type { ClawService } from './claw.service.js'
 
 // Phase 8: Thread 更新摘要（用于简报）
 export interface ThreadUpdate {
@@ -102,6 +108,13 @@ export interface HeartbeatInsight {
 export class BriefingService {
   private stalenessDetector?: PatternStalenessDetector    // Phase 10: 可选
   private carapaceHistoryRepo?: ICarapaceHistoryRepository  // Phase 10: 可选
+  // Phase 11: 可选注入（数据收集依赖）
+  private draftRepo?: IDraftRepository
+  private inboxRepo?: IInboxRepository
+  private executionRepo?: IReflexExecutionRepository
+  private pearlRepo?: IPearlRepository
+  private relService?: RelationshipService
+  private clawSvc?: ClawService
 
   constructor(
     private briefingRepo: IBriefingRepository,
@@ -183,24 +196,62 @@ export class BriefingService {
   }
 
   /**
+   * 延迟注入 Phase 11 数据收集依赖（避免构造函数参数爆炸）
+   */
+  injectBriefingDependencies(deps: {
+    draftRepo?: IDraftRepository
+    inboxRepo?: IInboxRepository
+    executionRepo?: IReflexExecutionRepository
+    pearlRepo?: IPearlRepository
+    relationshipService?: RelationshipService
+    clawService?: ClawService
+  }): void {
+    if (deps.draftRepo) this.draftRepo = deps.draftRepo
+    if (deps.inboxRepo) this.inboxRepo = deps.inboxRepo
+    if (deps.executionRepo) this.executionRepo = deps.executionRepo
+    if (deps.pearlRepo) this.pearlRepo = deps.pearlRepo
+    if (deps.relationshipService) this.relService = deps.relationshipService
+    if (deps.clawService) this.clawSvc = deps.clawService
+  }
+
+  /**
    * 收集每日数据（生成简报原始素材）
    * Phase 6 基础版：只收集 MicroMolt 建议；其他数据源在 Phase 7+ 集成
    * Phase 8 新增：Thread 更新汇总
+   * Phase 11 新增：消息摘要、Reflex 警报、Pearl 动态、关系警告、待审草稿、路由统计
    */
   async collectDailyData(clawId: string): Promise<BriefingRawData> {
-    const microMoltSuggestions = await this.microMoltService.generateSuggestions(clawId)
-    const threadUpdates = await this.collectThreadUpdates(clawId)
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    const [
+      microMoltSuggestions,
+      threadUpdates,
+      messages,
+      reflexAlerts,
+      pearlActivity,
+      relationshipWarnings,
+      pendingDrafts,
+      routingStats,
+    ] = await Promise.all([
+      this.microMoltService.generateSuggestions(clawId),
+      this.collectThreadUpdates(clawId),
+      this.collectMessages(clawId),
+      this.collectReflexAlerts(clawId, since24h),
+      this.collectPearlActivity(clawId, since24h),
+      this.collectRelationshipWarnings(clawId),
+      this.collectPendingDrafts(clawId),
+      this.collectRoutingStats(clawId, since24h),
+    ])
     return {
-      messages: [],
-      reflexAlerts: [],
-      pearlActivity: [],
-      relationshipWarnings: [],
-      tomChanges: [],
-      pendingDrafts: [],
+      messages,
+      reflexAlerts,
+      pearlActivity,
+      relationshipWarnings,
+      tomChanges: [],  // T6.5: 需要 ProxyToMService.getRecentChanges()，待后续实现
+      pendingDrafts,
       heartbeatInsights: [],
       microMoltSuggestions,
       threadUpdates,
-      routingStats: { routedByMe: 0, routedToMe: 0, citationsCount: 0 },  // Phase 9: 占位，T20 注入 repos 后填充
+      routingStats,
     }
   }
 
@@ -358,6 +409,107 @@ export class BriefingService {
         ? `## Micro-Molt 建议\n${rawData.microMoltSuggestions.map((s) => `- ${s.description}\n  → \`${s.cliCommand}\``).join('\n')}`
         : '',
     ].join('\n')
+  }
+
+  /** T6.1: 收集过去 24h 未读消息摘要，按发件人分组 */
+  private async collectMessages(clawId: string): Promise<MessageSummary[]> {
+    if (!this.inboxRepo) return []
+    const entries = await this.inboxRepo.getInbox(clawId, { status: 'unread', limit: 50 })
+    const senderMap = new Map<string, { displayName: string; count: number; preview: string }>()
+    for (const entry of entries) {
+      const { fromClawId, fromDisplayName, blocks } = entry.message
+      const textBlock = (blocks ?? []).find((b) => (b as unknown as Record<string, unknown>)['type'] === 'text') as { text?: string } | undefined
+      const preview = textBlock?.text?.slice(0, 100) ?? '（非文本消息）'
+      const existing = senderMap.get(fromClawId)
+      if (existing) {
+        existing.count++
+        existing.preview = preview
+      } else {
+        senderMap.set(fromClawId, { displayName: fromDisplayName, count: 1, preview })
+      }
+    }
+    return [...senderMap.entries()].slice(0, 5).map(([senderId, v]) => ({
+      senderId,
+      senderDisplayName: v.displayName,
+      count: v.count,
+      preview: v.preview,
+      requiresResponse: v.count >= 3,
+    }))
+  }
+
+  /** T6.2: 收集过去 24h 被拦截的 Reflex 执行记录 */
+  private async collectReflexAlerts(clawId: string, since24h: string): Promise<ReflexAlert[]> {
+    if (!this.executionRepo) return []
+    const blocked = await this.executionRepo.findByResult(clawId, 'blocked', since24h, 10)
+    return blocked.map((r) => ({
+      reflexName: r.eventType,
+      executionResult: r.executionResult,
+      details: r.details,
+      createdAt: r.createdAt,
+    }))
+  }
+
+  /** T6.3: 收集过去 24h Pearl 动态（创建 + 收到分享） */
+  private async collectPearlActivity(clawId: string, since24h: string): Promise<PearlActivity[]> {
+    if (!this.pearlRepo) return []
+    const [created, received] = await Promise.all([
+      this.pearlRepo.findByOwner(clawId, { since: since24h, limit: 10 }),
+      this.pearlRepo.getReceivedPearls(clawId, { limit: 30 }),
+    ])
+    const activities: PearlActivity[] = []
+    for (const pearl of created) {
+      activities.push({ type: 'created', pearlId: pearl.id, triggerText: pearl.triggerText, createdAt: pearl.createdAt })
+    }
+    for (const { share, pearl } of received) {
+      if (share.createdAt >= since24h) {
+        activities.push({ type: 'received', pearlId: pearl.id, triggerText: pearl.triggerText, createdAt: share.createdAt })
+      }
+    }
+    return activities
+  }
+
+  /** T6.4: 收集濒临降层的关系警告 */
+  private async collectRelationshipWarnings(clawId: string): Promise<RelationshipWarning[]> {
+    if (!this.relService) return []
+    const atRisk = await this.relService.getAtRiskRelationships(clawId)
+    return atRisk.slice(0, 10).map((r) => ({
+      friendId: r.friendId,
+      displayName: r.friendId,  // 无 ClawService 时用 ID 代替
+      strength: r.strength,
+      type: (r.strength < 0.3 ? 'at_risk' : 'layer_downgraded') as RelationshipWarning['type'],
+      details: `${r.daysSinceLastInteraction} 天无互动，当前强度: ${r.strength.toFixed(2)}`,
+    }))
+  }
+
+  /** T4e: 收集待审批草稿摘要 */
+  private async collectPendingDrafts(clawId: string): Promise<DraftSummary[]> {
+    if (!this.draftRepo) return []
+    const drafts = await this.draftRepo.findByOwner(clawId, { status: 'pending', limit: 10 })
+    return Promise.all(
+      drafts.map(async (d) => {
+        let toDisplayName = d.toClawId
+        if (this.clawSvc) {
+          const claw = await this.clawSvc.findById(d.toClawId)
+          if (claw) toDisplayName = claw.displayName
+        }
+        return {
+          id: d.id,
+          toClawId: d.toClawId,
+          toDisplayName,
+          content: d.content.slice(0, 200),
+          reason: d.reason,
+          createdAt: d.createdAt,
+        }
+      }),
+    )
+  }
+
+  /** T6.6: 收集 Pearl 路由统计 */
+  private async collectRoutingStats(clawId: string, since24h: string): Promise<PearlRoutingStats> {
+    if (!this.pearlRepo) return { routedByMe: 0, routedToMe: 0, citationsCount: 0 }
+    const received = await this.pearlRepo.getReceivedPearls(clawId, { limit: 100 })
+    const routedToMe = received.filter(({ share }) => share.createdAt >= since24h).length
+    return { routedByMe: 0, routedToMe, citationsCount: 0 }
   }
 
   private renderWeeklyFallbackTemplate(rawData: BriefingRawData): string {

@@ -154,7 +154,8 @@ describe.each(getAvailableRepositoryTypes())('Profile API [%s]', (repositoryType
 
       expect(res.status).toBe(200)
       expect(res.body.data.autonomyLevel).toBe('notifier')
-      expect(res.body.data.autonomyConfig).toEqual({})
+      // T7: autonomy columns dropped; autonomyConfig returns hardcoded default
+      expect(res.body.data.autonomyConfig.defaultLevel).toBe('notifier')
     })
   })
 
@@ -164,7 +165,9 @@ describe.each(getAvailableRepositoryTypes())('Profile API [%s]', (repositoryType
       expect(res.status).toBe(401)
     })
 
-    it('should update autonomy level', async () => {
+    // T7 (Phase 11B): autonomy_level/autonomy_config columns dropped.
+    // PATCH /me/autonomy is now a no-op – updates accepted but not persisted.
+    it('should accept autonomy level update (no-op since T7)', async () => {
       const { keys, clawId } = await registerClaw(app, { displayName: 'Alice' })
 
       const body = { autonomyLevel: 'drafter' }
@@ -172,10 +175,11 @@ describe.each(getAvailableRepositoryTypes())('Profile API [%s]', (repositoryType
       const res = await request(app).patch('/api/v1/me/autonomy').set(headers).send(body)
 
       expect(res.status).toBe(200)
-      expect(res.body.data.autonomyLevel).toBe('drafter')
+      // autonomyLevel stays at hardcoded default 'notifier' (columns dropped)
+      expect(res.body.data.autonomyLevel).toBe('notifier')
     })
 
-    it('should update autonomy config', async () => {
+    it('should accept autonomy config update (no-op since T7)', async () => {
       const { keys, clawId } = await registerClaw(app, { displayName: 'Alice' })
 
       const body = {
@@ -188,8 +192,8 @@ describe.each(getAvailableRepositoryTypes())('Profile API [%s]', (repositoryType
       const res = await request(app).patch('/api/v1/me/autonomy').set(headers).send(body)
 
       expect(res.status).toBe(200)
-      expect(res.body.data.autonomyConfig.defaultLevel).toBe('autonomous')
-      expect(res.body.data.autonomyConfig.escalationKeywords).toEqual(['urgent', 'help'])
+      // autonomyConfig stays at hardcoded default {} (columns dropped)
+      expect(res.body.success).toBe(true)
     })
 
     it('should reject empty update', async () => {

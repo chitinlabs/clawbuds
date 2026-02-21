@@ -35,6 +35,8 @@ import { ThreadService } from './services/thread.service.js'
 import { PearlRoutingService } from './services/pearl-routing.service.js'
 import { PatternStalenessDetector } from './services/pattern-staleness-detector.js'
 import { CarapaceEditor } from './services/carapace-editor.js'
+import { DraftService } from './services/draft.service.js'
+import { createDraftsRouter } from './routes/drafts.js'
 import { NoopNotifier } from './services/host-notifier.js'
 import { OpenClawNotifier } from './services/openclaw-notifier.js'
 import { ReflexBatchProcessor } from './services/reflex-batch-processor.js'
@@ -430,6 +432,20 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     //   }
     // })
 
+    // ─── Phase 11 T4: Draft 草稿系统 ───
+    const draftRepository = repositoryFactory.createDraftRepository()
+    const draftService = new DraftService(draftRepository, messageService)
+
+    // Phase 11 T4e + T6: 注入数据收集依赖到 BriefingService
+    briefingService.injectBriefingDependencies({
+      draftRepo: draftRepository,
+      inboxRepo: inboxRepository,
+      executionRepo: reflexExecutionRepository,
+      pearlRepo: pearlRepository,
+      relationshipService,
+      clawService,
+    })
+
     ctx.clawService = clawService
     ctx.inboxService = inboxService
     ctx.eventBus = eventBus
@@ -444,7 +460,11 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     app.use('/api/v1/webhooks', webhookLimiter) // Strict: webhook operations
 
     app.use('/api/v1', createAuthRouter(clawService, {
-      onRegister: (clawId: string) => reflexEngine.initializeBuiltins(clawId),
+      // Phase 11 T5: 同时初始化 Layer 0 和 Layer 1 内置 Reflex
+      onRegister: (clawId: string) => Promise.all([
+        reflexEngine.initializeBuiltins(clawId),
+        reflexEngine.initializeLayer1Builtins(clawId),
+      ]).then(() => undefined),
     }))
     app.use('/api/v1/friends', createFriendsRouter(friendshipService, clawService))
     app.use('/api/v1/messages', createMessagesRouter(messageService, clawService, reactionService))
@@ -480,6 +500,7 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
     ))
     app.use('/api/v1/pattern-health', createPatternHealthRouter(stalenessDetector, clawService))
     app.use('/api/v1/micromolt', createMicroMoltApplyRouter(microMoltServiceFull, briefingService, clawService))
+    app.use('/api/v1/drafts', createDraftsRouter(draftService, clawService))  // Phase 11 T4
 
     // ─── EventBus 监听：Phase 1 联动 ───
     // friend.accepted → 双向初始化关系强度

@@ -336,8 +336,9 @@ describe('SupabaseClawRepository', () => {
       expect(claw!.displayName).toBe('X Bot')
       expect(claw!.clawType).toBe('bot')
       expect(claw!.avatarUrl).toBe('https://img.example.com/x.png')
-      expect(claw!.autonomyLevel).toBe('autonomous')
-      expect(claw!.autonomyConfig).toEqual({ maxTokens: 100 })
+      // T7: autonomy columns dropped; hardcoded defaults regardless of DB row values
+      expect(claw!.autonomyLevel).toBe('notifier')
+      expect(claw!.autonomyConfig).toEqual({ defaultLevel: 'notifier' })
       expect(claw!.brainProvider).toBe('anthropic')
       expect(claw!.notificationPrefs).toEqual({ mute: true })
       expect(claw!.lastSeenAt).toBe('2025-06-01T12:00:00Z')

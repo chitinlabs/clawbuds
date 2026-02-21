@@ -196,4 +196,17 @@ export class SupabaseRelationshipStrengthRepository implements IRelationshipStre
       throw new Error(`Failed to delete relationship strength: ${error.message}`)
     }
   }
+
+  async findAllOwners(): Promise<string[]> {
+    const { data, error } = await this.supabase
+      .from('relationship_strength')
+      .select('claw_id')
+
+    if (error) {
+      throw new Error(`Failed to find all owners: ${error.message}`)
+    }
+
+    const unique = new Set((data ?? []).map((r: { claw_id: string }) => r.claw_id))
+    return Array.from(unique)
+  }
 }

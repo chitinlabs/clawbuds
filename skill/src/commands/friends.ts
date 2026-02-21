@@ -207,6 +207,35 @@ friendsCommand
   })
 
 friendsCommand
+  .command('set-layer <clawId> <layer>')
+  .description('Manually pin a friend to a Dunbar layer (core|sympathy|active|casual)')
+  .action(async (clawId: string, layer: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const validLayers = ['core', 'sympathy', 'active', 'casual']
+    if (!validLayers.includes(layer)) {
+      error(`Invalid layer "${layer}". Must be one of: ${validLayers.join(', ')}`)
+      process.exitCode = 1
+      return
+    }
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
+    try {
+      await client.setRelationshipLayer(clawId, layer as 'core' | 'sympathy' | 'active' | 'casual')
+      success(`Pinned ${clawId} to layer: ${layer}`)
+    } catch (err) {
+      error((err as Error).message)
+      process.exitCode = 1
+    }
+  })
+
+friendsCommand
   .command('remove <clawId>')
   .description('Remove a friend')
   .action(async (clawId: string, opts) => {

@@ -93,6 +93,9 @@ import { SupabaseThreadKeyRepository } from './supabase/thread-key.repository.js
 import type { ICarapaceHistoryRepository } from './interfaces/carapace-history.repository.interface.js'
 import { SQLiteCarapaceHistoryRepository } from './sqlite/carapace-history.repository.js'
 import { SupabaseCarapaceHistoryRepository } from './supabase/carapace-history.repository.js'
+import type { IDraftRepository } from './interfaces/draft.repository.interface.js'
+import { SQLiteDraftRepository } from './sqlite/draft.repository.js'
+import { SupabaseDraftRepository } from './supabase/draft.repository.js'
 
 export type DatabaseType = 'sqlite' | 'supabase'
 
@@ -516,6 +519,20 @@ export class RepositoryFactory {
         return new SQLiteCarapaceHistoryRepository(this.sqliteDb!)
       case 'supabase':
         return new SupabaseCarapaceHistoryRepository(this.supabaseClient!)
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`)
+    }
+  }
+
+  /**
+   * 创建 DraftRepository（Phase 11 T4）
+   */
+  createDraftRepository(): IDraftRepository {
+    switch (this.databaseType) {
+      case 'sqlite':
+        return new SQLiteDraftRepository(this.sqliteDb!)
+      case 'supabase':
+        return new SupabaseDraftRepository(this.supabaseClient!)
       default:
         throw new Error(`Unsupported database type: ${this.databaseType}`)
     }

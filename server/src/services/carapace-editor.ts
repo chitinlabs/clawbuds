@@ -13,6 +13,11 @@ import type {
 } from '../db/repositories/interfaces/carapace-history.repository.interface.js'
 import type { MicroMoltSuggestion } from './micro-molt.service.js'
 
+/** 移除换行符，防止换行注入攻击 */
+function sanitizeLine(input: string): string {
+  return input.replace(/[\r\n]/g, ' ').trim()
+}
+
 export class CarapaceEditor {
   private readonly resolvedPath: string
 
@@ -40,10 +45,13 @@ export class CarapaceEditor {
 
     const current = await this.readCarapace()
     const date = new Date().toISOString().slice(0, 10)
-    const annotation = note
-      ? `<!-- Micro-Molt: ${date}, ${note} -->`
+    const safeFriendId = sanitizeLine(friendId)
+    const safeScope = sanitizeLine(scope)
+    const safeNote = note ? sanitizeLine(note) : undefined
+    const annotation = safeNote
+      ? `<!-- Micro-Molt: ${date}, ${safeNote} -->`
       : `<!-- Micro-Molt: ${date}, allow 规则 -->`
-    const rule = `> 对 ${friendId}，${scope}可以直接发送，无需审阅`
+    const rule = `> 对 ${safeFriendId}，${safeScope}可以直接发送，无需审阅`
 
     await this.writeCarapace(`${current.trimEnd()}\n\n${annotation}\n${rule}\n`)
   }
@@ -56,8 +64,10 @@ export class CarapaceEditor {
 
     const current = await this.readCarapace()
     const date = new Date().toISOString().slice(0, 10)
+    const safeCondition = sanitizeLine(condition)
+    const safeAction = sanitizeLine(action)
     const annotation = `<!-- Micro-Molt: ${date}, escalate 规则 -->`
-    const rule = `> 当 ${condition} 时，${action}`
+    const rule = `> 当 ${safeCondition} 时，${safeAction}`
 
     await this.writeCarapace(`${current.trimEnd()}\n\n${annotation}\n${rule}\n`)
   }
@@ -85,6 +95,13 @@ export class CarapaceEditor {
     }
 
     await this.writeCarapace(`${current.trimEnd()}\n\n${annotation}\n${rule}\n`)
+  }
+
+  /**
+   * 获取当前 carapace.md 内容（只读，不备份）
+   */
+  async getContent(): Promise<string> {
+    return this.readCarapace()
   }
 
   /**

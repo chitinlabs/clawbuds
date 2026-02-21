@@ -479,6 +479,13 @@ export class ClawBudsClient {
     return this.request('GET', '/api/v1/relationships/at-risk')
   }
 
+  async setRelationshipLayer(
+    friendId: string,
+    layer: 'core' | 'sympathy' | 'active' | 'casual',
+  ): Promise<{ friendId: string; layer: string }> {
+    return this.request('PATCH', `/api/v1/relationships/${friendId}/layer`, { body: { layer } })
+  }
+
   // -- Friend Models (Phase 2) --
 
   async getFriendModel(friendId: string): Promise<FriendModelProfile> {
@@ -786,6 +793,56 @@ export class ClawBudsClient {
     confirmed: boolean
   }): Promise<{ appliedSuggestion: unknown }> {
     return this.request('POST', '/api/v1/micromolt/apply', { body: data })
+  }
+
+  // -- Draft (Phase 11 T4) --
+
+  async createDraft(data: {
+    toClawId: string
+    content: string
+    reason: string
+    expiresAt?: string
+  }): Promise<Record<string, unknown>> {
+    return this.request('POST', '/api/v1/drafts', { body: data })
+  }
+
+  async listDrafts(filters?: {
+    status?: string
+    limit?: number
+    offset?: number
+  }): Promise<Record<string, unknown>[]> {
+    const params = new URLSearchParams()
+    if (filters?.status) params.set('status', filters.status)
+    if (filters?.limit !== undefined) params.set('limit', String(filters.limit))
+    if (filters?.offset !== undefined) params.set('offset', String(filters.offset))
+    const qs = params.toString()
+    return this.request('GET', `/api/v1/drafts${qs ? `?${qs}` : ''}`)
+  }
+
+  async getDraft(id: string): Promise<Record<string, unknown>> {
+    return this.request('GET', `/api/v1/drafts/${id}`)
+  }
+
+  async approveDraft(id: string): Promise<{ draft: Record<string, unknown>; messageId: string }> {
+    return this.request('POST', `/api/v1/drafts/${id}/approve`)
+  }
+
+  async rejectDraft(id: string): Promise<Record<string, unknown>> {
+    return this.request('POST', `/api/v1/drafts/${id}/reject`)
+  }
+
+  // -- Carapace Allow/Escalate/Content (Phase 11 T3) --
+
+  async getCarapaceContent(): Promise<{ content: string }> {
+    return this.request('GET', '/api/v1/carapace/content')
+  }
+
+  async allowCarapace(data: { friendId: string; scope: string; note?: string }): Promise<{ newVersion: number }> {
+    return this.request('POST', '/api/v1/carapace/allow', { body: data })
+  }
+
+  async escalateCarapace(data: { condition: string; action: string }): Promise<{ newVersion: number }> {
+    return this.request('POST', '/api/v1/carapace/escalate', { body: data })
   }
 
   // -- Core request method --

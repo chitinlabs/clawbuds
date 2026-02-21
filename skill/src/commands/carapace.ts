@@ -1,7 +1,10 @@
 /**
- * carapace 命令（Phase 10）
- * clawbuds carapace history  — 查看 carapace.md 修改历史
- * clawbuds carapace diff <version>  — 查看版本 diff
+ * carapace 命令（Phase 10 + Phase 11）
+ * clawbuds carapace show               — 查看当前 carapace.md 内容
+ * clawbuds carapace allow              — 添加授权规则
+ * clawbuds carapace escalate           — 添加升级规则
+ * clawbuds carapace history            — 查看修改历史
+ * clawbuds carapace diff <version>     — 查看版本 diff
  * clawbuds carapace restore <version>  — 回滚到指定版本
  */
 
@@ -13,6 +16,93 @@ import { getProfileContext, addProfileOption } from './helpers.js'
 export const carapaceCommand = new Command('carapace').description('Manage carapace.md evolution')
 
 addProfileOption(carapaceCommand)
+
+// ─── carapace show ────────────────────────────────────────────────────────────
+
+carapaceCommand
+  .command('show')
+  .description('Show current carapace.md content')
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
+    try {
+      const result = await client.getCarapaceContent()
+      info('─'.repeat(60))
+      info(result.content)
+      info('─'.repeat(60))
+      info('使用 `clawbuds carapace allow` 或 `clawbuds carapace escalate` 快速追加规则')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      error(`获取 carapace.md 失败: ${message}`)
+    }
+  })
+
+// ─── carapace allow ───────────────────────────────────────────────────────────
+
+carapaceCommand
+  .command('allow')
+  .description('Add an allow rule to carapace.md')
+  .requiredOption('--friend <id>', 'Friend claw ID')
+  .requiredOption('--scope <scope>', 'Scope description (e.g. "日常梳理消息")')
+  .option('--note <note>', 'Reason or note for this rule')
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
+    try {
+      const result = await client.allowCarapace({
+        friendId: opts.friend,
+        scope: opts.scope,
+        note: opts.note,
+      })
+      success(`已添加授权规则（carapace.md 版本 ${result.newVersion}）`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      error(`添加授权规则失败: ${message}`)
+    }
+  })
+
+// ─── carapace escalate ────────────────────────────────────────────────────────
+
+carapaceCommand
+  .command('escalate')
+  .description('Add an escalate rule to carapace.md')
+  .requiredOption('--when <condition>', 'Condition for escalation (e.g. "Pearl 涉及金融话题")')
+  .requiredOption('--action <action>', 'Action to take (e.g. "需要人工审阅")')
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
+    try {
+      const result = await client.escalateCarapace({
+        condition: opts.when,
+        action: opts.action,
+      })
+      success(`已添加升级规则（carapace.md 版本 ${result.newVersion}）`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      error(`添加升级规则失败: ${message}`)
+    }
+  })
 
 // ─── carapace history ────────────────────────────────────────────────────────
 

@@ -10,8 +10,10 @@ import {
   getProfile,
   getCurrentProfileName,
   saveProfileState,
+  ensureConfigDir,
 } from '../config.js'
 import { success, error, info, formatProfile } from '../output.js'
+import { initializeCarapaceTemplate } from '../carapace-init.js'
 
 export const registerCommand = new Command('register')
   .description('Register a new ClawBuds identity')
@@ -71,6 +73,14 @@ export const registerCommand = new Command('register')
 
       // Initialize state
       saveProfileState(profileName, { lastSeq: 0 })
+
+      // Phase 11 T1: 首次注册时初始化 references/carapace.md 默认模板（已有则不覆盖）
+      try {
+        const configDir = ensureConfigDir()
+        initializeCarapaceTemplate(configDir)
+      } catch {
+        // 模板初始化失败不影响注册流程
+      }
 
       success('Registered successfully!')
       info('')

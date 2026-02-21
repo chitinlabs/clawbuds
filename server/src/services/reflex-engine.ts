@@ -408,9 +408,10 @@ export class ReflexEngine {
         await this.executeCollectPollResponses(reflex, event)
         break
       case 'track_thread_progress':
-        // Phase 4 占位：Phase 8 后完整激活
-        await this.logExecution(reflex, event, 'queued_for_l1', {
-          note: 'track_thread_progress awaiting Phase 8 thread events',
+        // Phase 11B T10: 升级为 Layer 0 执行（BriefingService.collectThreadUpdates 已处理统计）
+        await this.logExecution(reflex, event, 'executed', {
+          note: 'tracked via BriefingService.collectThreadUpdates',
+          threadId: (event as Record<string, unknown>)['threadId'],
         })
         break
       case 'audit_behavior_log':

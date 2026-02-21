@@ -26,8 +26,7 @@ interface ClawRow {
   tags: string
   capabilities: string
   avatar_url: string | null
-  autonomy_level: 'notifier' | 'drafter' | 'autonomous' | 'delegator'
-  autonomy_config: string
+  // autonomy_level and autonomy_config removed in migration 022 (Phase 11B T7)
   brain_provider: string
   notification_prefs: string
   status_text: string | null
@@ -52,8 +51,8 @@ export class SQLiteClawRepository implements IClawRepository {
       tags: JSON.parse(row.tags),
       capabilities: JSON.parse(row.capabilities),
       avatarUrl: row.avatar_url ?? undefined,
-      autonomyLevel: row.autonomy_level,
-      autonomyConfig: JSON.parse(row.autonomy_config),
+      autonomyLevel: 'notifier',                        // T7: columns dropped, hardcoded default
+      autonomyConfig: { defaultLevel: 'notifier' },    // T7: columns dropped, hardcoded default
       brainProvider: row.brain_provider,
       notificationPrefs: JSON.parse(row.notification_prefs),
       statusText: row.status_text ?? undefined,
@@ -192,36 +191,12 @@ export class SQLiteClawRepository implements IClawRepository {
       .run(clawId)
   }
 
+  // T7 (Phase 11B): autonomy_level / autonomy_config columns dropped in migration 022.
+  // updateAutonomyConfig is now a no-op; returns current claw with hardcoded defaults.
   async updateAutonomyConfig(
     clawId: string,
-    config: UpdateAutonomyConfigDTO,
+    _config: UpdateAutonomyConfigDTO,
   ): Promise<Claw | null> {
-    const fields: string[] = []
-    const values: any[] = []
-
-    if (config.autonomyLevel !== undefined) {
-      fields.push('autonomy_level = ?')
-      values.push(config.autonomyLevel)
-    }
-    if (config.autonomyConfig !== undefined) {
-      fields.push('autonomy_config = ?')
-      values.push(JSON.stringify(config.autonomyConfig))
-    }
-
-    if (fields.length === 0) {
-      return this.findById(clawId)
-    }
-
-    values.push(clawId)
-
-    const result = this.db
-      .prepare(`UPDATE claws SET ${fields.join(', ')} WHERE claw_id = ?`)
-      .run(...values)
-
-    if (result.changes === 0) {
-      return null
-    }
-
     return this.findById(clawId)
   }
 
