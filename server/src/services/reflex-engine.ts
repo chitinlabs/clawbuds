@@ -15,6 +15,7 @@ import type { ReactionService } from './reaction.service.js'
 import type { ClawService } from './claw.service.js'
 import type { EventBus } from './event-bus.js'
 import type { ReflexBatchProcessor, BatchQueueItem } from './reflex-batch-processor.js'
+import type { PearlRoutingService } from './pearl-routing.service.js'
 
 // ─── BusEvent: 统一的事件数据结构 ────────────────────────────────────────────
 export interface BusEvent {
@@ -249,7 +250,7 @@ const LAYER1_BUILTIN_REFLEXES: Array<Omit<ReflexRecord, 'id' | 'clawId' | 'creat
     valueLayer: 'cognitive',
     behavior: 'route',
     triggerLayer: 1,
-    triggerConfig: { type: 'event_type', eventType: 'heartbeat.received', condition: 'has_routing_candidates' },
+    triggerConfig: { type: 'event_type', eventType: 'heartbeat.received', condition: 'has_routing_candidates_after_prefilter' },
     enabled: true,
     confidence: 0.8,
     source: 'builtin',
@@ -278,6 +279,7 @@ const LAYER1_BUILTIN_REFLEXES: Array<Omit<ReflexRecord, 'id' | 'clawId' | 'creat
 
 export class ReflexEngine {
   private batchProcessor: ReflexBatchProcessor | null = null
+  private pearlRoutingService: PearlRoutingService | null = null
 
   constructor(
     private reflexRepo: IReflexRepository,
@@ -287,6 +289,14 @@ export class ReflexEngine {
     private clawService: ClawService,
     private eventBus: EventBus,
   ) {}
+
+  /**
+   * Phase 9: 注入 PearlRoutingService（延迟注入模式，避免循环依赖）
+   * 注入后 route_pearl_by_interest 才启用 has_routing_candidates_after_prefilter 条件
+   */
+  injectPearlRoutingService(service: PearlRoutingService): void {
+    this.pearlRoutingService = service
+  }
 
   /**
    * Phase 5: 注入 Layer 1 批处理器，激活真实积累
@@ -497,6 +507,56 @@ export class ReflexEngine {
 
   /** Layer 1 挂起队列（Phase 5：真实积累，Phase 4 兼容） */
   private async queueForLayer1(reflex: ReflexRecord, event: BusEvent): Promise<void> {
+    // Phase 9: route_pearl_by_interest 的条件预检（has_routing_candidates_after_prefilter）
+    if (reflex.name === 'route_pearl_by_interest' && this.pearlRoutingService) {
+      const heartbeat = event['payload'] as { interests?: string[] } | undefined
+      const ownerId = event['toClawId'] as string ?? event.clawId
+      const friendId = event['fromClawId'] as string ?? ''
+
+      const routingContext = await this.pearlRoutingService.buildRoutingContext(
+        ownerId,
+        friendId,
+        {
+          id: '',
+          fromClawId: friendId,
+          toClawId: ownerId,
+          interests: heartbeat?.interests ?? [],
+          isKeepalive: false,
+          createdAt: new Date().toISOString(),
+        },
+      )
+
+      if (!routingContext) {
+        // 无候选 Pearl → 不入队
+        return
+      }
+
+      // Phase 9 T14: 路由频率上限（24h 内对同一好友最多 3 个 Pearl）
+      const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      const recentRoutings = await this.executionRepo.findByResult(ownerId, 'queued_for_l1', since24h, 100)
+      const routingCountForFriend = recentRoutings.filter(r =>
+        (r.details as Record<string, unknown>)?.friendId === friendId,
+      ).length
+
+      if (routingCountForFriend >= 3) {
+        // 超过频率上限 → 不入队
+        return
+      }
+
+      // 有候选 → 将路由上下文附加到 triggerData
+      if (this.batchProcessor) {
+        const item: BatchQueueItem = {
+          reflexId: reflex.id,
+          reflexName: reflex.name,
+          clawId: event.clawId,
+          eventType: event.type,
+          triggerData: { ...event, routingContext },
+        }
+        this.batchProcessor.enqueue(item)
+      }
+      return
+    }
+
     // Phase 4 兼容：始终写入审计日志
     await this.logExecution(reflex, event, 'queued_for_l1', {
       note: this.batchProcessor ? 'Queued for L1 batch processing' : 'Awaiting Phase 5 agent execution model',

@@ -152,6 +152,11 @@ export class SQLitePearlRepository implements IPearlRepository {
     }
   }
 
+  async findAllIds(): Promise<string[]> {
+    const rows = this.db.prepare('SELECT id FROM pearls').all() as Array<{ id: string }>
+    return rows.map(r => r.id)
+  }
+
   async findByOwner(ownerId: string, filters?: PearlFilters): Promise<PearlMetadataRecord[]> {
     let sql = `
       SELECT id, owner_id, type, trigger_text, domain_tags, luster,

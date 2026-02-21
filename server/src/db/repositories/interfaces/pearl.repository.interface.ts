@@ -95,6 +95,11 @@ export interface IPearlRepository {
   /** 创建 Pearl（Level 1 记录） */
   create(data: CreatePearlData): Promise<PearlContentRecord>
 
+  /**
+   * 获取所有 Pearl 的 ID 列表（Phase 9 迁移：一次性 Luster 重算）
+   */
+  findAllIds(): Promise<string[]>
+
   /** 按级别查询单条 Pearl */
   findById(
     id: string,

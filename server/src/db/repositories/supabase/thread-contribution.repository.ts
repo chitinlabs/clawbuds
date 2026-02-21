@@ -96,6 +96,17 @@ export class SupabaseThreadContributionRepository implements IThreadContribution
     return count ?? 0
   }
 
+  async countByPearlRef(pearlId: string): Promise<number> {
+    const { count, error } = await this.supabase
+      .from('thread_contributions')
+      .select('*', { count: 'exact', head: true })
+      .eq('content_type', 'pearl_ref')
+      .eq('encrypted_content', pearlId)
+
+    if (error) throw error
+    return count ?? 0
+  }
+
   async findByContributor(
     threadId: string,
     contributorId: string,

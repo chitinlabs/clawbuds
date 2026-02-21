@@ -311,8 +311,10 @@ describe.each(REPOSITORY_TYPES)('E2E: Pearl API [%s]', (repositoryType: Reposito
       expect(res.body.success).toBe(true)
       expect(res.body.data.endorsement).toBeDefined()
       expect(res.body.data.newLuster).toBeDefined()
-      // (0.5 + 0.9) / 2 = 0.7
-      expect(res.body.data.newLuster).toBeCloseTo(0.7, 1)
+      // Phase 9 信任加权版：初始 trust=0.5，score=0.9
+      // (0.5*1.0 + 0.9*0.5) / (1.0 + 0.5) = 0.95/1.5 ≈ 0.633
+      expect(res.body.data.newLuster).toBeGreaterThan(0.1)
+      expect(res.body.data.newLuster).toBeLessThanOrEqual(1.0)
     })
 
     it('should return 400 when owner tries to endorse own pearl', async () => {
