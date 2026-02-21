@@ -63,6 +63,16 @@ describe('BriefingService', () => {
       expect(data).toHaveProperty('microMoltSuggestions')
     })
 
+    it('should include routingStats field (Phase 9)', async () => {
+      const data = await service.collectDailyData('claw-test')
+      expect(data).toHaveProperty('routingStats')
+      expect(data.routingStats).toMatchObject({
+        routedByMe: expect.any(Number),
+        routedToMe: expect.any(Number),
+        citationsCount: expect.any(Number),
+      })
+    })
+
     it('should include Micro-Molt suggestions', async () => {
       vi.mocked(microMoltService.generateSuggestions).mockResolvedValue([{
         type: 'disable',

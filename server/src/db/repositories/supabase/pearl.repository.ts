@@ -167,6 +167,15 @@ export class SupabasePearlRepository implements IPearlRepository {
     }
   }
 
+  async findAllIds(): Promise<string[]> {
+    const { data, error } = await this.supabase
+      .from('pearls')
+      .select('id')
+
+    if (error) throw error
+    return (data ?? []).map((r: { id: string }) => r.id)
+  }
+
   async findByOwner(ownerId: string, filters?: PearlFilters): Promise<PearlMetadataRecord[]> {
     let query = this.supabase
       .from('pearls')

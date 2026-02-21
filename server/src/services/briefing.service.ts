@@ -20,6 +20,13 @@ export interface ThreadUpdate {
   hasDigestPending: boolean   // 是否有 AI 摘要待生成
 }
 
+/** Phase 9: Pearl 路由活跃度统计 */
+export interface PearlRoutingStats {
+  routedByMe: number       // 今天主动路由给好友的 Pearl 数
+  routedToMe: number       // 今天收到自动路由的 Pearl 数
+  citationsCount: number   // 今天 Pearl 被 Thread 引用次数
+}
+
 export interface BriefingRawData {
   messages: MessageSummary[]
   reflexAlerts: ReflexAlert[]
@@ -29,7 +36,8 @@ export interface BriefingRawData {
   pendingDrafts: DraftSummary[]
   heartbeatInsights: HeartbeatInsight[]
   microMoltSuggestions: MicroMoltSuggestion[]
-  threadUpdates: ThreadUpdate[]  // Phase 8: Thread 活动汇总
+  threadUpdates: ThreadUpdate[]      // Phase 8: Thread 活动汇总
+  routingStats: PearlRoutingStats    // Phase 9: Pearl 路由活跃度
 }
 
 export interface MessageSummary {
@@ -123,6 +131,7 @@ export class BriefingService {
       heartbeatInsights: [],
       microMoltSuggestions,
       threadUpdates,
+      routingStats: { routedByMe: 0, routedToMe: 0, citationsCount: 0 },  // Phase 9: 占位，T20 注入 repos 后填充
     }
   }
 

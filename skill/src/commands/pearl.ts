@@ -333,3 +333,95 @@ pearlCommand
       error(`获取失败: ${err.message}`)
     }
   })
+
+// ─── pearl route-stats (Phase 9 T18) ─────────────────────────────────────────
+
+pearlCommand
+  .command('route-stats')
+  .description('View Pearl routing statistics (Phase 9)')
+  .option('--since <period>', 'Time period, e.g. "7 days" (informational only)', '7 days')
+  .action(async (opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
+    try {
+      const [myPearls, received] = await Promise.all([
+        client.listPearls({ shareability: 'friends_only', limit: 50 }),
+        client.getReceivedPearls({ limit: 50 }),
+      ])
+
+      info(`Pearl 路由统计（过去 ${opts.since}）`)
+      info('────────────────────────────────────────────────────────')
+
+      const highLuster = myPearls
+        .filter((p: any) => (p['luster'] ?? 0) >= 0.8)
+        .sort((a: any, b: any) => (b['luster'] ?? 0) - (a['luster'] ?? 0))
+        .slice(0, 5)
+
+      info(`被动路由（收到）: ${received.length} 次`)
+      for (const item of received.slice(0, 5)) {
+        const share = (item as any).share as Record<string, unknown>
+        const pearl = (item as any).pearl as Record<string, unknown>
+        const fromId = String(share['fromClawId']).slice(-8)
+        const trigger = String(pearl['triggerText']).slice(0, 30)
+        const luster = Number(pearl['luster']).toFixed(2)
+        info(`  ← ${fromId}: "${trigger}" (Luster: ${luster})`)
+      }
+
+      info('')
+      info(`Luster ≥ 0.8 的 Pearl:`)
+      if (highLuster.length === 0) {
+        info('  （暂无）')
+      } else {
+        for (const p of highLuster) {
+          const luster = Number((p as any)['luster']).toFixed(2)
+          const trigger = String((p as any)['triggerText']).slice(0, 40)
+          info(`  "${trigger}": ${luster}`)
+        }
+      }
+      info('')
+      info('💡 完整路由统计（主动路由/Thread 引用）请在每日简报中查看')
+    } catch (err: any) {
+      error(`获取路由统计失败: ${err.message}`)
+    }
+  })
+
+// ─── pearl luster (Phase 9 T19) ───────────────────────────────────────────────
+
+pearlCommand
+  .command('luster <id>')
+  .description('View Pearl Luster details (Phase 9)')
+  .action(async (id: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
+    try {
+      const pearl = await client.viewPearl(id, 1) as Record<string, unknown>
+
+      info('Pearl Luster 详情')
+      info(`触发器: "${pearl['triggerText']}"`)
+      info('')
+      info(`当前 Luster: ${Number(pearl['luster']).toFixed(2)}`)
+      info('─────────────────────────────────────────────')
+      info(`类型: ${pearl['type']}`)
+      info(`领域标签: ${Array.isArray(pearl['domainTags']) ? pearl['domainTags'].join(', ') : '-'}`)
+      info(`可见性: ${pearl['shareability']}`)
+      info('')
+      info('💡 完整 Luster 分解（背书方信任分 × 分数 + Thread 引用加成）')
+      info('   将在下一次背书或 Thread 引用后重算')
+    } catch (err: any) {
+      error(`获取 Luster 详情失败: ${err.message}`)
+    }
+  })

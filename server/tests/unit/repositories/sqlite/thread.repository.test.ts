@@ -327,6 +327,72 @@ describe('SQLiteThreadContributionRepository', () => {
       expect(contribs[0].contributorId).toBe(creatorId)
     })
   })
+
+  // ─── countByPearlRef (Phase 9) ───────────────────────────────────────────
+
+  describe('countByPearlRef', () => {
+    it('should return 0 when no pearl_ref contributions exist', async () => {
+      const count = await contribRepo.countByPearlRef('pearl-123')
+      expect(count).toBe(0)
+    })
+
+    it('should count only contributions with content_type=pearl_ref matching pearlId', async () => {
+      const pearlId = 'pearl-abc-target'
+      // pearl_ref 类型存 pearlId 明文（非加密内容，Pearl ID 不是敏感数据）
+      await contribRepo.create(makeContrib({
+        nonce: 'pearl_ref_nonce_01',
+        contentType: 'pearl_ref',
+        encryptedContent: pearlId,
+      }))
+      const count = await contribRepo.countByPearlRef(pearlId)
+      expect(count).toBe(1)
+    })
+
+    it('should not count pearl_ref for a different pearl', async () => {
+      await contribRepo.create(makeContrib({
+        nonce: 'pearl_ref_other_01',
+        contentType: 'pearl_ref',
+        encryptedContent: 'pearl-other-id',
+      }))
+      const count = await contribRepo.countByPearlRef('pearl-target-id')
+      expect(count).toBe(0)
+    })
+
+    it('should not count text contributions even if content matches pearlId', async () => {
+      const pearlId = 'pearl-text-confusion'
+      await contribRepo.create(makeContrib({
+        nonce: 'text_nonce_00001',
+        contentType: 'text',
+        encryptedContent: pearlId,  // text 类型碰巧有相同内容
+      }))
+      const count = await contribRepo.countByPearlRef(pearlId)
+      expect(count).toBe(0)
+    })
+
+    it('should count across multiple threads', async () => {
+      // 创建第二个 thread
+      const thread2Id = randomUUID()
+      await threadRepo.create({ id: thread2Id, creatorId, purpose: 'creation', title: 'Thread 2' })
+      await threadRepo.addParticipant(thread2Id, creatorId)
+
+      const pearlId = 'pearl-multi-thread'
+      await contribRepo.create(makeContrib({
+        nonce: 'multi_thread_nonce_1',
+        contentType: 'pearl_ref',
+        encryptedContent: pearlId,
+      }))
+      await contribRepo.create({
+        id: randomUUID(),
+        threadId: thread2Id,
+        contributorId: creatorId,
+        encryptedContent: pearlId,
+        nonce: 'multi_thread_nonce_2',
+        contentType: 'pearl_ref',
+      })
+      const count = await contribRepo.countByPearlRef(pearlId)
+      expect(count).toBe(2)
+    })
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────

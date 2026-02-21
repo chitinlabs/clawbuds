@@ -105,6 +105,16 @@ export class SQLiteThreadContributionRepository implements IThreadContributionRe
     return row.cnt
   }
 
+  async countByPearlRef(pearlId: string): Promise<number> {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) as cnt FROM thread_contributions
+         WHERE content_type = 'pearl_ref' AND encrypted_content = ?`,
+      )
+      .get(pearlId) as { cnt: number }
+    return row.cnt
+  }
+
   async findByContributor(
     threadId: string,
     contributorId: string,

@@ -1,6 +1,7 @@
 /**
  * ReflexEngine Unit Tests（Phase 4）
  * T11-T20: 核心路由、硬约束、执行逻辑
+ * Phase 9: route_pearl_by_interest Layer 1 集成 (T12/T13)
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -361,5 +362,158 @@ describe('ReflexEngine - phatic_micro_reaction', () => {
 
     expect(reactionService.addReaction).not.toHaveBeenCalled()
     expect(execRepo.create).not.toHaveBeenCalled()  // no match = no log
+  })
+})
+
+// ─── Phase 9: route_pearl_by_interest Layer 1 集成 (T12/T13) ─────────────────
+
+import type { PearlRoutingService, RoutingContext } from '../../../src/services/pearl-routing.service.js'
+
+describe('ReflexEngine - route_pearl_by_interest (Phase 9)', () => {
+  function makeBatchProcessor() {
+    return { enqueue: vi.fn(), acknowledgeBatch: vi.fn() } as any
+  }
+
+  function makePearlRoutingService(context: RoutingContext | null = null): PearlRoutingService {
+    return {
+      buildRoutingContext: vi.fn().mockResolvedValue(context),
+      preFilter: vi.fn().mockResolvedValue([]),
+      trustFilter: vi.fn().mockResolvedValue([]),
+      executeRoute: vi.fn().mockResolvedValue(undefined),
+      recordRoutingEvent: vi.fn().mockResolvedValue(undefined),
+    } as unknown as PearlRoutingService
+  }
+
+  const routeReflex = makeReflex({
+    name: 'route_pearl_by_interest',
+    triggerLayer: 1,
+    triggerConfig: {
+      type: 'event_type',
+      eventType: 'heartbeat.received',
+      condition: 'has_routing_candidates_after_prefilter',
+    },
+  })
+
+  const mockRoutingContext: RoutingContext = {
+    friendId: 'friend-1',
+    friendInterests: ['AI'],
+    friendToM: null,
+    candidates: [{
+      id: 'pearl-1',
+      ownerId: 'owner-1',
+      type: 'insight',
+      triggerText: 'test',
+      domainTags: ['AI'],
+      luster: 0.7,
+      shareability: 'friends_only',
+      shareConditions: null,
+      createdAt: '2026-02-21T',
+      updatedAt: '2026-02-21T',
+    }],
+    trustScores: { AI: 0.8 },
+  }
+
+  it('should enqueue route_pearl_by_interest when routing context is non-null', async () => {
+    const reflexRepo = makeReflexRepo([routeReflex])
+    const execRepo = makeExecRepo()
+    const batchProcessor = makeBatchProcessor()
+    const routingService = makePearlRoutingService(mockRoutingContext)
+
+    const engine = new ReflexEngine(
+      reflexRepo, execRepo, makeHeartbeatService(), makeReactionService(), makeClawService(), makeEventBus()
+    )
+    engine.activateLayer1(batchProcessor)
+    engine.injectPearlRoutingService(routingService)
+
+    await engine.onEvent({
+      type: 'heartbeat.received',
+      clawId: 'owner-1',
+      fromClawId: 'friend-1',
+      toClawId: 'owner-1',
+      payload: { interests: ['AI'] },
+    })
+
+    expect(batchProcessor.enqueue).toHaveBeenCalledOnce()
+    const enqueued = batchProcessor.enqueue.mock.calls[0][0]
+    expect(enqueued.reflexName).toBe('route_pearl_by_interest')
+    // triggerData should include the routing context
+    expect(enqueued.triggerData).toMatchObject(expect.objectContaining({
+      routingContext: expect.objectContaining({ friendId: 'friend-1' }),
+    }))
+  })
+
+  it('should NOT enqueue when routing context is null (no candidates after prefilter)', async () => {
+    const reflexRepo = makeReflexRepo([routeReflex])
+    const execRepo = makeExecRepo()
+    const batchProcessor = makeBatchProcessor()
+    const routingService = makePearlRoutingService(null)  // no candidates
+
+    const engine = new ReflexEngine(
+      reflexRepo, execRepo, makeHeartbeatService(), makeReactionService(), makeClawService(), makeEventBus()
+    )
+    engine.activateLayer1(batchProcessor)
+    engine.injectPearlRoutingService(routingService)
+
+    await engine.onEvent({
+      type: 'heartbeat.received',
+      clawId: 'owner-1',
+      fromClawId: 'friend-1',
+      toClawId: 'owner-1',
+      payload: { interests: [] },
+    })
+
+    expect(batchProcessor.enqueue).not.toHaveBeenCalled()
+  })
+
+  it('should NOT enqueue when route count for friend in last 24h >= 3 (frequency limit T14)', async () => {
+    const reflexRepo = makeReflexRepo([routeReflex])
+    const execRepo = makeExecRepo()
+    // 模拟已有 3 条路由记录
+    ;(execRepo.findByResult as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { details: { friendId: 'friend-1', action: 'routed' }, createdAt: new Date(Date.now() - 1000).toISOString() },
+      { details: { friendId: 'friend-1', action: 'routed' }, createdAt: new Date(Date.now() - 2000).toISOString() },
+      { details: { friendId: 'friend-1', action: 'routed' }, createdAt: new Date(Date.now() - 3000).toISOString() },
+    ])
+    const batchProcessor = makeBatchProcessor()
+    const routingService = makePearlRoutingService(mockRoutingContext)
+
+    const engine = new ReflexEngine(
+      reflexRepo, execRepo, makeHeartbeatService(), makeReactionService(), makeClawService(), makeEventBus()
+    )
+    engine.activateLayer1(batchProcessor)
+    engine.injectPearlRoutingService(routingService)
+
+    await engine.onEvent({
+      type: 'heartbeat.received',
+      clawId: 'owner-1',
+      fromClawId: 'friend-1',
+      toClawId: 'owner-1',
+      payload: { interests: ['AI'] },
+    })
+
+    expect(batchProcessor.enqueue).not.toHaveBeenCalled()
+  })
+
+  it('should still work without PearlRoutingService (fallback: enqueue without context)', async () => {
+    const reflexRepo = makeReflexRepo([routeReflex])
+    const execRepo = makeExecRepo()
+    const batchProcessor = makeBatchProcessor()
+
+    const engine = new ReflexEngine(
+      reflexRepo, execRepo, makeHeartbeatService(), makeReactionService(), makeClawService(), makeEventBus()
+    )
+    engine.activateLayer1(batchProcessor)
+    // No pearlRoutingService injected
+
+    await engine.onEvent({
+      type: 'heartbeat.received',
+      clawId: 'owner-1',
+      fromClawId: 'friend-1',
+      toClawId: 'owner-1',
+      payload: { interests: ['AI'] },
+    })
+
+    // Without routing service, should still enqueue (Phase 5 fallback behavior)
+    expect(batchProcessor.enqueue).toHaveBeenCalledOnce()
   })
 })

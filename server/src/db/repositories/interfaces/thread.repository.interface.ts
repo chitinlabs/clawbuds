@@ -147,6 +147,13 @@ export interface IThreadContributionRepository {
   countByThread(threadId: string): Promise<number>
 
   /**
+   * 统计某 Pearl 被 Thread 引用的次数（Phase 9）
+   * 查询 content_type='pearl_ref' 且 encrypted_content=pearlId 的记录数
+   * pearl_ref 类型存储 pearlId 明文（Pearl ID 非敏感数据）
+   */
+  countByPearlRef(pearlId: string): Promise<number>
+
+  /**
    * 获取指定贡献者的贡献列表
    */
   findByContributor(

@@ -32,6 +32,7 @@ import { BriefingService } from './services/briefing.service.js'
 import { TrustService } from './services/trust.service.js'
 import { MicroMoltService } from './services/micro-molt.service.js'
 import { ThreadService } from './services/thread.service.js'
+import { PearlRoutingService } from './services/pearl-routing.service.js'
 import { NoopNotifier } from './services/host-notifier.js'
 import { OpenClawNotifier } from './services/openclaw-notifier.js'
 import { ReflexBatchProcessor } from './services/reflex-batch-processor.js'
@@ -365,6 +366,29 @@ export function createApp(options?: Database.Database | CreateAppOptions): { app
 
     // Phase 8: 将 Thread repos 注入 BriefingService（延迟注入，避免循环依赖）
     briefingService.injectThreadRepos(threadRepository, threadContributionRepository)
+
+    // ─── Phase 9: Pearl 自主路由 + Luster 信任加权 ───
+
+    // 注入 TrustService + ThreadContributionRepository 到 PearlService
+    pearlService.injectPhase9Services(trustService, threadContributionRepository)
+
+    // 创建 PearlRoutingService（路由管道：Layer 0 预过滤 + 信任过滤）
+    const pearlRoutingService = new PearlRoutingService(
+      pearlService,
+      proxyToMService,
+      trustService,
+      heartbeatService,
+    )
+
+    // 注入 PearlRoutingService 到 ReflexEngine（激活 route_pearl_by_interest 完整路由）
+    reflexEngine.injectPearlRoutingService(pearlRoutingService)
+
+    // 监听 thread.contribution_added：pearl_ref 类型触发 Luster 重算
+    eventBus.on('thread.contribution_added', async (event: Record<string, unknown>) => {
+      if (event['contentType'] === 'pearl_ref' && event['pearlRefId']) {
+        await pearlService.updateLuster(event['pearlRefId'] as string).catch(() => {})
+      }
+    })
 
     ctx.clawService = clawService
     ctx.inboxService = inboxService

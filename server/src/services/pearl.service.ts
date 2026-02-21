@@ -5,6 +5,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { IPearlRepository, IPearlEndorsementRepository, PearlMetadataRecord, PearlContentRecord, PearlFullRecord, PearlReferenceRecord, PearlEndorsementRecord, PearlFilters, UpdatePearlData } from '../db/repositories/interfaces/pearl.repository.interface.js'
+import type { IThreadContributionRepository } from '../db/repositories/interfaces/thread.repository.interface.js'
 import type { FriendshipService } from './friendship.service.js'
 import type { EventBus } from './event-bus.js'
 import type { TrustService } from './trust.service.js'
@@ -18,23 +19,55 @@ export class TrustThresholdError extends Error {
   }
 }
 
+/** Phase 9: domainMatch 未满足时抛出（仅自动路由场景） */
+export class DomainMismatchError extends Error {
+  readonly code = 'DOMAIN_MISMATCH'
+  constructor(message: string) {
+    super(message)
+    this.name = 'DomainMismatchError'
+  }
+}
+
 /**
- * 基于背书分数计算 Pearl 质量评分（Phase 3 简化版）
+ * 基于背书分数计算 Pearl 质量评分
  *
- * 算法：以初始值 0.5 作为基准权重（相当于 1 票），与 N 个背书分取等权平均
+ * Phase 3（简化版，无信任分）: 等权平均
  *   luster = (0.5 + sum(scores)) / (1 + N)
- *   然后 clamp 到 [0.1, 1.0]
  *
- * Phase 9 升级：改为信任加权版 sum(trust_i * score_i) / sum(trust_i)
+ * Phase 9（信任加权版）: 信任分加权平均
+ *   baseline_weight = 1.0
+ *   luster = (0.5 × baseline_weight + Σ(score_i × trust_i)) / (baseline_weight + Σ trust_i)
+ *
+ * 向后兼容：endorserTrustScores 为空或未传时退化为 Phase 3 等权版
+ * 长度不一致时：取 min(scores.length, trusts.length)，多余的分数忽略
+ * clamp 到 [0.1, 1.0]
  */
-export function computeLuster(endorsementScores: number[]): number {
+export function computeLuster(
+  endorsementScores: number[],
+  endorserTrustScores?: number[],
+): number {
   if (endorsementScores.length === 0) return 0.5
 
-  const baseline = 0.5
-  const total = baseline + endorsementScores.reduce((sum, s) => sum + s, 0)
-  const count = 1 + endorsementScores.length
-  const luster = total / count
+  // 无信任分（或空数组）→ 退化为 Phase 3 等权版
+  if (!endorserTrustScores || endorserTrustScores.length === 0) {
+    const baseline = 0.5
+    const total = baseline + endorsementScores.reduce((sum, s) => sum + s, 0)
+    const count = 1 + endorsementScores.length
+    return Math.max(0.1, Math.min(1.0, total / count))
+  }
 
+  // Phase 9 信任加权版
+  const len = Math.min(endorsementScores.length, endorserTrustScores.length)
+  const baselineWeight = 1.0
+
+  let weightedSum = 0
+  let trustSum = 0
+  for (let i = 0; i < len; i++) {
+    weightedSum += endorsementScores[i] * endorserTrustScores[i]
+    trustSum += endorserTrustScores[i]
+  }
+
+  const luster = (0.5 * baselineWeight + weightedSum) / (baselineWeight + trustSum)
   return Math.max(0.1, Math.min(1.0, luster))
 }
 
@@ -44,7 +77,8 @@ export class PearlService {
     private endorsementRepo: IPearlEndorsementRepository,
     private friendshipService: FriendshipService,
     private eventBus: EventBus,
-    private trustService?: TrustService,  // Phase 7: 可选，信任阈值过滤
+    private trustService?: TrustService,                                // Phase 7: 可选，信任阈值过滤
+    private threadContributionRepo?: IThreadContributionRepository,     // Phase 9: 可选，Thread 引用计数
   ) {}
 
   /** 创建 Pearl（手动沉淀） */
@@ -125,9 +159,18 @@ export class PearlService {
 
   /**
    * 分享 Pearl 给好友
-   * 验证顺序：owner check → shareability check → friendship check → 幂等检查
+   * 验证顺序：owner check → shareability check → friendship check → trustThreshold → domainMatch → 幂等检查
+   *
+   * @param context 可选路由上下文（Phase 9：自动路由时提供，用于 domainMatch 验证）
+   *   - 手动分享（CLI `clawbuds pearl share`）：不传 context，跳过 domainMatch 检查
+   *   - 自动路由（由 PearlRoutingService 调用）：传入 friendInterests，执行 domainMatch 检查
    */
-  async share(pearlId: string, fromClawId: string, toClawId: string): Promise<void> {
+  async share(
+    pearlId: string,
+    fromClawId: string,
+    toClawId: string,
+    context?: { friendInterests?: string[] },
+  ): Promise<void> {
     const pearl = await this.pearlRepo.findById(pearlId, 1)
     if (!pearl) {
       throw Object.assign(new Error('Pearl not found'), { code: 'NOT_FOUND' })
@@ -152,6 +195,21 @@ export class PearlService {
       if (trustScore < (pearl.shareConditions.trustThreshold as number)) {
         throw new TrustThresholdError(
           `Trust score ${trustScore.toFixed(2)} < required ${pearl.shareConditions.trustThreshold}`,
+        )
+      }
+    }
+
+    // Phase 9: domainMatch 检查（仅自动路由场景，手动分享跳过）
+    if (
+      context?.friendInterests != null &&
+      pearl.shareConditions?.domainMatch === true
+    ) {
+      const hasIntersection = pearl.domainTags.some(tag =>
+        context.friendInterests!.includes(tag),
+      )
+      if (!hasIntersection) {
+        throw new DomainMismatchError(
+          `Pearl domain_tags [${pearl.domainTags.join(',')}] have no intersection with friend interests`,
         )
       }
     }
@@ -231,11 +289,68 @@ export class PearlService {
     return endorsement
   }
 
-  /** 重算 luster 并持久化（endorse 后自动调用） */
+  /**
+   * 重算 luster 并持久化（endorse 后自动调用）
+   * Phase 9 升级：信任加权版 + Thread 引用计数加成
+   */
   async updateLuster(pearlId: string): Promise<void> {
-    const scores = await this.endorsementRepo.getScores(pearlId)
-    const luster = computeLuster(scores)
+    const endorsements = await this.endorsementRepo.findByPearl(pearlId)
+    const scores = endorsements.map(e => e.score)
+
+    let trustScores: number[] = []
+    if (this.trustService && endorsements.length > 0) {
+      const pearl = await this.pearlRepo.findById(pearlId, 0)
+      if (pearl) {
+        const domain = pearl.domainTags[0] ?? '_overall'
+        trustScores = await Promise.all(
+          endorsements.map(e =>
+            this.trustService!.getComposite(pearl.ownerId, e.endorserClawId, domain),
+          ),
+        )
+      }
+    }
+
+    const citationCount = await this.getThreadCitationCount(pearlId)
+    const citationBoost = Math.min(citationCount / 5 * 0.04, 0.2)
+
+    const baseLuster = computeLuster(scores, trustScores.length > 0 ? trustScores : undefined)
+    const luster = Math.min(1.0, baseLuster + citationBoost)
+
     await this.pearlRepo.updateLuster(pearlId, luster)
+  }
+
+  /**
+   * 获取指定 Pearl 被 Thread 引用的次数（Phase 9 新增）
+   * 依赖 threadContributionRepo，未注入时返回 0
+   */
+  async getThreadCitationCount(pearlId: string): Promise<number> {
+    if (!this.threadContributionRepo) return 0
+    return this.threadContributionRepo.countByPearlRef(pearlId)
+  }
+
+  /**
+   * Phase 9: 延迟注入 TrustService 和 ThreadContributionRepository
+   * 避免 app.ts 中创建顺序的循环依赖问题
+   */
+  injectPhase9Services(
+    trustService: TrustService,
+    threadContributionRepo: IThreadContributionRepository,
+  ): void {
+    this.trustService = trustService
+    this.threadContributionRepo = threadContributionRepo
+  }
+
+  /**
+   * 一次性迁移：对所有已有 Pearl 执行 Luster 重算（Phase 9 上线时运行一次）
+   * 使用信任加权版 computeLuster + Thread 引用计数
+   * @returns 重算的 Pearl 数量
+   */
+  async recalculateAllLuster(): Promise<number> {
+    const allIds = await this.pearlRepo.findAllIds()
+    for (const id of allIds) {
+      await this.updateLuster(id)
+    }
+    return allIds.length
   }
 
   /** 检查 Pearl 是否对指定 claw 可见（用于 API 权限校验） */
