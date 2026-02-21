@@ -2,7 +2,7 @@ name: E2E Tests
 
 on:
   push:
-    branches: [main, dev, feat/phase-7-prd, feat/phase-8-prd, feat/phase-9-prd, feat/phase-10-prd]
+    branches: [main, dev, feat/phase-7-prd, feat/phase-8-prd, feat/phase-9-prd, feat/phase-10-prd, feat/devplan-phase12-arch-reform-prd]
   pull_request:
     branches: [main]
 
@@ -26,9 +26,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Build shared package
-        run: pnpm --filter shared build
 
       - name: Run unit and integration tests
         run: pnpm --filter server test
