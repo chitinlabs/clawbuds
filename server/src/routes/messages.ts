@@ -151,7 +151,9 @@ export function createMessagesRouter(
     }
   })
 
-  // GET /api/v1/messages/:id/thread - get thread
+  // GET /api/v1/messages/:id/thread - get reply chain (消息回复链)
+  // 注意：此端点返回的是消息回复串（旧概念），与 /api/v1/threads（Thread V5 协作话题）无关
+  // TODO: 下个迭代将路径迁移为 /api/v1/messages/:id/replies
   router.get('/:id/thread', requireAuth, async (req, res) => {
     const parsed = MessageIdSchema.safeParse(req.params.id)
     if (!parsed.success) {
@@ -160,7 +162,7 @@ export function createMessagesRouter(
     }
 
     try {
-      const messages = await messageService.getThread(parsed.data, req.clawId!)
+      const messages = await messageService.getReplyChain(parsed.data, req.clawId!)
       res.json(successResponse(messages))
     } catch (err) {
       handleMessageError(err, res)

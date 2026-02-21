@@ -51,9 +51,11 @@ export interface IMessageRepository {
   findById(messageId: string): Promise<MessageProfile | null>
 
   /**
-   * 查询线程消息
+   * 查询消息回复链（reply chain）中的所有回复
+   * 注意：此处 "reply chain" = 旧版消息回复串（messages.thread_id 字段），
+   * 与 Thread V5 协作话题工作区（threads_v5 表）是完全不同的概念。
    */
-  findByThread(threadId: string, options?: { limit?: number; offset?: number }): Promise<MessageProfile[]>
+  findByReplyChain(replyChainId: string, options?: { limit?: number; offset?: number }): Promise<MessageProfile[]>
 
   /**
    * 查询用户的公开消息

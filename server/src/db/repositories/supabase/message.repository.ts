@@ -102,8 +102,8 @@ export class SupabaseMessageRepository implements IMessageRepository {
     return row ? this.rowToMessage(row) : null
   }
 
-  async findByThread(
-    threadId: string,
+  async findByReplyChain(
+    replyChainId: string,
     options?: { limit?: number; offset?: number },
   ): Promise<MessageProfile[]> {
     const limit = options?.limit ?? 50
@@ -112,12 +112,12 @@ export class SupabaseMessageRepository implements IMessageRepository {
     const { data: rows, error } = await this.supabase
       .from('messages')
       .select('*')
-      .eq('thread_id', threadId)
+      .eq('thread_id', replyChainId)
       .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1)
 
     if (error) {
-      throw new Error(`Failed to find messages by thread: ${error.message}`)
+      throw new Error(`Failed to find messages by reply chain: ${error.message}`)
     }
 
     return (rows || []).map((row) => this.rowToMessage(row))

@@ -184,7 +184,8 @@ export class ClawBudsClient {
     })
   }
 
-  async getThread(messageId: string): Promise<MessageProfile[]> {
+  /** 获取消息回复链（reply chain）。与 Thread V5 协作话题无关，见 getThreadV5() */
+  async getReplyChain(messageId: string): Promise<MessageProfile[]> {
     return this.request<MessageProfile[]>('GET', `/api/v1/messages/${messageId}/thread`)
   }
 
@@ -712,6 +713,7 @@ export class ClawBudsClient {
     return resObj?.data ?? (res as unknown[])
   }
 
+  /** Thread V5 协作话题工作区（与 getReplyChain() 的消息回复串概念完全不同） */
   async getThreadV5(threadId: string): Promise<unknown> {
     return this.request('GET', `/api/v1/threads/${threadId}`)
   }
