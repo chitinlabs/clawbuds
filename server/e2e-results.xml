@@ -1,0 +1,759 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="50" failures="0" errors="0" time="44.709742191">
+    <testsuite name="tests/e2e/admin-api.e2e.test.ts" timestamp="2026-02-21T17:14:50.509Z" hostname="ip-172-31-37-183" tests="22" failures="0" errors="0" skipped="0" time="14.453491157">
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [sqlite] &gt; Admin Authentication &gt; should return 503 when CLAWBUDS_ADMIN_KEY is not set" time="0.193837462">
+            <system-out>
+2026-02-21 17:14:28.559 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_f45ca8f0c5c5a55d&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;3ced042af36cbdd88088cfb21a051971af1bf499058fa15919c692fa5937761f&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [sqlite] &gt; Admin Authentication &gt; should return 401 without auth header" time="0.032971689">
+            <system-out>
+2026-02-21 17:14:28.621 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_55c613e2d6af157b&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;3c5583f34b9df83229c8878e3e9a84e3c437be40cc0b63b3cb4052f3a8588e7e&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [sqlite] &gt; Admin Authentication &gt; should return 401 with wrong key" time="0.0362473">
+            <system-out>
+2026-02-21 17:14:28.658 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_386290cddfe70571&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;f25b38114752ebd830e55e43cf9a3b75fab3760bba386734ab3b8768255bcda6&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [sqlite] &gt; Admin Authentication &gt; should return 200 with correct key" time="0.028910912">
+            <system-out>
+2026-02-21 17:14:28.689 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_c388d1827bd588cd&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;22888d5a6ee25c67ff118940d6652425909d222fa18a9295db0df7f7648d4115&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [sqlite] &gt; GET /admin/health/detail &gt; should return health status object" time="0.034037043">
+            <system-out>
+2026-02-21 17:14:28.721 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_4afa1db5aa5b3f55&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;006ddba6afecc714e070ddd36a1467ffa5fba66834abf7e4407ed5348ace164e&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [sqlite] &gt; GET /admin/claws &gt; should return claw list with total" time="0.030101386">
+            <system-out>
+2026-02-21 17:14:28.753 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_923670ebc72d95cb&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;e4ad70eacea02375ecc285b57a3f6957e1b508109fa58b0cf82189dcaf2f1127&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [sqlite] &gt; GET /admin/claws &gt; should support limit and offset params" time="0.034283348">
+            <system-out>
+2026-02-21 17:14:28.784 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_bd1516a590ca4d88&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;6181d8cb0599ae8558469fef2bc80b2f803e70d991ce94ef6f58a366ebea7535&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [sqlite] &gt; GET /admin/claws/:id &gt; should return 404 for unknown claw" time="0.030258143">
+            <system-out>
+2026-02-21 17:14:28.818 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_dddfec7dd83ad3cd&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;4cf09bd9132093ef1cf18bec80eb0289d71f59b8657a6b55f77bc51666a70289&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [sqlite] &gt; GET /admin/stats/overview &gt; should return overview stats" time="0.029569069">
+            <system-out>
+2026-02-21 17:14:28.848 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_4dd1f4fa19bb42f5&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;28c85b694d3c764c17eeeec40fe31c7fc51b716bddb53e89b8c54448536c248c&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [sqlite] &gt; GET /admin/webhooks/deliveries &gt; should return delivery list (may be empty)" time="0.026990483">
+            <system-out>
+2026-02-21 17:14:28.876 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_0c0f32f0a312700f&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;48b193366039bdf9ebad6ef273291aa0fe01615e05a56c8ddf42653b7b8821ef&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [sqlite] &gt; GET /admin/reflexes/stats &gt; should return reflex execution stats" time="0.026932589">
+            <system-out>
+2026-02-21 17:14:28.903 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_2d7b98c8e6a131a0&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;cf019a8969494a5729eb912f4e387c56ab8c9c1baf6dadabaf6e4e5832e60444&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [supabase] &gt; Admin Authentication &gt; should return 503 when CLAWBUDS_ADMIN_KEY is not set" time="1.485908613">
+            <system-out>
+2026-02-21 17:14:30.382 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_978211ec635b300c&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;746972d97af587c30b55058b0a4498fd8b97cde2e6af2138097acf1d07d6927e&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [supabase] &gt; Admin Authentication &gt; should return 401 without auth header" time="1.23835827">
+            <system-out>
+2026-02-21 17:14:31.625 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_b1de2fbc97f6e0f4&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;89d519811626ee5428005a2bb5ed6e36274b338b24c3f0892dbe7796716a7be3&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [supabase] &gt; Admin Authentication &gt; should return 401 with wrong key" time="1.404039801">
+            <system-out>
+2026-02-21 17:14:33.030 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_dda4139a9d901856&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;3c76c5e6227f73092c2fafff4175b101828ec95052ad6c035c5a9dd648f0f0e1&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [supabase] &gt; Admin Authentication &gt; should return 200 with correct key" time="1.178187375">
+            <system-out>
+2026-02-21 17:14:33.790 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_a7f1e13dd6736b36&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;d0113092c0bebe0091c37c1694133196f1add41c5587313b723692783c2af9a0&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [supabase] &gt; GET /admin/health/detail &gt; should return health status object" time="1.134961219">
+            <system-out>
+2026-02-21 17:14:35.044 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_c36755a286eb7e09&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;3dd2428b67f743d30c10ce413342c1374b17953ac769a776b95023d7b4df68dc&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [supabase] &gt; GET /admin/claws &gt; should return claw list with total" time="1.493039781">
+            <system-out>
+2026-02-21 17:14:36.141 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_7f19790e45a179bb&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;68e47ec90a2b131eaf4b4a3a6ba2a55ce277aebad4a4b4ac41b6cc57f03f6cc4&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [supabase] &gt; GET /admin/claws &gt; should support limit and offset params" time="1.066614964">
+            <system-out>
+2026-02-21 17:14:37.620 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_75fbb8758be3ce83&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;76f20dde7f2c5f5a5a6bb9099fc6cacb679a12c401cc7ec35a572b1bd2ff37c9&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [supabase] &gt; GET /admin/claws/:id &gt; should return 404 for unknown claw" time="1.11433933">
+            <system-out>
+2026-02-21 17:14:38.754 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_cba1096abe50c00c&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;4f10b47aafc66e3d718fcfabbd6f9074df50480c0be7f66c236a0254c0a910c2&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [supabase] &gt; GET /admin/stats/overview &gt; should return overview stats" time="1.206797397">
+            <system-out>
+2026-02-21 17:14:39.836 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_fb0de6b35967b91f&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;ebb45092257ca9085105e36b3ea8be271bce2c4d1601746d3f04fc6a3a65f40f&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [supabase] &gt; GET /admin/webhooks/deliveries &gt; should return delivery list (may be empty)" time="1.524315372">
+            <system-out>
+2026-02-21 17:14:41.063 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_e84d2c14852a8c0c&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;933c1a6e1fd557f74952aab9a6733c740a83701af7ed4e9d39740e6752994651&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/admin-api.e2e.test.ts" name="E2E: Admin API [supabase] &gt; GET /admin/reflexes/stats &gt; should return reflex execution stats" time="1.099860445">
+            <system-out>
+2026-02-21 17:14:42.573 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_6c307714233c3ea5&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;2872603033cfc8a7d4ef56fac83c0350819b9050d0d90b92958730add6171b72&quot;
+}
+
+            </system-out>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/e2e/carapace-allow-escalate.e2e.test.ts" timestamp="2026-02-21T17:14:50.516Z" hostname="ip-172-31-37-183" tests="10" failures="0" errors="0" skipped="0" time="8.168828789">
+        <testcase classname="tests/e2e/carapace-allow-escalate.e2e.test.ts" name="E2E: Carapace Phase 12b API [sqlite] &gt; GET /api/v1/carapace/content &gt; should return 401 without auth" time="0.157370116">
+            <system-out>
+2026-02-21 17:14:28.534 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_6b38a48c0e2f31ef&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;bef4244dee2399e059e9613a464aa97244d043e79f1d2404288697a153632e8d&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-allow-escalate.e2e.test.ts" name="E2E: Carapace Phase 12b API [sqlite] &gt; GET /api/v1/carapace/content &gt; should return empty string when no snapshot has been pushed" time="0.045974758">
+            <system-out>
+2026-02-21 17:14:28.577 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_c3d14b63fe461752&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;cfc8e5579fc19eb5d19b50230ecf5c0e960960e4af0c6035635e8e2d26332f38&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-allow-escalate.e2e.test.ts" name="E2E: Carapace Phase 12b API [sqlite] &gt; GET /api/v1/carapace/content &gt; should return snapshot content after client pushes snapshot" time="0.045430665">
+            <system-out>
+2026-02-21 17:14:28.624 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_455cee08609ed455&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;9217b0c9276b7d6eedbed65e2c2ce01b17768c1619e54a737287e2e3d4739f89&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-allow-escalate.e2e.test.ts" name="E2E: Carapace Phase 12b API [sqlite] &gt; POST /api/v1/carapace/allow (deleted in Phase 12b) &gt; should return 404 (endpoint removed)" time="0.03401962">
+            <system-out>
+2026-02-21 17:14:28.666 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_233fded1477dc141&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;d52e6776f43d6fff5f7ce643c6c23f300e6a7f31b4047ec3a5cc757d5be87b8d&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-allow-escalate.e2e.test.ts" name="E2E: Carapace Phase 12b API [sqlite] &gt; POST /api/v1/carapace/escalate (deleted in Phase 12b) &gt; should return 404 (endpoint removed)" time="0.037346207">
+            <system-out>
+2026-02-21 17:14:28.707 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_bf2de5f7a97ea4ba&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;8dbbda395c099c60537c3c2387059e2639dc7ec56a524a7fc4a13083d96f52aa&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-allow-escalate.e2e.test.ts" name="E2E: Carapace Phase 12b API [supabase] &gt; GET /api/v1/carapace/content &gt; should return 401 without auth" time="1.402353226">
+            <system-out>
+2026-02-21 17:14:30.108 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_7d40dfcdd74ea5b5&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;23aade83d6b167796c286e820e0e011464decb0c8306e3ceb712192c34afe805&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-allow-escalate.e2e.test.ts" name="E2E: Carapace Phase 12b API [supabase] &gt; GET /api/v1/carapace/content &gt; should return empty string when no snapshot has been pushed" time="2.265416886">
+            <system-out>
+2026-02-21 17:14:30.899 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_f06eb2c284a44465&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;570a414d3533f44e274502c651ae9f593a96b17ac07706eff0ec05525f4dbb6a&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-allow-escalate.e2e.test.ts" name="E2E: Carapace Phase 12b API [supabase] &gt; GET /api/v1/carapace/content &gt; should return snapshot content after client pushes snapshot" time="2.726714033">
+            <system-out>
+2026-02-21 17:14:33.118 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_863c5fc90c1d4467&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;aaafb5c6adc9f7d7a92ce445208878c3afd0b9af3220c290dd2d867cb31a712d&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-allow-escalate.e2e.test.ts" name="E2E: Carapace Phase 12b API [supabase] &gt; POST /api/v1/carapace/allow (deleted in Phase 12b) &gt; should return 404 (endpoint removed)" time="0.713248445">
+            <system-out>
+2026-02-21 17:14:35.815 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_6a1ce8fcb5273d8c&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;95610d46d8b144a0af445e69ff9d13a32ba052d9a98bbb0c3480cb55172c4175&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-allow-escalate.e2e.test.ts" name="E2E: Carapace Phase 12b API [supabase] &gt; POST /api/v1/carapace/escalate (deleted in Phase 12b) &gt; should return 404 (endpoint removed)" time="0.738579757">
+            <system-out>
+2026-02-21 17:14:36.551 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_9083f724955a29d4&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;416a96d47a875421f7423fc24c5e1ce6c9208035b49e5461d83b8ef3a949f656&quot;
+}
+
+            </system-out>
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/e2e/carapace-snapshot.e2e.test.ts" timestamp="2026-02-21T17:14:50.520Z" hostname="ip-172-31-37-183" tests="18" failures="0" errors="0" skipped="0" time="22.087422245">
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [sqlite] &gt; POST /api/v1/carapace/snapshot &gt; should return 401 without auth" time="0.173451236">
+            <system-out>
+2026-02-21 17:14:28.542 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_1fc9d1669e893f27&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;ec432a95a5b15fcbf7ceb4e6007fe34c661bff2b970da362bf8bb7326aa785b4&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [sqlite] &gt; POST /api/v1/carapace/snapshot &gt; should return 400 when content is missing" time="0.045235866">
+            <system-out>
+2026-02-21 17:14:28.587 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_0dda82f786f4f952&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;0d7f2b24c864e0dd94060237aab29ad4474e11601245b397731f21fb1250cf0e&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [sqlite] &gt; POST /api/v1/carapace/snapshot &gt; should store snapshot and return version" time="0.036854934">
+            <system-out>
+2026-02-21 17:14:28.628 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_01c6ff6000d0e2de&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;e08c575e8b01cb1f478d12933556f66e090591857ad2f3c43fdf8b14b9c9be28&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [sqlite] &gt; POST /api/v1/carapace/snapshot &gt; should accept all valid reasons" time="0.066668156">
+            <system-out>
+2026-02-21 17:14:28.663 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_c16f7d28187d8244&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;c0b49668581710002b26fa0833a6faf647c1d9644ca86624288d932373a8a907&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [sqlite] &gt; GET /api/v1/carapace/content &gt; should return 401 without auth" time="0.028148022">
+            <system-out>
+2026-02-21 17:14:28.729 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_71d305f12afe5c1b&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;54926e1fe1a65c3d5649e4dd15736c5c5b108d342cf2ecb0b4d2104fbf4f63ec&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [sqlite] &gt; GET /api/v1/carapace/content &gt; should return empty string when no snapshot exists" time="0.034638389">
+            <system-out>
+2026-02-21 17:14:28.761 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_8ef5c7c2c6767da5&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;d27fa9b6cfb93e5a4d4bdf0b4276b220fc91fb3313f6871cda8e4f2094534559&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [sqlite] &gt; GET /api/v1/carapace/content &gt; should return latest snapshot content after push" time="0.043686146">
+            <system-out>
+2026-02-21 17:14:28.796 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_b0c6dd08101228c2&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;47160e7c178e07923551dbc36330e85a0c3c80579ac98c2ca5687d0d08714a1e&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [sqlite] &gt; GET /api/v1/carapace/content &gt; should work without CLAWBUDS_CARAPACE_PATH env var" time="0.030074971">
+            <system-out>
+2026-02-21 17:14:28.836 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_80803db6963080cf&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;5aafa959d1edb43e301ca139d90edd1d7f165077b13e4dc02de7ac9a542dd957&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [sqlite] &gt; POST /api/v1/carapace/restore/:version &gt; should return content without writing to file" time="0.044428349">
+            <system-out>
+2026-02-21 17:14:28.868 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_2d3668be27fb90b8&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;e488cd1bf8fee3e0c5289298d2fc1b342e674e9a80505f08dd1caf3abac1f7e5&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [supabase] &gt; POST /api/v1/carapace/snapshot &gt; should return 401 without auth" time="1.990951054">
+            <system-out>
+2026-02-21 17:14:30.870 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_4b2df58d4881e0fd&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;06971cca0bd69b2af0c2e85894141311b7ec73d2d140b50cdc4fad01c18778ce&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [supabase] &gt; POST /api/v1/carapace/snapshot &gt; should return 400 when content is missing" time="2.005294011">
+            <system-out>
+2026-02-21 17:14:32.384 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_c8770fe8ef1ebf22&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;21a65fff16f75a7b378b1168208ec16db8e5ab9f5e9ba768bae834356e8a4db1&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [supabase] &gt; POST /api/v1/carapace/snapshot &gt; should store snapshot and return version" time="2.372441185">
+            <system-out>
+2026-02-21 17:14:34.038 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_7a8edadec398a84a&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;9fcc86cdae699eaf5121ae1472e0eb64e5038508db52d0abc90989d2edaef2f8&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [supabase] &gt; POST /api/v1/carapace/snapshot &gt; should accept all valid reasons" time="5.042477165">
+            <system-out>
+2026-02-21 17:14:36.051 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_5deb012199333817&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;e7b701f2b4d2f1ec987dd6b028f67a13c57b93387efebadd08c95c8f8c462a33&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [supabase] &gt; GET /api/v1/carapace/content &gt; should return 401 without auth" time="0.7462716">
+            <system-out>
+2026-02-21 17:14:41.040 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_539c1961e85ea2db&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;3d2b88048a4f03c1b98cd455bc2c900da989e03719f868e533e2eb0037a8804a&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [supabase] &gt; GET /api/v1/carapace/content &gt; should return empty string when no snapshot exists" time="1.506209221">
+            <system-out>
+2026-02-21 17:14:41.808 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_74b78cde68518ed4&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;b456ab1d9f2c2d6975a0d9bddcd8f39b4267c325f261c069fcd61a5072fae088&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [supabase] &gt; GET /api/v1/carapace/content &gt; should return latest snapshot content after push" time="2.869336632">
+            <system-out>
+2026-02-21 17:14:43.345 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_e59750e675cd7623&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;cc95881a839ca4ad7cb94e8fb70c88825951177c2955b837795473199ece36a5&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [supabase] &gt; GET /api/v1/carapace/content &gt; should work without CLAWBUDS_CARAPACE_PATH env var" time="1.522706657">
+            <system-out>
+2026-02-21 17:14:46.189 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_90ab7a45167c9ef8&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;9d011a5301ddb2fac7a1aa6a8ebd1ec8eed8ea179a23e97e7bb9d75c295857cb&quot;
+}
+
+            </system-out>
+        </testcase>
+        <testcase classname="tests/e2e/carapace-snapshot.e2e.test.ts" name="E2E: Carapace Snapshot API [supabase] &gt; POST /api/v1/carapace/restore/:version &gt; should return content without writing to file" time="3.525897935">
+            <system-out>
+2026-02-21 17:14:47.685 [[32minfo[39m] AUDIT
+{
+  &quot;service&quot;: &quot;clawbuds-audit&quot;,
+  &quot;event&quot;: &quot;user.register&quot;,
+  &quot;clawId&quot;: &quot;claw_b41cafff9fcd22b7&quot;,
+  &quot;action&quot;: &quot;User registered: Alice&quot;,
+  &quot;result&quot;: &quot;success&quot;,
+  &quot;ip&quot;: &quot;::ffff:127.0.0.1&quot;,
+  &quot;publicKey&quot;: &quot;53ae36df2c0818a339a26270c84b73bae4e1799c2c800c04d6738e52fda125e2&quot;
+}
+
+            </system-out>
+        </testcase>
+    </testsuite>
+</testsuites>

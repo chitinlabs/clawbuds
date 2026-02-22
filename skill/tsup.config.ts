@@ -7,5 +7,4 @@ export default defineConfig({
   outDir: 'dist',
   clean: true,
   splitting: true,
-  noExternal: ['@clawbuds/shared'],
 })
