@@ -7,9 +7,13 @@ import {
   saveProfileState,
   loadState,
   saveState,
+  ensureConfigDir,
+  getCurrentProfile,
+  getCurrentProfileName,
 } from './config.js'
 import { appendToCache, updateLastSeq } from './cache.js'
 import { WsClient } from './ws-client.js'
+import { ClawBudsClient } from './client.js'
 import type { WsEvent, InboxEntry } from './types.js'
 import {
   createPlugin,
@@ -21,12 +25,15 @@ import {
   type NotificationPlugin,
   type NotificationEvent,
 } from './notification-plugin.js'
+import { createLocalServer, type LocalServer } from './local-server.js'
 
 const POLL_DIGEST_MS = parseInt(process.env.CLAWBUDS_POLL_DIGEST_MS || '300000', 10) // default 5min
 const PLUGIN_TYPE =
   process.env.CLAWBUDS_NOTIFICATION_PLUGIN || (process.env.OPENCLAW_HOOKS_TOKEN ? 'openclaw' : 'console')
+const LOCAL_PORT = parseInt(process.env.CLAWBUDS_LOCAL_PORT || '7878', 10)
 
 let notificationPlugin: NotificationPlugin | null = null
+let localServer: LocalServer | null = null
 
 // -- Profile connection tracking --
 
@@ -308,11 +315,51 @@ async function main(): Promise<void> {
 
   console.log(`[daemon] connected ${profileConnections.size} profile(s)`) // eslint-disable-line no-console
 
+  // Start local HTTP gateway (127.0.0.1 only)
+  const configDir = ensureConfigDir()
+  const defaultProfile = getCurrentProfile()
+  if (defaultProfile) {
+    const defaultProfileName = getCurrentProfileName() ?? 'default'
+    const apiClient = new ClawBudsClient({
+      serverUrl: defaultProfile.serverUrl,
+      clawId: defaultProfile.clawId,
+      privateKey: loadPrivateKey(defaultProfileName) ?? undefined,
+    })
+
+    localServer = createLocalServer({
+      port: LOCAL_PORT,
+      configDir,
+      client: apiClient as never,
+      config: {
+        getCurrentProfile,
+        listProfiles: () => listProfiles().map((p) => p.name),
+        getCurrentProfileName,
+      },
+      getServerConnected: () => profileConnections.size > 0,
+      getActiveProfiles: () => [...profileConnections.keys()],
+      staticDir: process.env.CLAWBUDS_STATIC_DIR,
+    })
+
+    try {
+      const { port } = await localServer.start()
+      console.log(`[daemon] local HTTP gateway started on http://127.0.0.1:${port}`) // eslint-disable-line no-console
+    } catch (err) {
+      console.error(`[daemon] failed to start local HTTP server: ${(err as Error).message}`) // eslint-disable-line no-console
+      localServer = null
+    }
+  }
+
   // Graceful shutdown
   const cleanup = async () => {
     console.log('[daemon] shutting down...') // eslint-disable-line no-console
     if (pollDigestTimer) clearInterval(pollDigestTimer)
     await flushPollDigest() // send remaining votes before exit
+
+    // Stop local HTTP gateway
+    if (localServer) {
+      await localServer.stop().catch(() => {})
+      localServer = null
+    }
 
     // Disconnect all profiles
     for (const profileName of profileConnections.keys()) {

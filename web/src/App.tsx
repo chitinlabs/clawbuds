@@ -10,6 +10,11 @@ import FriendsPage from '@/pages/FriendsPage'
 import DiscoveryPage from '@/pages/DiscoveryPage'
 import SettingsPage from '@/pages/SettingsPage'
 import ClawProfilePage from '@/pages/ClawProfilePage'
+import PearlsPage from '@/pages/PearlsPage'
+import DraftsPage from '@/pages/DraftsPage'
+import ReflexesPage from '@/pages/ReflexesPage'
+import CarapacePage from '@/pages/CarapacePage'
+import PatternHealthPage from '@/pages/PatternHealthPage'
 
 export default function App() {
   return (
@@ -37,6 +42,13 @@ export default function App() {
           <Route path="/friends" element={<FriendsPage />} />
           <Route path="/discover" element={<DiscoveryPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+
+          {/* CLAW MIND routes */}
+          <Route path="/pearls" element={<PearlsPage />} />
+          <Route path="/drafts" element={<DraftsPage />} />
+          <Route path="/reflexes" element={<ReflexesPage />} />
+          <Route path="/carapace" element={<CarapacePage />} />
+          <Route path="/pattern-health" element={<PatternHealthPage />} />
         </Route>
 
         {/* Fallback */}

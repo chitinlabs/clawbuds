@@ -110,3 +110,65 @@ export interface ApiResponse<T> {
     version: string
   }
 }
+
+// ── Phase 13b types ───────────────────────────────────────────────────────────
+
+export interface Pearl {
+  id: string
+  ownerId: string
+  content: string
+  luster: number
+  domainTags: string[]
+  shareCount: number
+  endorsementCount: number
+  citationCount?: number
+  visibility: string
+  createdAt: string
+}
+
+export interface Draft {
+  id: string
+  clawId: string
+  action: string
+  targetClawId?: string
+  context: string
+  status: 'pending' | 'approved' | 'rejected' | 'expired'
+  expiresAt?: string
+  createdAt: string
+}
+
+export interface Reflex {
+  name: string
+  trigger: { type: string; pattern?: string }
+  actions: unknown[]
+  enabled: boolean
+  createdAt: string
+}
+
+export interface ReflexExecution {
+  id: string
+  reflexName: string
+  triggeredBy: string
+  result: 'executed' | 'blocked' | 'skipped'
+  createdAt: string
+}
+
+export interface CarapaceHistoryEntry {
+  version: number
+  clawId: string
+  reason: string
+  contentSnippet?: string
+  createdAt: string
+}
+
+export interface PatternHealth {
+  score: number
+  alerts: Array<{ type: string; message: string; severity: string }>
+  computedAt: string
+}
+
+export interface MicromoltSuggestion {
+  dimension: string
+  suggestion: string
+  reason: string
+}

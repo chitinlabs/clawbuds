@@ -7,6 +7,13 @@ import type {
   InboxEntry,
   Message,
   Friendship,
+  Pearl,
+  Draft,
+  Reflex,
+  ReflexExecution,
+  CarapaceHistoryEntry,
+  PatternHealth,
+  MicromoltSuggestion,
 } from '../types/api.js'
 
 const BASE_URL = import.meta.env.VITE_API_URL
@@ -267,4 +274,81 @@ export function deleteWebhook(id: string) {
 
 export function getThread(messageId: string) {
   return request<Message[]>('GET', `/api/v1/messages/${messageId}/thread`)
+}
+
+// ── Phase 13b — Pearls ────────────────────────────────────────────────────────
+
+export function listPearls() {
+  return request<Pearl[]>('GET', '/api/v1/pearls')
+}
+
+export function getPearl(id: string) {
+  return request<Pearl>('GET', `/api/v1/pearls/${id}`)
+}
+
+export function deletePearl(id: string) {
+  return request<{ deleted: true }>('DELETE', `/api/v1/pearls/${id}`)
+}
+
+export function endorsePearl(id: string) {
+  return request<{ endorsed: true }>('POST', `/api/v1/pearls/${id}/endorse`)
+}
+
+// ── Phase 13b — Drafts ────────────────────────────────────────────────────────
+
+export function listDrafts(status?: string) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+  return request<Draft[]>('GET', `/api/v1/drafts${qs}`)
+}
+
+export function approveDraft(id: string) {
+  return request<{ approved: true }>('POST', `/api/v1/drafts/${id}/approve`)
+}
+
+export function rejectDraft(id: string) {
+  return request<{ rejected: true }>('POST', `/api/v1/drafts/${id}/reject`)
+}
+
+// ── Phase 13b — Reflexes ──────────────────────────────────────────────────────
+
+export function listReflexes() {
+  return request<Reflex[]>('GET', '/api/v1/reflexes')
+}
+
+export function getReflexExecutions() {
+  return request<ReflexExecution[]>('GET', '/api/v1/reflexes/executions')
+}
+
+export function enableReflex(name: string) {
+  return request<{ enabled: true }>('PATCH', `/api/v1/reflexes/${encodeURIComponent(name)}/enable`)
+}
+
+export function disableReflex(name: string) {
+  return request<{ disabled: true }>('PATCH', `/api/v1/reflexes/${encodeURIComponent(name)}/disable`)
+}
+
+// ── Phase 13b — Carapace history ──────────────────────────────────────────────
+
+export function getCarapaceHistory() {
+  return request<CarapaceHistoryEntry[]>('GET', '/api/v1/carapace/history')
+}
+
+export function getCarapaceContent() {
+  return request<{ content: string; version: number }>('GET', '/api/v1/carapace/content')
+}
+
+export function restoreCarapaceVersion(version: number) {
+  return request<{ version: number; restoredAt: string }>('POST', `/api/v1/carapace/restore/${version}`)
+}
+
+// ── Phase 13b — Pattern health + micromolt ────────────────────────────────────
+
+export function getPatternHealth() {
+  return request<PatternHealth & { suggestions?: MicromoltSuggestion[] }>('GET', '/api/v1/pattern-health')
+}
+
+export function applyMicromolt(suggestion: string, dimension: string) {
+  return request<{ applied: true; version: number }>('POST', '/api/v1/micromolt/apply', {
+    body: { suggestion, dimension },
+  })
 }
