@@ -338,4 +338,143 @@ describe('ClawBudsClient', () => {
       expect(result.recipientCount).toBe(2)
     })
   })
+
+  // ─── Phase 11B T8: Claw Config ───────────────────────────────────────────
+
+  describe('getConfig', () => {
+    it('calls GET /api/v1/me/config', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk({ maxMessagesPerHour: 20, maxPearlsPerDay: 10, briefingCron: '0 20 * * *' }))
+      const result = await client.getConfig()
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/me/config')
+      expect(opts.method).toBe('GET')
+      expect(result.maxMessagesPerHour).toBe(20)
+    })
+  })
+
+  describe('updateConfig', () => {
+    it('calls PATCH /api/v1/me/config with body', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk({ maxMessagesPerHour: 50, maxPearlsPerDay: 10, briefingCron: '0 20 * * *' }))
+      const result = await client.updateConfig({ maxMessagesPerHour: 50 })
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/me/config')
+      expect(opts.method).toBe('PATCH')
+      expect(JSON.parse(opts.body)).toMatchObject({ maxMessagesPerHour: 50 })
+      expect(result.maxMessagesPerHour).toBe(50)
+    })
+
+    it('supports partial update with multiple fields', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk({ maxMessagesPerHour: 100, maxPearlsPerDay: 5, briefingCron: '0 9 * * *' }))
+      await client.updateConfig({ maxMessagesPerHour: 100, maxPearlsPerDay: 5, briefingCron: '0 9 * * *' })
+      const [, opts] = mockFetch.mock.calls[0]
+      const body = JSON.parse(opts.body)
+      expect(body.maxMessagesPerHour).toBe(100)
+      expect(body.maxPearlsPerDay).toBe(5)
+      expect(body.briefingCron).toBe('0 9 * * *')
+    })
+  })
+
+  // ─── Phase 10: Pattern Health + MicroMolt ────────────────────────────────
+
+  describe('getPatternHealth', () => {
+    it('calls GET /api/v1/pattern-health', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk({ healthScore: 0.8, alerts: [] }))
+      const result = await client.getPatternHealth()
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/pattern-health')
+      expect(opts.method).toBe('GET')
+      expect(result.healthScore).toBe(0.8)
+      expect(result.alerts).toEqual([])
+    })
+  })
+
+  describe('applyMicroMoltSuggestion', () => {
+    it('calls POST /api/v1/micromolt/apply with confirmed and index', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk({ appliedSuggestion: { cliCommand: 'test' } }))
+      await client.applyMicroMoltSuggestion({ suggestionIndex: 0, confirmed: true })
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/micromolt/apply')
+      expect(opts.method).toBe('POST')
+      const body = JSON.parse(opts.body)
+      expect(body.suggestionIndex).toBe(0)
+      expect(body.confirmed).toBe(true)
+    })
+  })
+
+  // ─── Phase 11: Drafts ────────────────────────────────────────────────────
+
+  describe('listDrafts', () => {
+    it('calls GET /api/v1/drafts', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk([]))
+      await client.listDrafts()
+      const [url] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/drafts')
+    })
+
+    it('passes status filter as query param', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk([]))
+      await client.listDrafts({ status: 'pending', limit: 10 })
+      const [url] = mockFetch.mock.calls[0]
+      expect(url).toContain('status=pending')
+      expect(url).toContain('limit=10')
+    })
+  })
+
+  describe('approveDraft', () => {
+    it('calls POST /api/v1/drafts/:id/approve', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk({ draft: {}, messageId: 'msg_123' }))
+      const result = await client.approveDraft('draft_abc')
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/drafts/draft_abc/approve')
+      expect(opts.method).toBe('POST')
+      expect(result.messageId).toBe('msg_123')
+    })
+  })
+
+  describe('rejectDraft', () => {
+    it('calls POST /api/v1/drafts/:id/reject', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk({}))
+      await client.rejectDraft('draft_abc')
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/drafts/draft_abc/reject')
+      expect(opts.method).toBe('POST')
+    })
+  })
+
+  // ─── Phase 12b: Carapace Snapshot ────────────────────────────────────────
+
+  describe('pushCarapaceSnapshot', () => {
+    it('calls POST /api/v1/carapace/snapshot with content and reason', async () => {
+      mockFetch.mockResolvedValueOnce(apiCreated({ version: 5, createdAt: '2026-02-22T00:00:00Z' }))
+      const result = await client.pushCarapaceSnapshot('# My Carapace', 'weekly-review')
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/carapace/snapshot')
+      expect(opts.method).toBe('POST')
+      const body = JSON.parse(opts.body)
+      expect(body.content).toBe('# My Carapace')
+      expect(body.reason).toBe('weekly-review')
+      expect(result.version).toBe(5)
+    })
+  })
+
+  describe('getCarapaceVersion', () => {
+    it('calls GET /api/v1/carapace/history/:version', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk({ content: '# v3 content', version: 3 }))
+      await client.getCarapaceVersion(3)
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/carapace/history/3')
+      expect(opts.method).toBe('GET')
+    })
+  })
+
+  describe('getCarapaceContent', () => {
+    it('calls GET /api/v1/carapace/content', async () => {
+      mockFetch.mockResolvedValueOnce(apiOk({ content: '# Latest' }))
+      const result = await client.getCarapaceContent()
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toContain('/api/v1/carapace/content')
+      expect(opts.method).toBe('GET')
+      expect(result.content).toBe('# Latest')
+    })
+  })
 })
