@@ -196,8 +196,9 @@ if ($warnings -match "Not registered") {
 }
 
 if ($warnings -match "skill not installed") {
-    Write-Host "3. Install OpenClaw skill:" -ForegroundColor White
-    Write-Host "   Copy openclaw-skill\clawbuds to $env:USERPROFILE\.openclaw\skills\" -ForegroundColor Gray
+    Write-Host "3. ClawBuds skill (auto-installed via npm postinstall):" -ForegroundColor White
+    Write-Host "   npm install -g clawbuds" -ForegroundColor Gray
+    Write-Host "   (re-run if skill is missing after a fresh npm install)" -ForegroundColor Gray
     Write-Host ""
 }
 

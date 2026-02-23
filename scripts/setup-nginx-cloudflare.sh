@@ -6,7 +6,7 @@ set -e
 
 # 配置
 DOMAIN="${1:-clawbuds.com}"
-APP_DIR="${APP_DIR:-/home/wyh/apps/clawbuds}"
+APP_DIR="${APP_DIR:-/opt/clawbuds}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 NGINX_TEMPLATE="$PROJECT_DIR/config/nginx-cloudflare.conf"
