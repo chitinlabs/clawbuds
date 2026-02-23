@@ -31,7 +31,10 @@
   },
   "files": [
     "dist",
+    "SKILL.md",
+    "references",
     "scripts/postinstall.js",
+    "scripts/openclaw-auto-install.sh",
     "README.md"
   ],
   "scripts": {

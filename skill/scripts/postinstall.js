@@ -1,93 +1,118 @@
 #!/usr/bin/env node
 /**
  * Post-install script for clawbuds
- * Detects OpenClaw and provides installation instructions for the skill
+ *
+ * Design: the npm package IS the skill. On global install, this script:
+ *   1. Copies SKILL.md → ~/.openclaw/skills/clawbuds/  (the only file OpenClaw needs)
+ *   2. Writes / merges ~/.openclaw/openclaw.json with hooks config
+ *
+ * After this runs, the user only needs:
+ *   clawbuds register --server https://clawbuds.com --name "Your Name"
+ *   clawbuds daemon start
  */
 
-import { existsSync } from 'fs'
+import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
-import { join } from 'path'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { randomBytes } from 'crypto'
 
-const OPENCLAW_DIR = join(homedir(), '.openclaw')
-const SKILLS_DIR = join(OPENCLAW_DIR, 'skills')
-const CLAWBUDS_SKILL = join(SKILLS_DIR, 'clawbuds')
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const PACKAGE_DIR = join(__dirname, '..')   // scripts/ is one level below package root
 
-// ANSI colors
-const CYAN = '\x1b[36m'
-const GREEN = '\x1b[32m'
+const OPENCLAW_DIR     = join(homedir(), '.openclaw')
+const SKILLS_DIR       = join(OPENCLAW_DIR, 'skills')
+const SKILL_DIR        = join(SKILLS_DIR, 'clawbuds')
+const OPENCLAW_CONFIG  = join(OPENCLAW_DIR, 'openclaw.json')
+
+const GREEN  = '\x1b[32m'
 const YELLOW = '\x1b[33m'
-const RESET = '\x1b[0m'
-const BOLD = '\x1b[1m'
+const CYAN   = '\x1b[36m'
+const BOLD   = '\x1b[1m'
+const RESET  = '\x1b[0m'
 
-function log(msg, color = RESET) {
-  console.log(`${color}${msg}${RESET}`)
-}
+const log = (msg, color = RESET) => console.log(`${color}${msg}${RESET}`) // eslint-disable-line no-console
 
-// Check if we're in global install
-const isGlobalInstall = process.env.npm_config_global === 'true'
-
-if (!isGlobalInstall) {
-  // Local install - skip
-  process.exit(0)
-}
+// Only run on global install
+if (process.env.npm_config_global !== 'true') process.exit(0)
 
 log('')
-log('🦞 ClawBuds CLI installed successfully!', GREEN)
+log('🦞 ClawBuds CLI installed!', GREEN)
 log('')
 
-// Check if OpenClaw exists
+// ── No OpenClaw → show basic usage ──────────────────────────────────────────
 if (!existsSync(OPENCLAW_DIR)) {
-  // No OpenClaw - show basic usage
   log('Quick start:', CYAN)
-  log('  clawbuds register --server <server-url> --name "Your Name"')
+  log('  clawbuds register --server https://clawbuds.com --name "Your Name"')
+  log('  clawbuds daemon start')
   log('  clawbuds --help')
   log('')
-  log('📚 Documentation: https://github.com/chitinlabs/clawbuds', CYAN)
+  log('China mirror:  npm install -g clawbuds --registry https://registry.npmmirror.com', YELLOW)
+  log('Docs:          https://github.com/chitinlabs/clawbuds', CYAN)
   log('')
   process.exit(0)
 }
 
-// OpenClaw detected!
-log(`${BOLD}OpenClaw detected!${RESET}`, GREEN)
+// ── OpenClaw detected → auto-install skill + configure hooks ────────────────
+log(`${BOLD}OpenClaw detected — configuring ClawBuds skill...${RESET}`, GREEN)
 log('')
 
-// Check if skill is already installed
-if (existsSync(CLAWBUDS_SKILL)) {
-  log('✓ ClawBuds skill already installed', GREEN)
-  log(`  Location: ${CLAWBUDS_SKILL}`, CYAN)
-  log('')
-  log('Next steps:', CYAN)
-  log('  bash ~/.openclaw/skills/clawbuds/scripts/setup.sh <server-url>')
-  log('')
-  process.exit(0)
+// 1. Copy SKILL.md → ~/.openclaw/skills/clawbuds/SKILL.md
+try {
+  mkdirSync(SKILL_DIR, { recursive: true })
+  const src = join(PACKAGE_DIR, 'SKILL.md')
+  const dst = join(SKILL_DIR, 'SKILL.md')
+  if (existsSync(src)) {
+    copyFileSync(src, dst)
+    log(`  ✓ Skill installed  →  ${SKILL_DIR}`, GREEN)
+  } else {
+    log('  ⚠  SKILL.md not found in package (build issue?)', YELLOW)
+  }
+} catch (e) {
+  log(`  ⚠  Skill copy failed: ${e.message}`, YELLOW)
 }
 
-// Skill not installed - show installation command
-log('To enable ClawBuds in OpenClaw, install the skill:', YELLOW)
-log('')
+// 2. Write / merge ~/.openclaw/openclaw.json (idempotent)
+try {
+  let config = {}
+  if (existsSync(OPENCLAW_CONFIG)) {
+    try { config = JSON.parse(readFileSync(OPENCLAW_CONFIG, 'utf-8')) } catch {}
+  }
 
-if (process.platform === 'win32') {
-  // Windows
-  log('  PowerShell:', CYAN)
-  log('  irm https://raw.githubusercontent.com/your-org/clawbuds/main/scripts/install-skill-only.ps1 | iex')
-  log('')
-  log('  Or manually:', CYAN)
-  log('  1. Download: https://github.com/chitinlabs/clawbuds/archive/refs/heads/main.zip')
-  log('  2. Extract openclaw-skill/clawbuds to %USERPROFILE%\\.openclaw\\skills\\')
-} else {
-  // Linux/macOS
-  log('  One command:', CYAN)
-  log('  curl -fsSL https://raw.githubusercontent.com/your-org/clawbuds/main/scripts/install-skill-only.sh | bash')
-  log('')
-  log('  Or manually:', CYAN)
-  log('  git clone https://github.com/chitinlabs/clawbuds.git /tmp/clawbuds')
-  log('  cp -r /tmp/clawbuds/openclaw-skill/clawbuds ~/.openclaw/skills/')
-  log('  rm -rf /tmp/clawbuds')
+  if (config?.hooks?.token) {
+    // Already has a token — only patch missing fields
+    let changed = false
+    if (!config.hooks.allowRequestSessionKey) {
+      config.hooks.allowRequestSessionKey = true
+      changed = true
+    }
+    if (changed) {
+      writeFileSync(OPENCLAW_CONFIG, JSON.stringify(config, null, 2), 'utf-8')
+      log('  ✓ Hooks config updated (allowRequestSessionKey added)', GREEN)
+    } else {
+      log('  ✓ Hooks already configured', GREEN)
+    }
+  } else {
+    // First time — generate token and write full config
+    const token = `clawbuds-hook-${randomBytes(16).toString('hex')}`
+    config.hooks = { enabled: true, token, allowRequestSessionKey: true }
+    mkdirSync(OPENCLAW_DIR, { recursive: true })
+    writeFileSync(OPENCLAW_CONFIG, JSON.stringify(config, null, 2), 'utf-8')
+    log(`  ✓ Hooks configured  →  ${OPENCLAW_CONFIG}`, GREEN)
+  }
+} catch (e) {
+  log(`  ⚠  Hooks config failed: ${e.message}`, YELLOW)
 }
 
+// ── Next steps ───────────────────────────────────────────────────────────────
 log('')
-log('After installing the skill:', CYAN)
-log('  bash ~/.openclaw/skills/clawbuds/scripts/setup.sh <server-url>')
+log(`${BOLD}Next steps:${RESET}`)
 log('')
-log('📚 Full guide: https://github.com/chitinlabs/clawbuds/blob/main/docs/OPENCLAW_QUICKSTART.md', CYAN)
+log('  clawbuds register --server https://clawbuds.com --name "Your Name"', CYAN)
+log('  clawbuds daemon start', CYAN)
+log('')
+log('China mirror:', YELLOW)
+log('  npm install -g clawbuds --registry https://registry.npmmirror.com')
+log('')
+log('Docs: https://github.com/chitinlabs/clawbuds', CYAN)
 log('')
