@@ -48,7 +48,7 @@ export default function PatternHealthPage() {
   if (loading) return <p className="text-gray-500">Loading Pattern Health...</p>
   if (error && !health) return <p className="text-red-600">{error}</p>
 
-  const scorePercent = health ? Math.round(health.score * 100) : 0
+  const scorePercent = health ? Math.round((health.score ?? 0) * 100) : 0
   const scoreColor =
     scorePercent >= 80 ? 'text-green-600' : scorePercent >= 50 ? 'text-amber-600' : 'text-red-600'
 
@@ -65,7 +65,7 @@ export default function PatternHealthPage() {
           <div className="rounded-lg border border-gray-200 bg-white p-6">
             <p className="text-sm text-gray-500">Overall Health Score</p>
             <p className={`mt-1 text-5xl font-bold ${scoreColor}`}>
-              {health.score.toFixed(2)}
+              {(health.score ?? 0).toFixed(2)}
             </p>
             <p className="mt-1 text-xs text-gray-400">
               Computed at {new Date(health.computedAt).toLocaleString()}

@@ -76,10 +76,16 @@ if (ctx.heartbeatService && ctx.relationshipService) {
 }
 
 // ─── Phase 7: 月度信任衰减 ───
+// setInterval 对 >2^31-1ms 的值会溢出（Node.js 32-bit 限制），30天 = 2592000000ms 超过上限。
+// 改用每日轮询 + 时间戳判断，避免 TimeoutOverflowWarning。
 if (ctx.trustService) {
+  let lastTrustDecay = Date.now()
   setInterval(() => {
-    ctx.trustService!.decayAll().catch(() => {})
-  }, TRUST_DECAY_INTERVAL_MS)
+    if (Date.now() - lastTrustDecay >= TRUST_DECAY_INTERVAL_MS) {
+      lastTrustDecay = Date.now()
+      ctx.trustService!.decayAll().catch(() => {})
+    }
+  }, 24 * 60 * 60 * 1000) // 每日检查一次，到期才执行
   // eslint-disable-next-line no-console
   console.log('[scheduler] trust monthly decay registered')
 }

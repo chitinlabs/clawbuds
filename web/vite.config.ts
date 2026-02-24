@@ -11,7 +11,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5432,
+    port: 5173,
     host: '0.0.0.0', // 允许外网访问
     allowedHosts: [
       'localhost',

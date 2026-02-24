@@ -11,8 +11,8 @@ addProfileOption(friendsCommand)
 friendsCommand
   .command('list')
   .description('List your friends')
-  .action(async (opts) => {
-    const ctx = getProfileContext(opts)
+  .action(async (opts, cmd) => {
+    const ctx = getProfileContext(opts, cmd)
     if (!ctx) return
 
     const client = new ClawBudsClient({
@@ -40,8 +40,8 @@ friendsCommand
 friendsCommand
   .command('add <clawId>')
   .description('Send a friend request')
-  .action(async (clawId: string, opts) => {
-    const ctx = getProfileContext(opts)
+  .action(async (clawId: string, opts, cmd) => {
+    const ctx = getProfileContext(opts, cmd)
     if (!ctx) return
 
     const client = new ClawBudsClient({
@@ -66,8 +66,8 @@ friendsCommand
 friendsCommand
   .command('requests')
   .description('List pending friend requests')
-  .action(async (opts) => {
-    const ctx = getProfileContext(opts)
+  .action(async (opts, cmd) => {
+    const ctx = getProfileContext(opts, cmd)
     if (!ctx) return
 
     const client = new ClawBudsClient({
@@ -95,8 +95,8 @@ friendsCommand
 friendsCommand
   .command('accept <friendshipId>')
   .description('Accept a friend request (supports short ID)')
-  .action(async (friendshipId: string, opts) => {
-    const ctx = getProfileContext(opts)
+  .action(async (friendshipId: string, opts, cmd) => {
+    const ctx = getProfileContext(opts, cmd)
     if (!ctx) return
 
     const client = new ClawBudsClient({
@@ -129,8 +129,8 @@ friendsCommand
 friendsCommand
   .command('reject <friendshipId>')
   .description('Reject a friend request (supports short ID)')
-  .action(async (friendshipId: string, opts) => {
-    const ctx = getProfileContext(opts)
+  .action(async (friendshipId: string, opts, cmd) => {
+    const ctx = getProfileContext(opts, cmd)
     if (!ctx) return
 
     const client = new ClawBudsClient({
@@ -164,8 +164,8 @@ friendsCommand
   .command('layers')
   .description('Show friends grouped by Dunbar layer')
   .option('-l, --layer <layer>', 'Filter by layer (core|sympathy|active|casual)')
-  .action(async (opts) => {
-    const ctx = getProfileContext(opts)
+  .action(async (opts, cmd) => {
+    const ctx = getProfileContext(opts, cmd)
     if (!ctx) return
 
     const client = new ClawBudsClient({
@@ -209,8 +209,8 @@ friendsCommand
 friendsCommand
   .command('set-layer <clawId> <layer>')
   .description('Manually pin a friend to a Dunbar layer (core|sympathy|active|casual)')
-  .action(async (clawId: string, layer: string, opts) => {
-    const ctx = getProfileContext(opts)
+  .action(async (clawId: string, layer: string, opts, cmd) => {
+    const ctx = getProfileContext(opts, cmd)
     if (!ctx) return
 
     const validLayers = ['core', 'sympathy', 'active', 'casual']
@@ -238,8 +238,8 @@ friendsCommand
 friendsCommand
   .command('remove <clawId>')
   .description('Remove a friend')
-  .action(async (clawId: string, opts) => {
-    const ctx = getProfileContext(opts)
+  .action(async (clawId: string, opts, cmd) => {
+    const ctx = getProfileContext(opts, cmd)
     if (!ctx) return
 
     const client = new ClawBudsClient({

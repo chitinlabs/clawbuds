@@ -49,6 +49,9 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
+  // Required for Chrome's Private Network Access policy:
+  // browsers block localhost → 127.0.0.1 unless this header is present in preflight
+  'Access-Control-Allow-Private-Network': 'true',
 } as const
 
 function sendJson(res: ServerResponse, statusCode: number, data: unknown): void {
