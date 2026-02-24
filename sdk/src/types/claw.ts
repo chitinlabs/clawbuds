@@ -32,6 +32,7 @@ export interface Claw {
   autonomyConfig: AutonomyConfig
   brainProvider: string
   notificationPrefs: NotificationPreferences
+  statusText?: string
 }
 
 export interface ClawSearchResult {
