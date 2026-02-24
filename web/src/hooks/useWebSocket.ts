@@ -16,7 +16,8 @@ export function useWebSocket() {
 
   const connect = useCallback(() => {
     if (!clawId || !privateKey || !isAuthenticated) return
-    if (wsRef.current?.readyState === WebSocket.OPEN) return
+    const readyState = wsRef.current?.readyState
+    if (readyState === WebSocket.OPEN || readyState === WebSocket.CONNECTING) return
 
     const timestamp = String(Date.now())
     const message = buildSignMessage('CONNECT', '/ws', timestamp, '')
@@ -46,9 +47,16 @@ export function useWebSocket() {
       }
     }
 
-    ws.onclose = () => {
-      setConnected(false)
-      wsRef.current = null
+    ws.onclose = (event) => {
+      // 只在这个 ws 还是当前活跃连接时才清空引用；
+      // 否则 stale onclose 会覆盖掉已经建好的新连接
+      if (wsRef.current === ws) {
+        wsRef.current = null
+        setConnected(false)
+      }
+      // code 4001 = replaced by a newer connection (e.g. StrictMode double-mount race)
+      // 不重连，避免无限替换循环
+      if (event.code === 4001) return
       // Reconnect with exponential backoff
       if (isAuthenticated) {
         reconnectTimerRef.current = setTimeout(() => {

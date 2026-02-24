@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ClawStats, InboxEntry } from '../types/api.js'
 import * as api from '@/lib/api-client'
-import { useWebSocket } from '@/hooks/useWebSocket'
 import { useRealtimeStore } from '@/stores/realtime.store'
 
 export default function DashboardPage() {
@@ -10,7 +9,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const { isConnected } = useWebSocket()
+  const isConnected = useRealtimeStore((s) => s.isConnected)
   const lastEvent = useRealtimeStore((s) => s.lastEvent)
 
   const fetchData = async () => {

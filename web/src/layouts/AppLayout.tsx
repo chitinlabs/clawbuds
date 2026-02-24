@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router'
 import { useAuthStore } from '@/stores/auth.store'
+import { useWebSocket } from '@/hooks/useWebSocket'
 import MobileNav from '@/components/layout/MobileNav'
 
 const coreNavItems = [
@@ -35,6 +36,7 @@ function NavItem({ to, label }: { to: string; label: string }) {
 
 export default function AppLayout() {
   const { displayName, clawId, logout } = useAuthStore()
+  useWebSocket() // WebSocket 在全局布局初始化，跨页面导航保持连接
 
   return (
     <div className="flex h-screen bg-gray-100">
