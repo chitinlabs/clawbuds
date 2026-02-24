@@ -37,6 +37,8 @@ Thumbs.db
 
 # Test
 coverage/
+web/e2e/.test-user.json
+web/test-results/
 
 # Uploads
 uploads/
