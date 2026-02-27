@@ -2,7 +2,6 @@ import WebSocket from 'ws'
 import { buildSignMessage, sign } from './lib/sign-protocol.js'
 import type { WsEvent } from './types.js'
 
-const MAX_RETRIES = 10
 const BASE_DELAY = 1000
 const MAX_DELAY = 60_000
 
@@ -89,9 +88,6 @@ export class WsClient {
   }
 
   private scheduleReconnect(): void {
-    if (this.retries >= MAX_RETRIES) {
-      return
-    }
     const delay = Math.min(BASE_DELAY * Math.pow(2, this.retries), MAX_DELAY)
     const jitter = Math.random() * delay * 0.3
     this.retries++

@@ -145,10 +145,12 @@ function connectProfile(
       console.log(`[daemon:${profileName}] event: ${event.type}`, JSON.stringify(event.data)) // eslint-disable-line no-console
       appendToCache(event)
 
-      // Update connection's lastSeq
-      const conn = profileConnections.get(profileName)
-      if (conn) {
-        conn.lastSeq = event.seq
+      // Update connection's lastSeq (only message.new events carry a seq number)
+      if (event.type === 'message.new') {
+        const conn = profileConnections.get(profileName)
+        if (conn) {
+          conn.lastSeq = event.seq
+        }
       }
 
       if (!notificationPlugin || notificationPlugin.name === 'console') {
