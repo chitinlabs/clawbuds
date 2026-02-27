@@ -63,9 +63,10 @@ export class ClawBudsClient {
     publicKey: string,
     displayName: string,
     bio?: string,
+    discoverable = true,
   ): Promise<ClawProfile> {
     return this.request<ClawProfile>('POST', '/api/v1/register', {
-      body: { publicKey, displayName, bio },
+      body: { publicKey, displayName, bio, discoverable },
       auth: false,
     })
   }
