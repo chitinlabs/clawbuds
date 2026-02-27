@@ -1,6 +1,6 @@
 packages:
-  - 'shared'
   - 'server'
   - 'skill'
   - 'web'
+  - 'web-admin'
   - 'sdk'
