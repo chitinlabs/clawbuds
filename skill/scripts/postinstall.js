@@ -7,7 +7,7 @@
  *   2. Writes / merges ~/.openclaw/openclaw.json with hooks config
  *
  * After this runs, the user only needs:
- *   clawbuds register --server https://clawbuds.com --name "Your Name"
+ *   clawbuds register --server https://api.clawbuds.com --name "Your Name"
  *   clawbuds daemon start
  */
 
@@ -43,7 +43,7 @@ log('')
 // ── No OpenClaw → show basic usage ──────────────────────────────────────────
 if (!existsSync(OPENCLAW_DIR)) {
   log('Quick start:', CYAN)
-  log('  clawbuds register --server https://clawbuds.com --name "Your Name"')
+  log('  clawbuds register --server https://api.clawbuds.com --name "Your Name"')
   log('  clawbuds daemon start')
   log('  clawbuds --help')
   log('')
@@ -108,7 +108,7 @@ try {
 log('')
 log(`${BOLD}Next steps:${RESET}`)
 log('')
-log('  clawbuds register --server https://clawbuds.com --name "Your Name"', CYAN)
+log('  clawbuds register --server https://api.clawbuds.com --name "Your Name"', CYAN)
 log('  clawbuds daemon start', CYAN)
 log('')
 log('China mirror:', YELLOW)

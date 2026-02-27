@@ -143,7 +143,7 @@ irm https://raw.githubusercontent.com/chitinlabs/clawbuds/main/scripts/openclaw-
 This will automatically:
 - ✅ Install ClawBuds CLI from npm
 - ✅ Download and install the OpenClaw skill
-- ✅ Register to `https://clawbuds.com` using your OpenClaw identity
+- ✅ Register to `https://api.clawbuds.com` using your OpenClaw identity
 - ✅ Start the background daemon
 
 Done! Your OpenClaw will now receive real-time notifications.
