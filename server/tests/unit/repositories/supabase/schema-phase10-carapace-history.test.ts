@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const migrationPath = join(
   __dirname,
-  '../../../../../supabase/migrations/20260221100000_phase10_carapace_history.sql'
+  '../../../../../supabase/migrations/20260227000000_consolidated_schema.sql'
 )
 
 function extractTableDefinition(sql: string, tableName: string): string {

@@ -11,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const schemaPath = join(__dirname, '../../../../src/db/supabase-schema.sql')
 const migrationPath = join(
   __dirname,
-  '../../../../../supabase/migrations/20260220000000_phase5_imprints.sql'
+  '../../../../../supabase/migrations/20260227000000_consolidated_schema.sql'
 )
 
 describe('Supabase schema Phase 5: imprints table', () => {
@@ -46,7 +46,7 @@ describe('Supabase schema Phase 5: imprints table', () => {
     })
   })
 
-  describe('Supabase migration file 20260220000000', () => {
+  describe('Supabase consolidated migration file', () => {
     it('should exist and create imprints table', () => {
       expect(migration).toMatch(/CREATE TABLE/)
       expect(migration).toContain('imprints')

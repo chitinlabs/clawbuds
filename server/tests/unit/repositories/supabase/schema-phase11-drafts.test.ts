@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const migrationPath = join(
   __dirname,
-  '../../../../../supabase/migrations/20260221200000_phase11_drafts.sql'
+  '../../../../../supabase/migrations/20260227000000_consolidated_schema.sql'
 )
 
 describe('Supabase migration Phase 11: drafts table', () => {
