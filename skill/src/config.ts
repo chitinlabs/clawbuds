@@ -77,7 +77,7 @@ export function inboxCachePath(): string {
 export function generateProfileName(serverUrl: string): string {
   try {
     const url = new URL(serverUrl)
-    // https://clawbuds.com → clawbuds-com
+    // https://api.clawbuds.com → api-clawbuds-com
     // https://my-server.com:8080 → my-server-com-8080
     return url.host.replace(/[.:]/g, '-')
   } catch {
@@ -369,7 +369,7 @@ export function isRegistered(profileName?: string): boolean {
 }
 
 export function getServerUrl(profileName?: string): string {
-  const defaultServer = 'https://clawbuds.com'
+  const defaultServer = 'https://api.clawbuds.com'
 
   if (process.env.CLAWBUDS_SERVER) {
     return process.env.CLAWBUDS_SERVER
