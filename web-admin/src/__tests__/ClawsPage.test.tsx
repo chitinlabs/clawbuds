@@ -15,13 +15,14 @@ const mockClaw = {
   clawId: 'claw_alice',
   displayName: 'Alice',
   status: 'active' as const,
+  discoverable: true,
   createdAt: '2026-02-01T00:00:00Z',
 }
 
 describe('ClawsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(apiClient.adminApi.getClaws).mockResolvedValue({ claws: [], total: 0 })
+    vi.mocked(apiClient.adminApi.getClaws).mockResolvedValue({ claws: [], total: 0, limit: 20, offset: 0 })
   })
 
   it('renders page heading', async () => {
@@ -50,7 +51,7 @@ describe('ClawsPage', () => {
   })
 
   it('renders claw rows when data is returned', async () => {
-    vi.mocked(apiClient.adminApi.getClaws).mockResolvedValue({ claws: [mockClaw], total: 1 })
+    vi.mocked(apiClient.adminApi.getClaws).mockResolvedValue({ claws: [mockClaw], total: 1, limit: 20, offset: 0 })
     render(<ClawsPage />)
 
     await waitFor(() => {
@@ -61,7 +62,7 @@ describe('ClawsPage', () => {
   })
 
   it('shows "Suspend" button for active claw', async () => {
-    vi.mocked(apiClient.adminApi.getClaws).mockResolvedValue({ claws: [mockClaw], total: 1 })
+    vi.mocked(apiClient.adminApi.getClaws).mockResolvedValue({ claws: [mockClaw], total: 1, limit: 20, offset: 0 })
     render(<ClawsPage />)
 
     await waitFor(() => {
@@ -71,7 +72,7 @@ describe('ClawsPage', () => {
 
   it('shows "Activate" button for suspended claw', async () => {
     const suspended = { ...mockClaw, status: 'suspended' as const }
-    vi.mocked(apiClient.adminApi.getClaws).mockResolvedValue({ claws: [suspended], total: 1 })
+    vi.mocked(apiClient.adminApi.getClaws).mockResolvedValue({ claws: [suspended], total: 1, limit: 20, offset: 0 })
     render(<ClawsPage />)
 
     await waitFor(() => {
@@ -80,8 +81,8 @@ describe('ClawsPage', () => {
   })
 
   it('calls updateClawStatus and reloads on Suspend click', async () => {
-    vi.mocked(apiClient.adminApi.getClaws).mockResolvedValue({ claws: [mockClaw], total: 1 })
-    vi.mocked(apiClient.adminApi.updateClawStatus).mockResolvedValue(undefined)
+    vi.mocked(apiClient.adminApi.getClaws).mockResolvedValue({ claws: [mockClaw], total: 1, limit: 20, offset: 0 })
+    vi.mocked(apiClient.adminApi.updateClawStatus).mockResolvedValue(mockClaw)
 
     render(<ClawsPage />)
     await waitFor(() => screen.getByText('Suspend'))
@@ -114,7 +115,7 @@ describe('ClawsPage', () => {
   })
 
   it('formats joined date as YYYY-MM-DD', async () => {
-    vi.mocked(apiClient.adminApi.getClaws).mockResolvedValue({ claws: [mockClaw], total: 1 })
+    vi.mocked(apiClient.adminApi.getClaws).mockResolvedValue({ claws: [mockClaw], total: 1, limit: 20, offset: 0 })
     render(<ClawsPage />)
 
     await waitFor(() => {

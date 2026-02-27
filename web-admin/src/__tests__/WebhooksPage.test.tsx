@@ -12,6 +12,7 @@ vi.mock('../lib/api-client.js', () => ({
 
 const mockDelivery = {
   id: 'del_001',
+  webhookId: 'wh_001',
   event: 'message.created',
   status: 'delivered' as const,
   responseStatus: 200,
@@ -20,6 +21,7 @@ const mockDelivery = {
 
 const mockFailedDelivery = {
   id: 'del_002',
+  webhookId: 'wh_001',
   event: 'pearl.shared',
   status: 'failed' as const,
   responseStatus: 500,
@@ -83,7 +85,7 @@ describe('WebhooksPage', () => {
   })
 
   it('shows "—" when responseStatus is null', async () => {
-    const noStatus = { ...mockDelivery, responseStatus: null }
+    const noStatus = { ...mockDelivery, responseStatus: undefined }
     vi.mocked(apiClient.adminApi.getWebhookDeliveries).mockResolvedValue({ deliveries: [noStatus] })
     render(<WebhooksPage />)
     await waitFor(() => {

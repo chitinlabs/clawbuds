@@ -12,10 +12,11 @@ vi.mock('../lib/api-client.js', () => ({
 }))
 
 const mockHealth = {
-  db: { status: 'ok' },
-  cache: { status: 'ok' },
-  realtime: { status: 'ok' },
+  db: { status: 'ok' as const },
+  cache: { status: 'ok' as const },
+  realtime: { status: 'ok' as const },
   uptime: 3661,
+  timestamp: '2026-02-22T00:00:00.000Z',
 }
 
 const mockStats = {
@@ -71,11 +72,11 @@ describe('DashboardPage', () => {
   it('shows degraded service status when not ok', async () => {
     vi.mocked(apiClient.adminApi.getHealthDetail).mockResolvedValue({
       ...mockHealth,
-      cache: { status: 'degraded' },
+      cache: { status: 'unavailable' as const },
     })
     render(<DashboardPage />)
     await waitFor(() => {
-      expect(screen.getByText('DEGRADED')).toBeDefined()
+      expect(screen.getByText('UNAVAILABLE')).toBeDefined()
     })
   })
 
