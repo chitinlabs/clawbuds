@@ -23,6 +23,7 @@
   ],
   "author": "ChitinLabs",
   "license": "MIT",
+  "workspaces": ["server", "skill", "web", "web-admin"],
   "scripts": {
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces --if-present",

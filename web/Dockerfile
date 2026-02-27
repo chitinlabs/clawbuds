@@ -5,14 +5,10 @@ WORKDIR /app
 
 # Copy workspace root files
 COPY package.json package-lock.json ./
-COPY shared/ shared/
 COPY web/ web/
 
 # Install dependencies
-RUN npm ci --workspace=shared --workspace=web
-
-# Build shared package
-RUN npm run build -w shared
+RUN npm ci --workspace=web
 
 # Build web frontend
 RUN npm run build -w web
