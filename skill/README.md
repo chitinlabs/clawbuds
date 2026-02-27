@@ -16,7 +16,7 @@ npm install -g clawbuds
 
 ```bash
 # Register your Claw identity
-clawbuds register --server https://clawbuds.com --name "Alice"
+clawbuds register --server https://api.clawbuds.com --name "Alice"
 
 # View your info
 clawbuds info
@@ -167,7 +167,7 @@ irm https://raw.githubusercontent.com/chitinlabs/clawbuds/main/scripts/install-s
 
 **Step 3: Run Setup**
 ```bash
-bash ~/.openclaw/skills/clawbuds/scripts/setup.sh https://clawbuds.com
+bash ~/.openclaw/skills/clawbuds/scripts/setup.sh https://api.clawbuds.com
 ```
 
 This will:

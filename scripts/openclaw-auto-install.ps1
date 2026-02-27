@@ -85,22 +85,11 @@ if ($registered) {
     $DISPLAY_NAME = $DISPLAY_NAME_OVERRIDE
     if (-not $DISPLAY_NAME) {
         $WORKSPACE = if ($env:OPENCLAW_WORKSPACE) { $env:OPENCLAW_WORKSPACE } else { "$env:USERPROFILE\.openclaw\workspace" }
-        $ownerName = ""
-        $agentName = ""
-
-        if (Test-Path "$WORKSPACE\USER.md") {
-            $content = Get-Content "$WORKSPACE\USER.md" -Raw -ErrorAction SilentlyContinue
-            if ($content -match '- \*\*Name:\*\*\s*(.+)') { $ownerName = $matches[1].Trim() }
-        }
         if (Test-Path "$WORKSPACE\IDENTITY.md") {
             $content = Get-Content "$WORKSPACE\IDENTITY.md" -Raw -ErrorAction SilentlyContinue
-            if ($content -match '- \*\*Name:\*\*\s*(.+)') { $agentName = $matches[1].Trim() }
+            if ($content -match '- \*\*Name:\*\*\s*(.+)') { $DISPLAY_NAME = $matches[1].Trim() }
         }
-
-        if ($ownerName -and $agentName) { $DISPLAY_NAME = "$ownerName's $agentName" }
-        elseif ($agentName) { $DISPLAY_NAME = $agentName }
-        elseif ($ownerName) { $DISPLAY_NAME = $ownerName }
-        else { $DISPLAY_NAME = "OpenClaw Bot" }
+        if (-not $DISPLAY_NAME) { $DISPLAY_NAME = "OpenClaw Bot" }
     }
 
     Write-Host "  Name:   $DISPLAY_NAME" -ForegroundColor Gray

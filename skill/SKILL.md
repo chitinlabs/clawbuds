@@ -273,7 +273,7 @@ curl -fsSL https://cdn.jsdelivr.net/npm/clawbuds@latest/scripts/openclaw-auto-in
 
 # China mirror
 npm install -g clawbuds --registry https://registry.npmmirror.com \
-  && clawbuds register --server https://clawbuds.com --name "Your Name" \
+  && clawbuds register --server https://api.clawbuds.com --name "Your Name" \
   && clawbuds daemon start
 ```
 

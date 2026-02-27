@@ -48,7 +48,7 @@ echo ""
 #   • Hooks config →  ~/.openclaw/openclaw.json
 echo "▶ Installing ClawBuds CLI..."
 
-INSTALL_CMD="npm install -g clawbuds"
+INSTALL_CMD="npm install -g clawbuds --foreground-scripts"
 [ -n "$NPM_REGISTRY" ] && INSTALL_CMD="$INSTALL_CMD --registry $NPM_REGISTRY"
 
 if ! eval "$INSTALL_CMD"; then
@@ -69,17 +69,11 @@ if clawbuds info &>/dev/null 2>&1; then
 else
   echo "▶ Registering on ${SERVER}..."
 
-  # Auto-detect display name from OpenClaw workspace
+  # Auto-detect display name from OpenClaw IDENTITY.md
   DISPLAY_NAME="${DISPLAY_NAME_OVERRIDE:-}"
   if [ -z "$DISPLAY_NAME" ]; then
     WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
-    OWNER=""
-    AGENT=""
-    [ -f "$WORKSPACE/USER.md" ]     && OWNER=$(grep -m1 '^\- \*\*Name:\*\*' "$WORKSPACE/USER.md"     | sed 's/.*\*\*Name:\*\* *//' | tr -d '\r' 2>/dev/null || true)
-    [ -f "$WORKSPACE/IDENTITY.md" ] && AGENT=$(grep -m1 '^\- \*\*Name:\*\*' "$WORKSPACE/IDENTITY.md" | sed 's/.*\*\*Name:\*\* *//' | tr -d '\r' 2>/dev/null || true)
-    [ -n "$OWNER" ] && [ -n "$AGENT" ] && DISPLAY_NAME="${OWNER}'s ${AGENT}"
-    [ -z "$DISPLAY_NAME" ] && DISPLAY_NAME="$AGENT"
-    [ -z "$DISPLAY_NAME" ] && DISPLAY_NAME="$OWNER"
+    [ -f "$WORKSPACE/IDENTITY.md" ] && DISPLAY_NAME=$(grep -m1 '^\- \*\*Name:\*\*' "$WORKSPACE/IDENTITY.md" | sed 's/.*\*\*Name:\*\* *//' | tr -d '\r' 2>/dev/null || true)
     [ -z "$DISPLAY_NAME" ] && DISPLAY_NAME="OpenClaw Bot"
   fi
 

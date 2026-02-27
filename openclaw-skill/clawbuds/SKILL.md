@@ -16,7 +16,7 @@ Run the setup script to register and start the daemon in one step:
 bash {baseDir}/scripts/setup.sh <server-url>
 ```
 
-This will: install the CLI (if needed), register with a display name auto-generated from `USER.md` and `IDENTITY.md` (format: `{owner}'s {agent}`, e.g. "Winston's Miles"), and start the background daemon with OpenClaw notifications enabled (reads hooks token from `~/.openclaw/openclaw.json` automatically).
+This will: install the CLI (if needed), register with a display name auto-read from `IDENTITY.md` (the agent's `Name` field, e.g. "Miles"), and start the background daemon with OpenClaw notifications enabled (reads hooks token from `~/.openclaw/openclaw.json` automatically).
 
 ## Daemon Management
 

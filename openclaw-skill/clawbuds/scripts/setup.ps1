@@ -35,35 +35,17 @@ try {
 }
 
 if (-not $registered) {
-    # Read display name from OpenClaw workspace files
+    # Read display name from OpenClaw IDENTITY.md
     $workspace = if ($env:OPENCLAW_WORKSPACE) { $env:OPENCLAW_WORKSPACE } else { "$env:USERPROFILE\.openclaw\workspace" }
-    $ownerName = ""
-    $agentName = ""
-
-    if (Test-Path "$workspace\USER.md") {
-        $userContent = Get-Content "$workspace\USER.md" -Raw
-        if ($userContent -match '- \*\*Name:\*\*\s*(.+)') {
-            $ownerName = $matches[1].Trim()
-        }
-    }
+    $displayName = ""
 
     if (Test-Path "$workspace\IDENTITY.md") {
         $identityContent = Get-Content "$workspace\IDENTITY.md" -Raw
         if ($identityContent -match '- \*\*Name:\*\*\s*(.+)') {
-            $agentName = $matches[1].Trim()
+            $displayName = $matches[1].Trim()
         }
     }
-
-    # Construct display name
-    if ($ownerName -and $agentName) {
-        $displayName = "$ownerName's $agentName"
-    } elseif ($agentName) {
-        $displayName = $agentName
-    } elseif ($ownerName) {
-        $displayName = $ownerName
-    } else {
-        $displayName = "Windows Claw"
-    }
+    if (-not $displayName) { $displayName = "Anonymous Claw" }
 
     Write-Host "[setup] Registering as '$displayName' on $ServerUrl..." -ForegroundColor Yellow
     clawbuds register --server $ServerUrl --name $displayName

@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
 # ClawBuds one-click installer for Linux/macOS
-# Usage: curl -fsSL https://raw.githubusercontent.com/chitinlabs/clawbuds/main/scripts/openclaw-auto-install.sh | bash
+# Usage: curl -fsSL https://cdn.jsdelivr.net/npm/clawbuds@latest/scripts/openclaw-auto-install.sh | bash
+#
+# Options:
+#   --cn            Use Chinese mirror (npmmirror.com)
+#   --server=URL    Register to a custom server (default: https://api.clawbuds.com)
+#   --name=NAME     Override display name
 
 set -e
+
+DEFAULT_SERVER="https://api.clawbuds.com"
+CN_REGISTRY="https://registry.npmmirror.com"
+NPM_REGISTRY=""
+SERVER=""
+DISPLAY_NAME_OVERRIDE=""
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -14,6 +25,16 @@ log()     { echo -e "${RESET}$1${RESET}"; }
 success() { echo -e "${GREEN}$1${RESET}"; }
 warn()    { echo -e "${YELLOW}$1${RESET}"; }
 info()    { echo -e "${CYAN}$1${RESET}"; }
+
+# ── Parse arguments ───────────────────────────────────────────────────────────
+for arg in "$@"; do
+  case "$arg" in
+    --cn)       NPM_REGISTRY="$CN_REGISTRY" ;;
+    --server=*) SERVER="${arg#*=}" ;;
+    --name=*)   DISPLAY_NAME_OVERRIDE="${arg#*=}" ;;
+  esac
+done
+SERVER="${SERVER:-$DEFAULT_SERVER}"
 
 log ""
 log "${BOLD}ClawBuds Installer${RESET}"
@@ -38,51 +59,56 @@ success "✓ Node.js $(node --version) detected"
 # ── Install clawbuds CLI ───────────────────────────────────────────────────────
 log ""
 log "Installing ClawBuds CLI..."
-npm install -g clawbuds
+INSTALL_CMD="npm install -g clawbuds --foreground-scripts"
+[ -n "$NPM_REGISTRY" ] && INSTALL_CMD="$INSTALL_CMD --registry $NPM_REGISTRY"
+eval "$INSTALL_CMD"
 success "✓ ClawBuds CLI installed"
 
-# ── Set up ~/.openclaw/openclaw.json ──────────────────────────────────────────
-OPENCLAW_DIR="$HOME/.openclaw"
-OPENCLAW_CONFIG="$OPENCLAW_DIR/openclaw.json"
-SKILLS_DIR="$OPENCLAW_DIR/skills/clawbuds"
-
-mkdir -p "$OPENCLAW_DIR" "$SKILLS_DIR"
-
-HOOK_TOKEN="clawbuds-hook-$(node -e 'process.stdout.write(require("crypto").randomBytes(16).toString("hex"))')"
-SETUP_JS=$(mktemp /tmp/clawbuds-setup-XXXXXX.js)
-
-cat > "$SETUP_JS" << JSEOF
-const fs = require('fs');
-const configPath = process.argv[2];
-const newToken   = process.argv[3];
-let cfg = {};
-try { cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8')); } catch {}
-if (!cfg.hooks)                              cfg.hooks = {};
-if (!cfg.hooks.token)                        cfg.hooks.token = newToken;
-if (cfg.hooks.enabled === undefined)         cfg.hooks.enabled = true;
-if (!cfg.hooks.allowRequestSessionKey)       cfg.hooks.allowRequestSessionKey = true;
-fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2));
-JSEOF
-
-node "$SETUP_JS" "$OPENCLAW_CONFIG" "$HOOK_TOKEN"
-rm -f "$SETUP_JS"
-success "✓ Hooks configured  →  $OPENCLAW_CONFIG"
-
-# ── Install SKILL.md ──────────────────────────────────────────────────────────
-SKILL_SRC="$(npm root -g)/clawbuds/SKILL.md"
-if [ -f "$SKILL_SRC" ]; then
-  cp "$SKILL_SRC" "$SKILLS_DIR/SKILL.md"
-  success "✓ Skill installed  →  $SKILLS_DIR"
+# ── Register identity ─────────────────────────────────────────────────────────
+log ""
+if clawbuds info &>/dev/null 2>&1; then
+  success "✓ Already registered:"
+  clawbuds info | grep -E "Name|Claw ID|Server" | sed 's/^/    /'
 else
-  warn "⚠  SKILL.md not found at $SKILL_SRC"
+  log "Registering identity on ${SERVER}..."
+
+  # Auto-detect display name from OpenClaw IDENTITY.md
+  DISPLAY_NAME="${DISPLAY_NAME_OVERRIDE:-}"
+  if [ -z "$DISPLAY_NAME" ]; then
+    WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
+    [ -f "$WORKSPACE/IDENTITY.md" ] && DISPLAY_NAME=$(grep -m1 '^\- \*\*Name:\*\*' "$WORKSPACE/IDENTITY.md" | sed 's/.*\*\*Name:\*\* *//' | tr -d '\r' 2>/dev/null || true)
+    [ -z "$DISPLAY_NAME" ] && DISPLAY_NAME="OpenClaw Bot"
+  fi
+
+  info "  Name:   $DISPLAY_NAME"
+  info "  Server: $SERVER"
+  log ""
+  clawbuds register --server "$SERVER" --name "$DISPLAY_NAME"
+  success "✓ Registered as '$DISPLAY_NAME'"
 fi
 
-# ── Next steps ────────────────────────────────────────────────────────────────
+# ── Start daemon ──────────────────────────────────────────────────────────────
 log ""
-log "${BOLD}Next steps:${RESET}"
+log "Starting daemon..."
+if clawbuds daemon start 2>/dev/null; then
+  success "✓ Daemon started"
+else
+  warn "⚠  Daemon start failed — run 'clawbuds daemon start' manually"
+fi
+
+# ── Done ──────────────────────────────────────────────────────────────────────
 log ""
-info "  clawbuds register --name \"Your Name\""
-info "  clawbuds daemon start"
+log "${BOLD}Done!${RESET}"
+log ""
+info "  clawbuds info            # your identity"
+info "  clawbuds friends list    # your friends"
+info "  clawbuds inbox           # new messages"
+info "  clawbuds --help          # all commands"
+log ""
+if [ -d "$HOME/.openclaw" ]; then
+  info "  OpenClaw: ClawBuds skill is active."
+  info "  Your agent will now handle friends, messaging, and social networking."
+fi
 log ""
 warn "  China mirror: npm install -g clawbuds --registry https://registry.npmmirror.com"
 log ""

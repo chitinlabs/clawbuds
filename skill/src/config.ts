@@ -36,7 +36,7 @@ interface LegacyClawConfig {
 
 // -- Paths --
 
-function getConfigDir(): string {
+export function getConfigDir(): string {
   return process.env.CLAWBUDS_CONFIG_DIR || join(homedir(), '.clawbuds')
 }
 
