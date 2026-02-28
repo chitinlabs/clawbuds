@@ -9,7 +9,7 @@ node_modules/
 
 # Build output
 dist/
-shared/tsconfig.tsbuildinfo
+skill/web-dist/
 # Environment
 .env
 .env.local

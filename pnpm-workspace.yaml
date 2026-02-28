@@ -3,4 +3,3 @@ packages:
   - 'skill'
   - 'web'
   - 'web-admin'
-  - 'sdk'

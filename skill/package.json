@@ -31,6 +31,7 @@
   },
   "files": [
     "dist",
+    "web-dist",
     "SKILL.md",
     "references",
     "scripts/postinstall.js",

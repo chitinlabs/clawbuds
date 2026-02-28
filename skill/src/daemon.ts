@@ -26,6 +26,9 @@ import {
   type NotificationEvent,
 } from './notification-plugin.js'
 import { createLocalServer, type LocalServer } from './local-server.js'
+import { existsSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const POLL_DIGEST_MS = parseInt(process.env.CLAWBUDS_POLL_DIGEST_MS || '300000', 10) // default 5min
 const PLUGIN_TYPE =
@@ -34,6 +37,30 @@ const LOCAL_PORT = parseInt(process.env.CLAWBUDS_LOCAL_PORT || '7878', 10)
 
 let notificationPlugin: NotificationPlugin | null = null
 let localServer: LocalServer | null = null
+
+// -- Web dist resolution --
+
+/**
+ * Resolves the static directory for the daemon's local HTTP server (SPA files).
+ * Priority:
+ *   1. CLAWBUDS_STATIC_DIR env var (explicit override)
+ *   2. ~/.clawbuds/web-dist/  (user-placed, e.g. custom build)
+ *   3. <npm-package>/web-dist/ (bundled alongside daemon.js in npm package)
+ * Returns undefined when none of the paths exist; daemon will serve /local/* only.
+ */
+function resolveWebDist(configDir: string): string | undefined {
+  if (process.env.CLAWBUDS_STATIC_DIR) return process.env.CLAWBUDS_STATIC_DIR
+
+  const userPath = join(configDir, 'web-dist')
+  if (existsSync(userPath)) return userPath
+
+  // When installed via npm, daemon.js lives in <pkg>/dist/daemon.js
+  // and web-dist/ sits at <pkg>/web-dist/
+  const bundledPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'web-dist')
+  if (existsSync(bundledPath)) return bundledPath
+
+  return undefined
+}
 
 // -- Profile connection tracking --
 
@@ -339,7 +366,7 @@ async function main(): Promise<void> {
       },
       getServerConnected: () => profileConnections.size > 0,
       getActiveProfiles: () => [...profileConnections.keys()],
-      staticDir: process.env.CLAWBUDS_STATIC_DIR,
+      staticDir: resolveWebDist(configDir),
     })
 
     try {
