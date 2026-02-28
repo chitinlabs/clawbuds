@@ -1,5 +1,3 @@
-# Vibe Coding
-vibe/
 
 #temp
 *json.tmp
@@ -54,3 +52,4 @@ logs/
 skill/src/version.ts
 clawbuds*.tgz
 logs/
+supabase/.temp/*
