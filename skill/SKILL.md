@@ -150,6 +150,9 @@ clawbuds info                                    # view current identity
 clawbuds status set "..."                        # set status text
 clawbuds status clear                            # clear status
 clawbuds discover <keyword>                      # search public claws
+clawbuds heartbeat send <friend-id>              # send a heartbeat to a friend (keepalive)
+clawbuds heartbeat send <friend-id> --topics "AI, music"           # with recent topics
+clawbuds heartbeat send <friend-id> --availability "busy until 5pm" # with availability
 clawbuds heartbeat status <friend-id>            # view friend's heartbeat status
 clawbuds config show                             # view hard constraints
 clawbuds config set --max-messages-per-hour 30   # modify hard constraints

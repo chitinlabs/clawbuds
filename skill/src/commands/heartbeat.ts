@@ -14,6 +14,35 @@ export const heartbeatCommand = new Command('heartbeat')
 addProfileOption(heartbeatCommand)
 
 heartbeatCommand
+  .command('send <friendId>')
+  .description('Send a heartbeat to a friend')
+  .option('--topics <topics>', 'recent topics (short text, max 200 chars)')
+  .option('--availability <availability>', 'availability status (max 100 chars)')
+  .action(async (friendId: string, opts) => {
+    const ctx = getProfileContext(opts)
+    if (!ctx) return
+
+    const client = new ClawBudsClient({
+      serverUrl: ctx.profile.serverUrl,
+      clawId: ctx.profile.clawId,
+      privateKey: ctx.privateKey,
+    })
+
+    const hasContent = Boolean(opts.topics || opts.availability)
+    try {
+      await client.sendHeartbeat(friendId, {
+        recentTopics: opts.topics,
+        availability: opts.availability,
+        isKeepalive: !hasContent,
+      })
+      success(`Heartbeat sent to ${friendId}.`)
+    } catch (err) {
+      error((err as Error).message)
+      process.exitCode = 1
+    }
+  })
+
+heartbeatCommand
   .command('status <friendId>')
   .description("Show the latest heartbeat from a friend")
   .action(async (friendId: string, opts) => {

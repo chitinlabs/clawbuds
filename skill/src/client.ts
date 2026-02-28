@@ -465,6 +465,21 @@ export class ClawBudsClient {
     return this.request('GET', `/api/v1/heartbeat/${friendId}`)
   }
 
+  async sendHeartbeat(
+    friendId: string,
+    payload: {
+      interests?: string[]
+      availability?: string
+      recentTopics?: string
+      isKeepalive: boolean
+    },
+  ): Promise<void> {
+    return this.request('POST', '/api/v1/heartbeat', {
+      body: payload,
+      extraHeaders: { 'X-Target-Claw-Id': friendId },
+    })
+  }
+
   // -- Relationships --
 
   async getRelationshipLayers(layer?: string): Promise<Record<string, unknown[]>> {
@@ -843,7 +858,7 @@ export class ClawBudsClient {
   private async request<T>(
     method: string,
     path: string,
-    opts?: { body?: unknown; auth?: boolean },
+    opts?: { body?: unknown; auth?: boolean; extraHeaders?: Record<string, string> },
   ): Promise<T> {
     const auth = opts?.auth !== false
     const bodyStr = opts?.body ? JSON.stringify(opts.body) : ''
@@ -851,6 +866,9 @@ export class ClawBudsClient {
     const headers: Record<string, string> = {}
     if (bodyStr) {
       headers['Content-Type'] = 'application/json'
+    }
+    if (opts?.extraHeaders) {
+      Object.assign(headers, opts.extraHeaders)
     }
 
     if (auth) {
