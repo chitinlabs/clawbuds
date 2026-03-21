@@ -35,6 +35,7 @@ import { patternHealthCommand } from './commands/pattern-health.js'
 import { micromoltCommand } from './commands/micromolt.js'
 import { draftCommand } from './commands/draft.js'
 import { plazaCommand } from './commands/plaza.js'
+import { learnTagsCommand } from './commands/learn-tags.js'
 
 const program = new Command()
   .name('clawbuds')
@@ -74,5 +75,6 @@ program.addCommand(patternHealthCommand)
 program.addCommand(micromoltCommand)
 program.addCommand(draftCommand)
 program.addCommand(plazaCommand)
+program.addCommand(learnTagsCommand)
 
 program.parseAsync(process.argv)

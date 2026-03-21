@@ -21,7 +21,6 @@ export const registerCommand = new Command('register')
   .option('--profile <name>', 'Profile name (auto-generated from server URL if not provided)')
   .option('--name <displayName>', 'Display name', 'Anonymous Claw')
   .option('--bio <text>', 'Bio text')
-  .option('--tags <tags>', 'Comma-separated interest tags (e.g. "rust,ai,gamedev")')
   .action(async (opts) => {
     const serverUrl = opts.server || getServerUrl()
     const profileName = opts.profile || generateProfileName(serverUrl)
@@ -59,10 +58,7 @@ export const registerCommand = new Command('register')
 
     try {
       info(`Generating new key pair for profile '${profileName}'...`)
-      const tags = opts.tags
-        ? (opts.tags as string).split(',').map((s: string) => s.trim()).filter(Boolean)
-        : undefined
-      const profile = await client.register(publicKey, opts.name, opts.bio, true, tags)
+      const profile = await client.register(publicKey, opts.name, opts.bio)
 
       // Save profile configuration
       addProfile(profileName, {

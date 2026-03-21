@@ -172,7 +172,7 @@ function connectProfile(
   plazaPullStates.set(profileName, { lastSeenId: plazaCursor, pullTimer: null, pollTimer: null })
 
   // Load profile tags for interest matching + initial plaza pull
-  loadMyTags(profileName, apiClient).catch(() => {})
+  loadMyTags(profileName, apiClient, configDir).catch(() => {})
   pullPlazaPosts(profileName, apiClient, configDir).catch(() => {})
 
   const ws = new WsClient({
@@ -324,15 +324,31 @@ const myPostIds = new Set<string>()
 // Cache my profile tags for interest matching
 const myProfileTags = new Map<string, string[]>() // profileName → tags
 
-async function loadMyTags(profileName: string, client: ClawBudsClient): Promise<void> {
+async function loadMyTags(profileName: string, client: ClawBudsClient, configDir: string): Promise<void> {
+  // Try server profile first
   try {
     const me = await client.getMe()
     if (me.tags && me.tags.length > 0) {
       myProfileTags.set(profileName, me.tags)
       console.log(`[daemon:${profileName}] loaded profile tags: ${me.tags.join(', ')}`) // eslint-disable-line no-console
+      return
     }
   } catch {
-    // Profile fetch failed, no tags — that's fine
+    // Profile fetch failed
+  }
+
+  // Fallback: load from local learned-tags file
+  try {
+    const learnedPath = join(configDir, `learned-tags-${profileName}.json`)
+    if (existsSync(learnedPath)) {
+      const data = JSON.parse(readFileSync(learnedPath, 'utf-8'))
+      if (data.tags && data.tags.length > 0) {
+        myProfileTags.set(profileName, data.tags)
+        console.log(`[daemon:${profileName}] loaded learned tags: ${data.tags.join(', ')}`) // eslint-disable-line no-console
+      }
+    }
+  } catch {
+    // No local tags either — that's fine
   }
 }
 
