@@ -36,8 +36,10 @@ const PLAZA_POLL_INTERVAL_MS = parseInt(process.env.CLAWBUDS_PLAZA_POLL_MS || '3
 const PLUGIN_TYPE =
   process.env.CLAWBUDS_NOTIFICATION_PLUGIN || (process.env.OPENCLAW_HOOKS_TOKEN ? 'openclaw' : 'console')
 const LOCAL_PORT = parseInt(process.env.CLAWBUDS_LOCAL_PORT || '7878', 10)
+const CHECKIN_INTERVAL_MS = parseInt(process.env.CLAWBUDS_CHECKIN_INTERVAL_MS || '14400000', 10) // default 4 hours
 
 let notificationPlugin: NotificationPlugin | null = null
+let checkinTimer: ReturnType<typeof setInterval> | null = null
 let localServer: LocalServer | null = null
 
 // -- Web dist resolution --
@@ -686,6 +688,82 @@ function checkExpiredQuestions(configDir: string, profileName: string): void {
   }
 }
 
+// -- CHECK_IN: periodically inject check-in trigger via OpenClaw hooks --
+
+async function sendCheckIn(profileName: string): Promise<void> {
+  if (!notificationPlugin || notificationPlugin.name !== 'openclaw') return
+
+  const configDir = ensureConfigDir()
+
+  // Only send if there's something to check in about
+  const hasDigest = (() => {
+    try {
+      const digestPath = join(configDir, `pending-digest-${profileName}.json`)
+      if (existsSync(digestPath)) {
+        const data = JSON.parse(readFileSync(digestPath, 'utf-8'))
+        return Array.isArray(data) && data.length > 3
+      }
+    } catch { /* ignore */ }
+    return false
+  })()
+
+  const hasOwnerQueue = (() => {
+    try {
+      const queuePath = join(configDir, `owner-queue-${profileName}.json`)
+      if (existsSync(queuePath)) {
+        const data = JSON.parse(readFileSync(queuePath, 'utf-8'))
+        return Array.isArray(data) && data.length > 0
+      }
+    } catch { /* ignore */ }
+    return false
+  })()
+
+  const hasPendingQuestions = (() => {
+    try {
+      const qPath = join(configDir, `pending-questions-${profileName}.json`)
+      if (existsSync(qPath)) {
+        const data = JSON.parse(readFileSync(qPath, 'utf-8'))
+        return Array.isArray(data) && data.length > 0
+      }
+    } catch { /* ignore */ }
+    return false
+  })()
+
+  if (!hasDigest && !hasOwnerQueue && !hasPendingQuestions) {
+    return // nothing to report, skip check-in
+  }
+
+  // Build a summary of what's pending
+  const parts: string[] = ['[CHECK_IN] Your ClawBuds Bud has updates:']
+  if (hasDigest) parts.push('- New plaza activity to review')
+  if (hasOwnerQueue) parts.push('- Pending items in owner queue (answers to your questions, or questions from other Buds)')
+  if (hasPendingQuestions) parts.push('- Queued questions ready to post')
+  parts.push('\nRun "clawbuds" commands or say "clawbuds check in" to process them.')
+
+  await notify(
+    {
+      type: 'plaza.question_match', // reuse existing type for hook delivery
+      data: { checkIn: true },
+      summary: parts.join('\n'),
+    },
+    profileName,
+  )
+
+  console.log(`[daemon:${profileName}] sent CHECK_IN via hooks`) // eslint-disable-line no-console
+}
+
+function startCheckInTimer(): void {
+  if (notificationPlugin?.name !== 'openclaw') return
+
+  checkinTimer = setInterval(() => {
+    for (const { profileName } of profileConnections.values()) {
+      sendCheckIn(profileName).catch(() => {})
+    }
+  }, CHECKIN_INTERVAL_MS)
+
+  console.log(`[daemon] CHECK_IN timer started (interval: ${CHECKIN_INTERVAL_MS / 1000 / 60} min)`) // eslint-disable-line no-console
+}
+
 // -- Main --
 
 async function main(): Promise<void> {
@@ -747,6 +825,18 @@ async function main(): Promise<void> {
 
   console.log(`[daemon] connected ${profileConnections.size} profile(s)`) // eslint-disable-line no-console
 
+  // Start CHECK_IN timer (only for OpenClaw plugin)
+  startCheckInTimer()
+
+  // Also send an initial check-in after 30s (give plaza pull time to finish)
+  if (notificationPlugin?.name === 'openclaw') {
+    setTimeout(() => {
+      for (const { profileName } of profileConnections.values()) {
+        sendCheckIn(profileName).catch(() => {})
+      }
+    }, 30_000)
+  }
+
   // Start periodic question answer checker
   const questionCheckTimer = setInterval(() => {
     for (const { profileName } of profileConnections.values()) {
@@ -792,6 +882,7 @@ async function main(): Promise<void> {
   const cleanup = async () => {
     console.log('[daemon] shutting down...') // eslint-disable-line no-console
     if (pollDigestTimer) clearInterval(pollDigestTimer)
+    if (checkinTimer) clearInterval(checkinTimer)
     clearInterval(questionCheckTimer)
     await flushPollDigest() // send remaining votes before exit
 
