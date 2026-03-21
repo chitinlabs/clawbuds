@@ -194,3 +194,88 @@ replyCmd.action(async (postId: string, opts) => {
 })
 
 plazaCommand.addCommand(replyCmd)
+
+// plaza queue — silently save a question for later review, without posting immediately
+const queueCmd = new Command('queue')
+  .description('Queue a question to post later (does not post immediately)')
+  .requiredOption('--text <question>', 'The question text')
+  .option('--tags <tags>', 'Comma-separated topic tags')
+  .option('--context <context>', 'Why this question matters to the owner')
+
+addProfileOption(queueCmd)
+
+queueCmd.action(async (_opts) => {
+  const ctx = getProfileContext(_opts)
+  if (!ctx) return
+
+  const { ensureConfigDir } = await import('../config.js')
+  const { existsSync, readFileSync, writeFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+
+  const configDir = ensureConfigDir()
+  const queuePath = join(configDir, `pending-questions-${ctx.profileName}.json`)
+
+  const topicTags = _opts.tags
+    ? (_opts.tags as string).split(',').map((s: string) => s.trim()).filter(Boolean)
+    : []
+
+  let queue: Array<Record<string, unknown>> = []
+  try {
+    if (existsSync(queuePath)) {
+      queue = JSON.parse(readFileSync(queuePath, 'utf-8'))
+    }
+  } catch { /* ignore */ }
+
+  queue.push({
+    text: _opts.text,
+    topicTags,
+    context: _opts.context ?? null,
+    queuedAt: new Date().toISOString(),
+  })
+
+  writeFileSync(queuePath, JSON.stringify(queue, null, 2))
+  success(`Question queued (${queue.length} pending). Will be reviewed at next check-in.`)
+})
+
+plazaCommand.addCommand(queueCmd)
+
+// plaza pending — show queued questions
+const pendingCmd = new Command('pending')
+  .description('Show queued questions waiting to be posted')
+
+addProfileOption(pendingCmd)
+
+pendingCmd.action(async (_opts) => {
+  const ctx = getProfileContext(_opts)
+  if (!ctx) return
+
+  const { ensureConfigDir } = await import('../config.js')
+  const { existsSync, readFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+
+  const configDir = ensureConfigDir()
+  const queuePath = join(configDir, `pending-questions-${ctx.profileName}.json`)
+
+  let queue: Array<Record<string, unknown>> = []
+  try {
+    if (existsSync(queuePath)) {
+      queue = JSON.parse(readFileSync(queuePath, 'utf-8'))
+    }
+  } catch { /* ignore */ }
+
+  if (queue.length === 0) {
+    info('No pending questions.')
+    return
+  }
+
+  for (let i = 0; i < queue.length; i++) {
+    const q = queue[i]
+    const tags = (q.topicTags as string[])?.length > 0 ? ` #${(q.topicTags as string[]).join(' #')}` : ''
+    console.log(`  [${i + 1}] ${q.text}${tags}`)
+    if (q.context) console.log(`      Context: ${q.context}`)
+    console.log(`      Queued: ${q.queuedAt}`)
+    console.log()
+  }
+})
+
+plazaCommand.addCommand(pendingCmd)
