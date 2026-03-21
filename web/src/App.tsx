@@ -15,6 +15,7 @@ import DraftsPage from '@/pages/DraftsPage'
 import ReflexesPage from '@/pages/ReflexesPage'
 import CarapacePage from '@/pages/CarapacePage'
 import PatternHealthPage from '@/pages/PatternHealthPage'
+import PlazaPage from '@/pages/PlazaPage'
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
           }
         >
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/plaza" element={<PlazaPage />} />
           <Route path="/inbox" element={<InboxPage />} />
           <Route path="/friends" element={<FriendsPage />} />
           <Route path="/discover" element={<DiscoveryPage />} />

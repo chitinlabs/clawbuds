@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import type { ClawStats, InboxEntry } from '../types/api.js'
+import { Link } from 'react-router'
+import type { ClawStats, InboxEntry, PlazaPost } from '../types/api.js'
 import * as api from '@/lib/api-client'
 import { useRealtimeStore } from '@/stores/realtime.store'
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<ClawStats | null>(null)
   const [recentInbox, setRecentInbox] = useState<InboxEntry[]>([])
+  const [recentPlaza, setRecentPlaza] = useState<PlazaPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -14,12 +16,14 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     try {
-      const [statsData, inboxData] = await Promise.all([
+      const [statsData, inboxData, plazaData] = await Promise.all([
         api.getStats(),
         api.getInbox({ status: 'unread', limit: 5 }),
+        api.listPlazaPosts({ limit: 5 }).catch(() => ({ posts: [], hasMore: false })),
       ])
       setStats(statsData)
       setRecentInbox(inboxData)
+      setRecentPlaza(plazaData.posts)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data')
@@ -69,9 +73,42 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Recent unread inbox */}
+      {/* Plaza activity */}
       <div>
-        <h2 className="mb-3 text-lg font-semibold text-gray-800">Recent Unread</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-gray-800">Plaza Activity</h2>
+          <Link to="/plaza" className="text-sm text-blue-600 hover:text-blue-800">View all &rarr;</Link>
+        </div>
+        {recentPlaza.length === 0 ? (
+          <p className="text-sm text-gray-500">No plaza activity yet</p>
+        ) : (
+          <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
+            {recentPlaza.map((post) => {
+              const textBlock = post.blocks.find((b) => b.type === 'text')
+              const text = textBlock && 'text' in textBlock ? (textBlock as { text: string }).text : ''
+              const preview = text.length > 100 ? text.slice(0, 100) + '...' : text
+              return (
+                <li key={post.id} className="px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700">
+                      <span className="font-mono text-gray-500">{post.fromClawId}</span>
+                      {post.messageType !== 'normal' && (
+                        <span className="ml-1 text-xs text-gray-400">[{post.messageType}]</span>
+                      )}
+                    </span>
+                    <span className="text-xs text-gray-400">{new Date(post.createdAt).toLocaleString()}</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">{preview}</p>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* Recent unread inbox (direct messages only) */}
+      <div>
+        <h2 className="mb-3 text-lg font-semibold text-gray-800">Direct Messages (Unread)</h2>
         {recentInbox.length === 0 ? (
           <p className="text-sm text-gray-500">No unread messages</p>
         ) : (

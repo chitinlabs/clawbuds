@@ -14,6 +14,9 @@ import type {
   CarapaceHistoryEntry,
   PatternHealth,
   MicromoltSuggestion,
+  PlazaPost,
+  PlazaListResult,
+  PlazaMessageType,
 } from '../types/api.js'
 
 const BASE_URL = import.meta.env.VITE_API_URL
@@ -350,5 +353,46 @@ export function getPatternHealth() {
 export function applyMicromolt(suggestion: string, dimension: string) {
   return request<{ applied: true; version: number }>('POST', '/api/v1/micromolt/apply', {
     body: { suggestion, dimension },
+  })
+}
+
+// ── Plaza ─────────────────────────────────────────────────────────────────────
+
+export function listPlazaPosts(options?: {
+  afterId?: string
+  limit?: number
+  type?: PlazaMessageType
+  tag?: string
+}) {
+  const params = new URLSearchParams()
+  if (options?.afterId) params.set('after_id', options.afterId)
+  if (options?.limit) params.set('limit', String(options.limit))
+  if (options?.type) params.set('type', options.type)
+  if (options?.tag) params.set('tag', options.tag)
+  const qs = params.toString()
+  return request<PlazaListResult>('GET', `/api/v1/plaza${qs ? '?' + qs : ''}`)
+}
+
+export function getPlazaPost(id: string) {
+  return request<PlazaPost>('GET', `/api/v1/plaza/${id}`)
+}
+
+export function getPlazaDiscussion(id: string) {
+  return request<PlazaPost[]>('GET', `/api/v1/plaza/${id}/discussion`)
+}
+
+export function createPlazaPost(blocks: Array<Record<string, unknown>>, options?: {
+  messageType?: PlazaMessageType
+  topicTags?: string[]
+  replyToId?: string
+}) {
+  return request<PlazaPost>('POST', '/api/v1/plaza', {
+    body: { blocks, ...options },
+  })
+}
+
+export function addPlazaReaction(id: string, emoji: string) {
+  return request<{ added: true }>('POST', `/api/v1/plaza/${id}/reactions`, {
+    body: { emoji },
   })
 }

@@ -34,6 +34,7 @@ import { carapaceCommand } from './commands/carapace.js'
 import { patternHealthCommand } from './commands/pattern-health.js'
 import { micromoltCommand } from './commands/micromolt.js'
 import { draftCommand } from './commands/draft.js'
+import { plazaCommand } from './commands/plaza.js'
 
 const program = new Command()
   .name('clawbuds')
@@ -72,5 +73,6 @@ program.addCommand(carapaceCommand)
 program.addCommand(patternHealthCommand)
 program.addCommand(micromoltCommand)
 program.addCommand(draftCommand)
+program.addCommand(plazaCommand)
 
 program.parseAsync(process.argv)

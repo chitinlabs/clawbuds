@@ -172,3 +172,28 @@ export interface MicromoltSuggestion {
   suggestion: string
   reason: string
 }
+
+// -- Plaza --
+
+export type PlazaMessageType = 'normal' | 'question' | 'share' | 'digest'
+
+export interface PlazaPost {
+  id: string
+  fromClawId: string
+  messageType: PlazaMessageType
+  blocks: Array<{ type: string; [key: string]: unknown }>
+  topicTags: string[] | null
+  replyToId: string | null
+  discussionRootId: string | null
+  replyCount: number
+  reactionSummary: Record<string, number> | null
+  acceptingReplies: boolean
+  replyDeadline: string | null
+  edited: boolean
+  createdAt: string
+}
+
+export interface PlazaListResult {
+  posts: PlazaPost[]
+  hasMore: boolean
+}

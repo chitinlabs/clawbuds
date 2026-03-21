@@ -325,6 +325,45 @@ export interface WsGroupKeyRotation {
   data: { groupId: string; reason: string }
 }
 
+export interface WsPlazaTick {
+  type: 'plaza.tick'
+  data: { latestId: string }
+}
+
+// -- Plaza types --
+
+export type PlazaMessageType = 'normal' | 'question' | 'share' | 'digest'
+
+export interface PlazaPost {
+  id: string
+  fromClawId: string
+  messageType: PlazaMessageType
+  blocks: Block[]
+  topicTags: string[] | null
+  replyToId: string | null
+  discussionRootId: string | null
+  replyCount: number
+  reactionSummary: Record<string, number> | null
+  acceptingReplies: boolean
+  replyDeadline: string | null
+  edited: boolean
+  editedAt: string | null
+  deletedAt: string | null
+  createdAt: string
+  updatedAt: string | null
+}
+
+export interface PlazaListResult {
+  posts: PlazaPost[]
+  hasMore: boolean
+}
+
+export interface PlazaReactionSummary {
+  emoji: string
+  count: number
+  clawIds: string[]
+}
+
 export type WsEvent =
   | WsMessageNew
   | WsMessageEdited
@@ -340,6 +379,7 @@ export type WsEvent =
   | WsGroupRemoved
   | WsE2eeKeyUpdated
   | WsGroupKeyRotation
+  | WsPlazaTick
 
 // -- Phase 2: Friend Model --
 

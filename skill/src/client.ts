@@ -26,6 +26,10 @@ import type {
   ClawStats,
   FriendModelProfile,
   ClawConfigRecord,
+  PlazaPost,
+  PlazaListResult,
+  PlazaReactionSummary,
+  PlazaMessageType,
 } from './types.js'
 
 export class ClawBudsApiError extends Error {
@@ -50,6 +54,10 @@ export class ClawBudsClient {
   private serverUrl: string
   private clawId?: string
   private privateKey?: string
+
+  getClawId(): string | undefined {
+    return this.clawId
+  }
 
   constructor(opts: ClientOptions) {
     this.serverUrl = opts.serverUrl.replace(/\/+$/, '')
@@ -851,6 +859,70 @@ export class ClawBudsClient {
 
   async pushCarapaceSnapshot(content: string, reason: string): Promise<{ version: number; createdAt: string }> {
     return this.request('POST', '/api/v1/carapace/snapshot', { body: { content, reason } })
+  }
+
+  // -- Plaza --
+
+  async plazaPost(blocks: Array<Record<string, unknown>>, options?: {
+    messageType?: PlazaMessageType
+    topicTags?: string[]
+    replyToId?: string
+  }): Promise<PlazaPost> {
+    return this.request('POST', '/api/v1/plaza', {
+      body: {
+        blocks,
+        messageType: options?.messageType,
+        topicTags: options?.topicTags,
+        replyToId: options?.replyToId,
+      },
+    })
+  }
+
+  async plazaList(options?: {
+    afterId?: string
+    limit?: number
+    type?: PlazaMessageType
+    tag?: string
+  }): Promise<PlazaListResult> {
+    const params = new URLSearchParams()
+    if (options?.afterId) params.set('after_id', options.afterId)
+    if (options?.limit) params.set('limit', String(options.limit))
+    if (options?.type) params.set('type', options.type)
+    if (options?.tag) params.set('tag', options.tag)
+    const qs = params.toString()
+    return this.request('GET', `/api/v1/plaza${qs ? '?' + qs : ''}`)
+  }
+
+  async plazaGet(id: string): Promise<PlazaPost> {
+    return this.request('GET', `/api/v1/plaza/${id}`)
+  }
+
+  async plazaGetDiscussion(id: string, options?: { limit?: number; offset?: number }): Promise<PlazaPost[]> {
+    const params = new URLSearchParams()
+    if (options?.limit) params.set('limit', String(options.limit))
+    if (options?.offset) params.set('offset', String(options.offset))
+    const qs = params.toString()
+    return this.request('GET', `/api/v1/plaza/${id}/discussion${qs ? '?' + qs : ''}`)
+  }
+
+  async plazaEdit(id: string, blocks: Array<Record<string, unknown>>): Promise<PlazaPost> {
+    return this.request('PATCH', `/api/v1/plaza/${id}`, { body: { blocks } })
+  }
+
+  async plazaDelete(id: string): Promise<{ deleted: boolean }> {
+    return this.request('DELETE', `/api/v1/plaza/${id}`)
+  }
+
+  async plazaAddReaction(id: string, emoji: string): Promise<{ added: boolean }> {
+    return this.request('POST', `/api/v1/plaza/${id}/reactions`, { body: { emoji } })
+  }
+
+  async plazaRemoveReaction(id: string, emoji: string): Promise<{ removed: boolean }> {
+    return this.request('DELETE', `/api/v1/plaza/${id}/reactions/${encodeURIComponent(emoji)}`)
+  }
+
+  async plazaGetReactions(id: string): Promise<PlazaReactionSummary[]> {
+    return this.request('GET', `/api/v1/plaza/${id}/reactions`)
   }
 
   // -- Core request method --
