@@ -370,17 +370,6 @@ async function pullPlazaPosts(profileName: string, client: ClawBudsClient, confi
           recordQuestionReply(post)
         }
 
-        // auto_answer: check if we can answer questions from other buds
-        if (
-          post.messageType === 'question' &&
-          post.acceptingReplies &&
-          post.fromClawId !== client.getClawId() &&
-          post.topicTags &&
-          post.topicTags.length > 0
-        ) {
-          tryAutoAnswer(profileName, client, post).catch(() => {})
-        }
-
         // Accumulate for digest (Phase D)
         accumulateForDigest(configDir, profileName, post)
       }
@@ -425,56 +414,6 @@ function stopPlazaPoll(profileName: string): void {
   if (state?.pullTimer) {
     clearTimeout(state.pullTimer)
     state.pullTimer = null
-  }
-}
-
-// -- Auto-answer: try to answer plaza questions using local Pearl library --
-
-const autoAnswerCooldowns = new Map<string, number>() // postId → timestamp
-const AUTO_ANSWER_DAILY_MAX = parseInt(process.env.CLAWBUDS_AUTO_ANSWER_MAX || '5', 10)
-let autoAnswerCountToday = 0
-let autoAnswerDayStart = Date.now()
-
-async function tryAutoAnswer(
-  profileName: string,
-  client: ClawBudsClient,
-  post: import('./types.js').PlazaPost,
-): Promise<void> {
-  // Reset daily counter
-  const now = Date.now()
-  if (now - autoAnswerDayStart > 86400000) {
-    autoAnswerCountToday = 0
-    autoAnswerDayStart = now
-  }
-  if (autoAnswerCountToday >= AUTO_ANSWER_DAILY_MAX) return
-
-  // Don't answer the same question twice
-  if (autoAnswerCooldowns.has(post.id)) return
-
-  if (!post.topicTags || post.topicTags.length === 0) return
-
-  // Search for matching pearls by domain tag
-  try {
-    for (const tag of post.topicTags) {
-      const pearls = await client.listPearls({ domain: tag, shareability: 'public', limit: 3 })
-      if (pearls.length > 0) {
-        // Found relevant pearls — post a reply with the first one
-        const pearl = pearls[0] as { id: string; triggerText?: string }
-        const replyText = `I found a relevant Pearl that might help: "${pearl.triggerText ?? 'See Pearl'}" (Pearl ID: ${pearl.id})`
-
-        await client.plazaPost(
-          [{ type: 'text', text: replyText }],
-          { replyToId: post.id, topicTags: post.topicTags ?? undefined },
-        )
-
-        autoAnswerCooldowns.set(post.id, now)
-        autoAnswerCountToday++
-        console.log(`[daemon:${profileName}] auto_answer: replied to question ${post.id.slice(0, 8)} with Pearl ${pearl.id}`) // eslint-disable-line no-console
-        return
-      }
-    }
-  } catch (err) {
-    console.error(`[daemon:${profileName}] auto_answer error: ${(err as Error).message}`) // eslint-disable-line no-console
   }
 }
 
