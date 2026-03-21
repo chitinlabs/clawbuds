@@ -3,7 +3,7 @@ import type { InboxEntry } from './types.js'
 // -- Plugin Interface --
 
 export interface NotificationEvent {
-  type: 'message.new' | 'friend.request' | 'friend.accepted' | 'poll.voted' | 'group.invited'
+  type: 'message.new' | 'friend.request' | 'friend.accepted' | 'poll.voted' | 'group.invited' | 'plaza.reply' | 'plaza.question_match'
   data: unknown
   summary: string // Human-readable one-line summary
 }

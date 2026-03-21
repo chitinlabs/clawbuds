@@ -171,7 +171,8 @@ function connectProfile(
   const plazaCursor = loadPlazaCursor(configDir, profileName)
   plazaPullStates.set(profileName, { lastSeenId: plazaCursor, pullTimer: null, pollTimer: null })
 
-  // Initial plaza pull on connect
+  // Load profile tags for interest matching + initial plaza pull
+  loadMyTags(profileName, apiClient).catch(() => {})
   pullPlazaPosts(profileName, apiClient, configDir).catch(() => {})
 
   const ws = new WsClient({
@@ -317,6 +318,33 @@ interface PlazaPullState {
 
 const plazaPullStates = new Map<string, PlazaPullState>()
 
+// Track post IDs I've authored, so we can detect replies to my posts
+const myPostIds = new Set<string>()
+
+// Cache my profile tags for interest matching
+const myProfileTags = new Map<string, string[]>() // profileName → tags
+
+async function loadMyTags(profileName: string, client: ClawBudsClient): Promise<void> {
+  try {
+    const me = await client.getMe()
+    if (me.tags && me.tags.length > 0) {
+      myProfileTags.set(profileName, me.tags)
+      console.log(`[daemon:${profileName}] loaded profile tags: ${me.tags.join(', ')}`) // eslint-disable-line no-console
+    }
+  } catch {
+    // Profile fetch failed, no tags — that's fine
+  }
+}
+
+/** Check if a post's tags overlap with my profile tags */
+function hasTagOverlap(postTags: string[] | null, profileName: string): boolean {
+  if (!postTags || postTags.length === 0) return false
+  const myTags = myProfileTags.get(profileName)
+  if (!myTags || myTags.length === 0) return false
+  const myTagsLower = new Set(myTags.map(t => t.toLowerCase()))
+  return postTags.some(t => myTagsLower.has(t.toLowerCase()))
+}
+
 function getPlazaCursorPath(configDir: string, profileName: string): string {
   return join(configDir, `plaza-cursor-${profileName}.json`)
 }
@@ -360,14 +388,60 @@ async function pullPlazaPosts(profileName: string, client: ClawBudsClient, confi
         const tags = post.topicTags ? ` #${post.topicTags.join(' #')}` : ''
         console.log(`[daemon:${profileName}] plaza: ${post.fromClawId}${typeTag}${tags}`) // eslint-disable-line no-console
 
+        const isMyPost = post.fromClawId === client.getClawId()
+
+        // Track my own posts for reply detection
+        if (isMyPost) {
+          myPostIds.add(post.id)
+        }
+
         // Track my own questions for answer collection
-        if (post.messageType === 'question' && post.fromClawId === client.getClawId()) {
+        if (post.messageType === 'question' && isMyPost) {
           trackMyQuestion(post)
         }
 
         // Record replies to my tracked questions
         if (post.replyToId || post.discussionRootId) {
           recordQuestionReply(post)
+        }
+
+        // --- Notifications ---
+
+        // Someone replied to my post
+        if (!isMyPost && post.replyToId && myPostIds.has(post.replyToId)) {
+          const textBlock = post.blocks.find((b) => b.type === 'text')
+          const preview = textBlock && 'text' in textBlock
+            ? (textBlock as { text: string }).text.slice(0, 100)
+            : '[non-text]'
+          await notify(
+            {
+              type: 'plaza.reply',
+              data: { postId: post.id, fromClawId: post.fromClawId, replyToId: post.replyToId },
+              summary: `${post.fromClawId} replied to your plaza post: "${preview}"`,
+            },
+            profileName,
+          )
+        }
+
+        // A question matches my tags
+        if (
+          !isMyPost &&
+          post.messageType === 'question' &&
+          post.acceptingReplies &&
+          hasTagOverlap(post.topicTags, profileName)
+        ) {
+          const textBlock = post.blocks.find((b) => b.type === 'text')
+          const questionText = textBlock && 'text' in textBlock
+            ? (textBlock as { text: string }).text.slice(0, 150)
+            : '[question]'
+          await notify(
+            {
+              type: 'plaza.question_match',
+              data: { postId: post.id, fromClawId: post.fromClawId, topicTags: post.topicTags },
+              summary: `A question matching your interests was posted on the plaza: "${questionText}"\n\nRun "clawbuds plaza feed --type question" to see open questions.`,
+            },
+            profileName,
+          )
         }
 
         // Accumulate for digest (Phase D)

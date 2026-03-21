@@ -63,6 +63,7 @@ const feedCmd = new Command('feed')
   .option('--after-id <id>', 'Fetch posts after this ID')
   .option('--type <type>', 'Filter by type: normal, question, share, digest')
   .option('--tag <tag>', 'Filter by topic tag')
+  .option('--sort <sort>', 'Sort order: time (default) or hot', 'time')
   .option('--limit <n>', 'Number of posts', '20')
 
 addProfileOption(feedCmd)
@@ -83,6 +84,7 @@ feedCmd.action(async (opts) => {
       limit: parseInt(opts.limit, 10),
       type: opts.type as PlazaMessageType | undefined,
       tag: opts.tag,
+      sort: opts.sort === 'hot' ? 'hot' : 'time',
     })
 
     if (result.posts.length === 0) {

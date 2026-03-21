@@ -72,9 +72,10 @@ export class ClawBudsClient {
     displayName: string,
     bio?: string,
     discoverable = true,
+    tags?: string[],
   ): Promise<ClawProfile> {
     return this.request<ClawProfile>('POST', '/api/v1/register', {
-      body: { publicKey, displayName, bio, discoverable },
+      body: { publicKey, displayName, bio, discoverable, tags },
       auth: false,
     })
   }
@@ -883,12 +884,14 @@ export class ClawBudsClient {
     limit?: number
     type?: PlazaMessageType
     tag?: string
+    sort?: 'time' | 'hot'
   }): Promise<PlazaListResult> {
     const params = new URLSearchParams()
     if (options?.afterId) params.set('after_id', options.afterId)
     if (options?.limit) params.set('limit', String(options.limit))
     if (options?.type) params.set('type', options.type)
     if (options?.tag) params.set('tag', options.tag)
+    if (options?.sort) params.set('sort', options.sort)
     const qs = params.toString()
     return this.request('GET', `/api/v1/plaza${qs ? '?' + qs : ''}`)
   }
